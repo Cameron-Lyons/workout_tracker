@@ -1,8 +1,24 @@
 import Foundation
 
+struct ExerciseWeightRecommendation: Equatable {
+    var recommendedWeight: Double
+    var previousWeight: Double
+    var shouldIncrease: Bool
+    var increment: Double
+    var guidance: String
+}
+
 final class WorkoutStore: ObservableObject {
     private enum Persistence {
         static let saveDebounceMilliseconds = 300
+    }
+
+    private enum Recommendation {
+        static let defaultMinimumIncrease = 2.5
+        static let defaultUpperBodyIncrement = 2.5
+        static let defaultLowerBodyIncrement = 5.0
+        static let fallbackTopSetRepGoal = 8
+        static let weightComparisonTolerance = 0.01
     }
 
     @Published var routines: [Routine] {
@@ -81,6 +97,10 @@ final class WorkoutStore: ObservableObject {
         )
     }
 
+    func addPopularRoutinePack(_ pack: PopularRoutinePack) {
+        Self.popularRoutines(for: pack).forEach { addRoutine($0) }
+    }
+
     func updateRoutine(id: UUID, name: String, exercises: [Exercise]) {
         guard let index = routineIndexByID[id] else { return }
         guard let trimmedName = name.nonEmptyTrimmed else { return }
@@ -150,10 +170,17 @@ final class WorkoutStore: ObservableObject {
         isHydrating = true
         defer { isHydrating = false }
 
+        var didMigrateLegacyStarterRoutines = false
+
         if let data = defaults.data(forKey: routinesKey),
            let decodedRoutines = try? decoder.decode([Routine].self, from: data),
            !decodedRoutines.isEmpty {
-            routines = decodedRoutines
+            if Self.matchesLegacyStarterRoutines(decodedRoutines) {
+                routines = Self.starterRoutines
+                didMigrateLegacyStarterRoutines = true
+            } else {
+                routines = decodedRoutines
+            }
         } else {
             routines = Self.starterRoutines
         }
@@ -175,10 +202,78 @@ final class WorkoutStore: ObservableObject {
 
         rebuildRoutineIndex()
         rebuildLiftHistoryIndex()
+
+        if didMigrateLegacyStarterRoutines {
+            persist(routines, forKey: routinesKey)
+        }
     }
 
     func liftRecords(forExerciseName exerciseName: String) -> [LiftRecord] {
         liftHistoryByExerciseName[exerciseName] ?? []
+    }
+
+    func weightRecommendation(
+        routineName: String,
+        exerciseName: String,
+        targetReps: [Int],
+        minimumIncrease: Double
+    ) -> ExerciseWeightRecommendation? {
+        let latestRecords = latestSessionRecords(
+            forExerciseName: exerciseName,
+            preferredRoutineName: routineName
+        )
+        guard !latestRecords.isEmpty else {
+            return nil
+        }
+
+        guard let previousWeight = latestRecords.compactMap(\.weight).max() else {
+            return nil
+        }
+
+        let resolvedMinimumIncrease = max(minimumIncrease, Recommendation.defaultMinimumIncrease)
+        let increment = recommendedIncrement(
+            forExerciseName: exerciseName,
+            minimumIncrease: resolvedMinimumIncrease
+        )
+        let cleanedTargets = targetReps.filter { $0 > 0 }
+        let shouldIncrease: Bool
+        let guidance: String
+
+        if cleanedTargets.isEmpty {
+            let topSetReps = topSetReps(from: latestRecords, topWeight: previousWeight)
+            shouldIncrease = topSetReps.map { $0 >= Recommendation.fallbackTopSetRepGoal } ?? false
+
+            if let topSetReps {
+                if shouldIncrease {
+                    guidance = "Top set reached \(topSetReps) reps last time. Add \(WeightFormatter.displayString(increment)) lb."
+                } else {
+                    guidance = "Top set reached \(topSetReps) reps last time. Stay at this weight."
+                }
+            } else {
+                guidance = "No rep data from last workout. Stay at this weight."
+            }
+        } else {
+            shouldIncrease = didMeetAllRepTargets(cleanedTargets, records: latestRecords)
+            let targetSummary = cleanedTargets.map(String.init).joined(separator: "/")
+            if shouldIncrease {
+                guidance = "Hit all target reps (\(targetSummary)) last time. Add \(WeightFormatter.displayString(increment)) lb."
+            } else {
+                guidance = "Missed target reps (\(targetSummary)) last time. Stay at this weight."
+            }
+        }
+
+        let recommendedWeight = roundToNearestIncrement(
+            previousWeight + (shouldIncrease ? increment : 0),
+            increment: resolvedMinimumIncrease
+        )
+
+        return ExerciseWeightRecommendation(
+            recommendedWeight: recommendedWeight,
+            previousWeight: previousWeight,
+            shouldIncrease: shouldIncrease,
+            increment: shouldIncrease ? increment : 0,
+            guidance: guidance
+        )
     }
 
     func flushPendingSaves() {
@@ -207,6 +302,82 @@ final class WorkoutStore: ObservableObject {
         let encoder = Self.makeEncoder()
         guard let data = try? encoder.encode(value) else { return }
         defaults.set(data, forKey: key)
+    }
+
+    private func latestSessionRecords(
+        forExerciseName exerciseName: String,
+        preferredRoutineName: String
+    ) -> [LiftRecord] {
+        let records = liftHistoryByExerciseName[exerciseName] ?? []
+        guard !records.isEmpty else {
+            return []
+        }
+
+        let groupedBySession = Dictionary(grouping: records, by: \.sessionID)
+        let preferredRoutineRecords = groupedBySession.values.filter { grouped in
+            grouped.first?.routineName == preferredRoutineName
+        }
+        let candidateGroups = preferredRoutineRecords.isEmpty ? Array(groupedBySession.values) : preferredRoutineRecords
+
+        return candidateGroups.max { lhs, rhs in
+            let lhsDate = lhs.map(\.performedAt).max() ?? .distantPast
+            let rhsDate = rhs.map(\.performedAt).max() ?? .distantPast
+            return lhsDate < rhsDate
+        } ?? []
+    }
+
+    private func didMeetAllRepTargets(_ targets: [Int], records: [LiftRecord]) -> Bool {
+        guard !targets.isEmpty else {
+            return false
+        }
+
+        var repsBySetIndex: [Int: Int] = [:]
+        for record in records {
+            guard let reps = record.reps else { continue }
+            repsBySetIndex[record.setIndex] = reps
+        }
+
+        return targets.enumerated().allSatisfy { index, target in
+            guard let performedReps = repsBySetIndex[index + 1] else {
+                return false
+            }
+            return performedReps >= target
+        }
+    }
+
+    private func topSetReps(from records: [LiftRecord], topWeight: Double) -> Int? {
+        records
+            .filter { record in
+                guard let weight = record.weight else { return false }
+                return abs(weight - topWeight) < Recommendation.weightComparisonTolerance
+            }
+            .compactMap(\.reps)
+            .max()
+    }
+
+    private func recommendedIncrement(
+        forExerciseName exerciseName: String,
+        minimumIncrease: Double
+    ) -> Double {
+        isLowerBodyLift(exerciseName)
+            ? max(minimumIncrease, Recommendation.defaultLowerBodyIncrement)
+            : max(minimumIncrease, Recommendation.defaultUpperBodyIncrement)
+    }
+
+    private func isLowerBodyLift(_ exerciseName: String) -> Bool {
+        let normalized = exerciseName.lowercased()
+        return normalized.contains("squat")
+            || normalized.contains("deadlift")
+            || normalized.contains("clean")
+            || normalized.contains("lunge")
+            || normalized.contains("leg")
+            || normalized.contains("calf")
+            || normalized.contains("hip thrust")
+    }
+
+    private func roundToNearestIncrement(_ value: Double, increment: Double) -> Double {
+        guard increment > 0 else { return value }
+        return (value / increment).rounded() * increment
     }
 
     private func rebuildRoutineIndex() {
@@ -378,32 +549,222 @@ private extension WorkoutStore {
         }
     }
 
+    static func popularRoutines(for pack: PopularRoutinePack) -> [Routine] {
+        switch pack {
+        case .pushPullLegs:
+            return [
+                Routine(
+                    name: "PPL Push",
+                    exercises: [
+                        Exercise(name: "Bench Press"),
+                        Exercise(name: "Overhead Press"),
+                        Exercise(name: "Incline Dumbbell Press"),
+                        Exercise(name: "Dips"),
+                        Exercise(name: "Lateral Raise"),
+                        Exercise(name: "Triceps Pushdown")
+                    ]
+                ),
+                Routine(
+                    name: "PPL Pull",
+                    exercises: [
+                        Exercise(name: "Deadlift"),
+                        Exercise(name: "Pull Up"),
+                        Exercise(name: "Barbell Row"),
+                        Exercise(name: "Seated Cable Row"),
+                        Exercise(name: "Face Pull"),
+                        Exercise(name: "Barbell Curl")
+                    ]
+                ),
+                Routine(
+                    name: "PPL Legs",
+                    exercises: [
+                        Exercise(name: "Back Squat"),
+                        Exercise(name: "Romanian Deadlift"),
+                        Exercise(name: "Leg Press"),
+                        Exercise(name: "Leg Curl"),
+                        Exercise(name: "Walking Lunge"),
+                        Exercise(name: "Standing Calf Raise")
+                    ]
+                )
+            ]
+        case .upperLower:
+            return [
+                Routine(
+                    name: "Upper/Lower Upper",
+                    exercises: [
+                        Exercise(name: "Bench Press"),
+                        Exercise(name: "Barbell Row"),
+                        Exercise(name: "Overhead Press"),
+                        Exercise(name: "Pull Up"),
+                        Exercise(name: "Incline Dumbbell Press"),
+                        Exercise(name: "Barbell Curl")
+                    ]
+                ),
+                Routine(
+                    name: "Upper/Lower Lower",
+                    exercises: [
+                        Exercise(name: "Back Squat"),
+                        Exercise(name: "Deadlift"),
+                        Exercise(name: "Bulgarian Split Squat"),
+                        Exercise(name: "Leg Curl"),
+                        Exercise(name: "Hip Thrust"),
+                        Exercise(name: "Seated Calf Raise")
+                    ]
+                )
+            ]
+        case .strongLiftsFiveByFive:
+            return [
+                Routine(
+                    name: "StrongLifts 5x5 A",
+                    exercises: [
+                        Exercise(name: "Back Squat"),
+                        Exercise(name: "Bench Press"),
+                        Exercise(name: "Barbell Row")
+                    ]
+                ),
+                Routine(
+                    name: "StrongLifts 5x5 B",
+                    exercises: [
+                        Exercise(name: "Back Squat"),
+                        Exercise(name: "Overhead Press"),
+                        Exercise(name: "Deadlift")
+                    ]
+                )
+            ]
+        case .arnoldSplit:
+            return [
+                Routine(
+                    name: "Arnold Chest/Back",
+                    exercises: [
+                        Exercise(name: "Bench Press"),
+                        Exercise(name: "Incline Bench Press"),
+                        Exercise(name: "Dumbbell Fly"),
+                        Exercise(name: "Pull Up"),
+                        Exercise(name: "Barbell Row"),
+                        Exercise(name: "Lat Pulldown")
+                    ]
+                ),
+                Routine(
+                    name: "Arnold Shoulders/Arms",
+                    exercises: [
+                        Exercise(name: "Overhead Press"),
+                        Exercise(name: "Lateral Raise"),
+                        Exercise(name: "Rear Delt Fly"),
+                        Exercise(name: "Barbell Curl"),
+                        Exercise(name: "Incline Dumbbell Curl"),
+                        Exercise(name: "Skull Crusher")
+                    ]
+                ),
+                Routine(
+                    name: "Arnold Legs",
+                    exercises: [
+                        Exercise(name: "Back Squat"),
+                        Exercise(name: "Romanian Deadlift"),
+                        Exercise(name: "Leg Press"),
+                        Exercise(name: "Leg Extension"),
+                        Exercise(name: "Leg Curl"),
+                        Exercise(name: "Standing Calf Raise")
+                    ]
+                )
+            ]
+        case .phul:
+            return [
+                Routine(
+                    name: "PHUL Upper Power",
+                    exercises: [
+                        Exercise(name: "Bench Press"),
+                        Exercise(name: "Barbell Row"),
+                        Exercise(name: "Overhead Press"),
+                        Exercise(name: "Weighted Pull Up"),
+                        Exercise(name: "Barbell Curl"),
+                        Exercise(name: "Skull Crusher")
+                    ]
+                ),
+                Routine(
+                    name: "PHUL Lower Power",
+                    exercises: [
+                        Exercise(name: "Back Squat"),
+                        Exercise(name: "Deadlift"),
+                        Exercise(name: "Front Squat"),
+                        Exercise(name: "Leg Press"),
+                        Exercise(name: "Standing Calf Raise")
+                    ]
+                ),
+                Routine(
+                    name: "PHUL Upper Hypertrophy",
+                    exercises: [
+                        Exercise(name: "Incline Dumbbell Press"),
+                        Exercise(name: "Seated Cable Row"),
+                        Exercise(name: "Dumbbell Shoulder Press"),
+                        Exercise(name: "Lat Pulldown"),
+                        Exercise(name: "Lateral Raise"),
+                        Exercise(name: "Triceps Pushdown"),
+                        Exercise(name: "Hammer Curl")
+                    ]
+                ),
+                Routine(
+                    name: "PHUL Lower Hypertrophy",
+                    exercises: [
+                        Exercise(name: "Front Squat"),
+                        Exercise(name: "Romanian Deadlift"),
+                        Exercise(name: "Bulgarian Split Squat"),
+                        Exercise(name: "Leg Extension"),
+                        Exercise(name: "Leg Curl"),
+                        Exercise(name: "Seated Calf Raise")
+                    ]
+                )
+            ]
+        }
+    }
+
     static var starterRoutines: [Routine] {
         [
+            .startingStrength,
+            .fiveThreeOne,
+            .boringButBig
+        ].map { kind in
             Routine(
+                name: kind.displayName,
+                exercises: ProgramTemplate.exerciseNames(for: kind).map { Exercise(name: $0) },
+                program: ProgramConfig(kind: kind)
+            )
+        }
+    }
+
+    static func matchesLegacyStarterRoutines(_ routines: [Routine]) -> Bool {
+        let legacyRoutines: [(name: String, exerciseNames: [String])] = [
+            (
                 name: "Push",
-                exercises: [
-                    Exercise(name: "Bench Press"),
-                    Exercise(name: "Incline Dumbbell Press"),
-                    Exercise(name: "Overhead Press")
+                exerciseNames: [
+                    "Bench Press",
+                    "Incline Dumbbell Press",
+                    "Overhead Press"
                 ]
             ),
-            Routine(
+            (
                 name: "Pull",
-                exercises: [
-                    Exercise(name: "Deadlift"),
-                    Exercise(name: "Pull Up"),
-                    Exercise(name: "Barbell Row")
+                exerciseNames: [
+                    "Deadlift",
+                    "Pull Up",
+                    "Barbell Row"
                 ]
             ),
-            Routine(
+            (
                 name: "Legs",
-                exercises: [
-                    Exercise(name: "Back Squat"),
-                    Exercise(name: "Romanian Deadlift"),
-                    Exercise(name: "Leg Press")
+                exerciseNames: [
+                    "Back Squat",
+                    "Romanian Deadlift",
+                    "Leg Press"
                 ]
             )
         ]
+
+        guard routines.count == legacyRoutines.count else { return false }
+
+        return zip(routines, legacyRoutines).allSatisfy { routine, legacy in
+            routine.name == legacy.name &&
+            routine.program == nil &&
+            routine.exercises.map(\.name) == legacy.exerciseNames
+        }
     }
 }

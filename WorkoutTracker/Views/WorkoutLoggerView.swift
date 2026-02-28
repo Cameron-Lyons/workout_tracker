@@ -21,6 +21,7 @@ struct WorkoutLoggerView: View {
         static let defaultRestSeconds = 90
         static let minimumRestSeconds = 1
         static let quickAddRestSeconds = 30
+        static let defaultMinimumWeightIncrease = 10.0
         static let restPresets = [60, 90, 120, 180]
         static let restTickerInterval = 1.0
         static let animationDuration = 0.2
@@ -43,10 +44,12 @@ struct WorkoutLoggerView: View {
     @EnvironmentObject private var store: WorkoutStore
     @StateObject private var speechInput = SpeechInputManager()
     @AppStorage("workout_tracker_rest_timer_auto_start_v1") private var autoStartRestTimer = false
+    @AppStorage("workout_tracker_min_weight_increase_v1") private var minimumWeightIncrease = Constants.defaultMinimumWeightIncrease
 
     @State private var selectedRoutineID: UUID?
     @State private var drafts: [UUID: [SetDraft]] = [:]
     @State private var activeVoiceTarget: ActiveVoiceTarget?
+    @State private var minimumWeightIncreaseInput = ""
 
     @State private var showErrorAlert = false
     @State private var errorMessage = ""
@@ -156,7 +159,10 @@ struct WorkoutLoggerView: View {
             .navigationTitle("Log Workout")
             .toolbarBackground(AppColors.chrome, for: .navigationBar)
             .toolbarBackground(.visible, for: .navigationBar)
-            .onAppear(perform: syncSelection)
+            .onAppear {
+                syncSelection()
+                syncMinimumWeightIncreaseInput()
+            }
             .onChange(of: store.routines) { _, _ in
                 syncSelection()
             }
@@ -225,6 +231,26 @@ struct WorkoutLoggerView: View {
             }
             .pickerStyle(.menu)
             .tint(AppColors.textPrimary)
+
+            HStack(spacing: Layout.compactSpacing) {
+                Text("Min Increase")
+                    .font(.caption.weight(.semibold))
+                    .foregroundStyle(AppColors.textSecondary)
+
+                Spacer()
+
+                HStack(spacing: Layout.compactSpacing) {
+                    TextField("10", text: minimumWeightIncreaseBinding)
+                        .keyboardType(.decimalPad)
+                        .multilineTextAlignment(.trailing)
+                        .frame(width: 66)
+                        .appInputField()
+
+                    Text("lb")
+                        .font(.caption.weight(.semibold))
+                        .foregroundStyle(AppColors.textSecondary)
+                }
+            }
         }
         .padding(14)
         .appSurface(cornerRadius: Layout.cardCornerRadius, shadow: false)
@@ -304,12 +330,17 @@ struct WorkoutLoggerView: View {
         _ exercise: Exercise,
         plan: ProgramWorkoutPlan
     ) -> some View {
-        let sets = setDrafts(for: exercise.id, plan: plan)
+        let sets = setDrafts(for: exercise, plan: plan)
+        let recommendation = weightRecommendation(for: exercise, targetSets: sets)
 
         return VStack(alignment: .leading, spacing: Layout.rowSpacing) {
             Text(exercise.name)
                 .font(.system(size: 20, weight: .black, design: .rounded))
                 .foregroundStyle(AppColors.textPrimary)
+
+            if let recommendation {
+                recommendationCallout(recommendation)
+            }
 
             ForEach(Array(sets.enumerated()), id: \.element.id) { index, set in
                 VStack(alignment: .leading, spacing: Layout.compactSpacing) {
@@ -387,6 +418,33 @@ struct WorkoutLoggerView: View {
         .appSurface(cornerRadius: Layout.cardCornerRadius, shadow: false)
     }
 
+    private func recommendationCallout(_ recommendation: ExerciseWeightRecommendation) -> some View {
+        VStack(alignment: .leading, spacing: 4) {
+            HStack(spacing: 6) {
+                Image(systemName: recommendation.shouldIncrease ? "arrow.up.right.circle.fill" : "equal.circle.fill")
+                    .foregroundStyle(recommendation.shouldIncrease ? AppColors.accent : AppColors.accentAlt)
+
+                Text("Suggested: \(WeightFormatter.displayString(recommendation.recommendedWeight)) lb")
+                    .font(.caption.weight(.semibold))
+                    .foregroundStyle(AppColors.textPrimary)
+            }
+
+            Text(recommendation.guidance)
+                .font(.caption2)
+                .foregroundStyle(AppColors.textSecondary)
+        }
+        .padding(.horizontal, 10)
+        .padding(.vertical, 8)
+        .background(
+            RoundedRectangle(cornerRadius: 10, style: .continuous)
+                .fill(AppColors.input.opacity(0.85))
+        )
+        .overlay(
+            RoundedRectangle(cornerRadius: 10, style: .continuous)
+                .stroke(AppColors.stroke.opacity(0.75), lineWidth: 1)
+        )
+    }
+
     private func activeExercises(in routine: Routine, plan: ProgramWorkoutPlan) -> [Exercise] {
         if let activeIDs = plan.activeExerciseIDs {
             return routine.exercises.filter { activeIDs.contains($0.id) }
@@ -429,6 +487,28 @@ struct WorkoutLoggerView: View {
         let minutes = totalSeconds / 60
         let remainingSeconds = totalSeconds % 60
         return "\(minutes):\(String(format: "%02d", remainingSeconds))"
+    }
+
+    private var minimumWeightIncreaseBinding: Binding<String> {
+        Binding(
+            get: {
+                minimumWeightIncreaseInput
+            },
+            set: { value in
+                let sanitized = value.filter { Constants.weightInputCharacters.contains($0) }
+                minimumWeightIncreaseInput = sanitized
+
+                guard let parsed = Double(sanitized), parsed > 0 else {
+                    return
+                }
+
+                minimumWeightIncrease = parsed
+            }
+        )
+    }
+
+    private func syncMinimumWeightIncreaseInput() {
+        minimumWeightIncreaseInput = WeightFormatter.displayString(minimumWeightIncrease)
     }
 
     private func startRestTimer(seconds: Int) {
@@ -477,18 +557,24 @@ struct WorkoutLoggerView: View {
     }
 
     private func defaultDrafts(
-        for exerciseID: UUID,
+        for exercise: Exercise,
         plan: ProgramWorkoutPlan
     ) -> [SetDraft] {
-        let templates = plan.setTemplatesByExerciseID[exerciseID] ?? []
+        let templates = plan.setTemplatesByExerciseID[exercise.id] ?? []
+        let recommendation = weightRecommendation(for: exercise, targetReps: templates.map(\.reps))
+        let recommendedWeight = recommendation?.recommendedWeight
 
         if templates.isEmpty {
-            return [SetDraft()]
+            return [
+                SetDraft(
+                    weight: recommendedWeight.map(WeightFormatter.displayString) ?? ""
+                )
+            ]
         }
 
         return templates.map { template in
             SetDraft(
-                weight: template.weight.map(WeightFormatter.displayString) ?? "",
+                weight: (template.weight ?? recommendedWeight).map(WeightFormatter.displayString) ?? "",
                 reps: String(template.reps),
                 transcript: "",
                 prescriptionNote: template.note
@@ -522,7 +608,7 @@ struct WorkoutLoggerView: View {
         for exercise in exercises {
             let existingSets = drafts[exercise.id] ?? []
             refreshed[exercise.id] = existingSets.isEmpty
-                ? defaultDrafts(for: exercise.id, plan: plan)
+                ? defaultDrafts(for: exercise, plan: plan)
                 : existingSets
         }
 
@@ -536,11 +622,35 @@ struct WorkoutLoggerView: View {
     }
 
     private func setDrafts(
-        for exerciseID: UUID,
+        for exercise: Exercise,
         plan: ProgramWorkoutPlan
     ) -> [SetDraft] {
-        let sets = drafts[exerciseID] ?? []
-        return sets.isEmpty ? defaultDrafts(for: exerciseID, plan: plan) : sets
+        let sets = drafts[exercise.id] ?? []
+        return sets.isEmpty ? defaultDrafts(for: exercise, plan: plan) : sets
+    }
+
+    private func weightRecommendation(
+        for exercise: Exercise,
+        targetSets: [SetDraft]
+    ) -> ExerciseWeightRecommendation? {
+        let targetReps = targetSets.compactMap { Int($0.reps) }
+        return weightRecommendation(for: exercise, targetReps: targetReps)
+    }
+
+    private func weightRecommendation(
+        for exercise: Exercise,
+        targetReps: [Int]
+    ) -> ExerciseWeightRecommendation? {
+        guard let selectedRoutine else {
+            return nil
+        }
+
+        return store.weightRecommendation(
+            routineName: selectedRoutine.name,
+            exerciseName: exercise.name,
+            targetReps: targetReps,
+            minimumIncrease: minimumWeightIncrease
+        )
     }
 
     private func addSet(to exerciseID: UUID) {

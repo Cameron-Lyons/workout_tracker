@@ -17,6 +17,46 @@ enum ProgramKind: String, Codable {
     }
 }
 
+enum PopularRoutinePack: String, CaseIterable, Identifiable {
+    case pushPullLegs
+    case upperLower
+    case strongLiftsFiveByFive
+    case arnoldSplit
+    case phul
+
+    var id: String { rawValue }
+
+    var displayName: String {
+        switch self {
+        case .pushPullLegs:
+            return "Push/Pull/Legs"
+        case .upperLower:
+            return "Upper/Lower"
+        case .strongLiftsFiveByFive:
+            return "StrongLifts 5x5"
+        case .arnoldSplit:
+            return "Arnold Split"
+        case .phul:
+            return "PHUL"
+        }
+    }
+
+    var systemImage: String {
+        switch self {
+        case .pushPullLegs:
+            return "figure.strengthtraining.traditional"
+        case .upperLower:
+            return "arrow.up.arrow.down"
+        case .strongLiftsFiveByFive:
+            return "5.circle"
+        case .arnoldSplit:
+            return "dumbbell"
+        case .phul:
+            return "chart.bar"
+        }
+    }
+}
+
 enum WeightFormatter {
     static func displayString(_ weight: Double) -> String {
         if weight.rounded() == weight {

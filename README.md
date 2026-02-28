@@ -8,6 +8,7 @@ Native SwiftUI iPhone app for logging workouts with routines and voice entry.
 - Add, edit, and reorder exercises inside each routine
 - Log multiple sets per exercise (manual-first flow)
 - One-tap program templates: Starting Strength, 5/3/1, Boring But Big
+- Popular online routine packs: Push/Pull/Legs, Upper/Lower, StrongLifts 5x5, Arnold Split, PHUL
 - Auto-calculated prescribed sets/weights for template routines (using per-exercise TM/working weight)
 - Automatic progression tracking:
   - Starting Strength day rotation (A/B)

@@ -40,6 +40,16 @@ struct RoutinesView: View {
                         Button("Boring But Big", systemImage: "scalemass") {
                             store.addProgramTemplate(.boringButBig)
                         }
+
+                        Divider()
+
+                        Menu("Popular Online Packs", systemImage: "globe") {
+                            ForEach(PopularRoutinePack.allCases) { pack in
+                                Button(pack.displayName, systemImage: pack.systemImage) {
+                                    store.addPopularRoutinePack(pack)
+                                }
+                            }
+                        }
                     } label: {
                         Image(systemName: "plus")
                     }
