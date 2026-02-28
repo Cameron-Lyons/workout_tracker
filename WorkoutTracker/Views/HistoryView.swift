@@ -34,6 +34,9 @@ struct HistoryView: View {
     @State private var selectedCalendarDay: Date?
     @State private var displayedMonth = Date()
     @State private var hasInitializedCalendarMonth = false
+    @State private var cachedWorkoutDays: Set<Date> = []
+    @State private var cachedFilteredSessions: [WorkoutSession] = []
+    @State private var cachedProgressPointsByExerciseName: [String: [LiftProgressPoint]] = [:]
 #if DEBUG
     @State private var showBenchmarkAlert = false
     @State private var benchmarkSummary = ""
@@ -51,7 +54,7 @@ struct HistoryView: View {
                     if store.workoutHistory.isEmpty {
                         emptyState
                     } else {
-                        let sessions = filteredSessions
+                        let sessions = cachedFilteredSessions
 
                         List {
                             calendarSection(filteredSessionCount: sessions.count)
@@ -97,14 +100,24 @@ struct HistoryView: View {
             .toolbarBackground(AppColors.chrome, for: .navigationBar)
             .toolbarBackground(.visible, for: .navigationBar)
             .onAppear {
+                rebuildHistoryCaches()
                 syncExerciseSelection()
+                rebuildProgressPointsCache()
                 syncCalendarState()
             }
             .onChange(of: store.liftHistory) { _, _ in
                 syncExerciseSelection()
+                rebuildProgressPointsCache()
             }
             .onChange(of: store.workoutHistory) { _, _ in
+                rebuildHistoryCaches()
                 syncCalendarState()
+            }
+            .onChange(of: selectedCalendarDay) { _, _ in
+                updateFilteredSessions()
+            }
+            .onChange(of: weightUnitRawValue) { _, _ in
+                rebuildProgressPointsCache()
             }
             .tint(AppColors.accent)
 #if DEBUG
@@ -214,12 +227,7 @@ struct HistoryView: View {
     }
 
     private var workoutDays: Set<Date> {
-        Set(store.workoutHistory.map { calendar.startOfDay(for: $0.performedAt) })
-    }
-
-    private var filteredSessions: [WorkoutSession] {
-        guard let selectedCalendarDay else { return store.workoutHistory }
-        return store.workoutHistory.filter { calendar.isDate($0.performedAt, inSameDayAs: selectedCalendarDay) }
+        cachedWorkoutDays
     }
 
     private var displayedMonthStart: Date {
@@ -407,25 +415,47 @@ struct HistoryView: View {
         displayedMonth = calendar.startOfMonth(for: nextMonth)
     }
 
-    private func progressPoints(for exerciseName: String) -> [LiftProgressPoint] {
+    private func progressPoints(for exerciseName: String, unit: WeightUnit) -> [LiftProgressPoint] {
         guard !exerciseName.isEmpty else { return [] }
 
         let records = store.liftRecords(forExerciseName: exerciseName)
-        let groupedBySession = Dictionary(grouping: records, by: \.sessionID)
+        var summaryBySessionID: [UUID: (date: Date, topWeightInStoredPounds: Double)] = [:]
 
-        return groupedBySession.compactMap { sessionID, groupedRecords in
-            guard let date = groupedRecords.map(\.performedAt).max(),
-                  let topWeightInStoredPounds = groupedRecords.compactMap(\.weight).max() else {
-                return nil
+        for record in records {
+            guard let weight = record.weight else {
+                continue
             }
 
-            return LiftProgressPoint(
+            if var existing = summaryBySessionID[record.sessionID] {
+                if record.performedAt > existing.date {
+                    existing.date = record.performedAt
+                }
+
+                if weight > existing.topWeightInStoredPounds {
+                    existing.topWeightInStoredPounds = weight
+                }
+
+                summaryBySessionID[record.sessionID] = existing
+            } else {
+                summaryBySessionID[record.sessionID] = (
+                    date: record.performedAt,
+                    topWeightInStoredPounds: weight
+                )
+            }
+        }
+
+        return summaryBySessionID.map { sessionID, summary in
+            LiftProgressPoint(
                 sessionID: sessionID,
-                date: date,
-                topWeight: weightUnit.displayValue(fromStoredPounds: topWeightInStoredPounds)
+                date: summary.date,
+                topWeight: unit.displayValue(fromStoredPounds: summary.topWeightInStoredPounds)
             )
         }
         .sorted { $0.date < $1.date }
+    }
+
+    private var selectedProgressPoints: [LiftProgressPoint] {
+        cachedProgressPointsByExerciseName[selectedExerciseName] ?? []
     }
 
     private func trendSummary(for progressPoints: [LiftProgressPoint]) -> String? {
@@ -446,7 +476,7 @@ struct HistoryView: View {
 
     private var progressSection: some View {
         let exercises = trackedExercises
-        let points = progressPoints(for: selectedExerciseName)
+        let points = selectedProgressPoints
         let summary = trendSummary(for: points)
 
         return Section("Progress Over Time") {
@@ -553,6 +583,37 @@ struct HistoryView: View {
         if options.contains(selectedExerciseName) == false {
             selectedExerciseName = options[0]
         }
+    }
+
+    private func rebuildHistoryCaches() {
+        let history = store.workoutHistory
+        cachedWorkoutDays = Set(history.map { calendar.startOfDay(for: $0.performedAt) })
+        updateFilteredSessions(using: history)
+    }
+
+    private func updateFilteredSessions(using history: [WorkoutSession]? = nil) {
+        let sessions = history ?? store.workoutHistory
+        guard let selectedCalendarDay else {
+            cachedFilteredSessions = sessions
+            return
+        }
+
+        cachedFilteredSessions = sessions.filter {
+            calendar.isDate($0.performedAt, inSameDayAs: selectedCalendarDay)
+        }
+    }
+
+    private func rebuildProgressPointsCache() {
+        let exercises = trackedExercises
+        let unit = weightUnit
+        var refreshed: [String: [LiftProgressPoint]] = [:]
+        refreshed.reserveCapacity(exercises.count)
+
+        for exerciseName in exercises {
+            refreshed[exerciseName] = progressPoints(for: exerciseName, unit: unit)
+        }
+
+        cachedProgressPointsByExerciseName = refreshed
     }
 
     private func syncCalendarState() {

@@ -4,7 +4,6 @@ struct ExerciseWeightRecommendation: Equatable {
     var recommendedWeight: Double
     var previousWeight: Double
     var shouldIncrease: Bool
-    var increment: Double
     var guidance: String
 }
 
@@ -269,13 +268,11 @@ final class WorkoutStore: ObservableObject {
         let recommendedWeight = unit.storedPounds(
             fromDisplayValue: unit.roundedForGymDisplay(recommendedDisplayWeight)
         )
-        let incrementInStoredPounds = unit.storedPounds(fromDisplayValue: increment)
 
         return ExerciseWeightRecommendation(
             recommendedWeight: recommendedWeight,
             previousWeight: previousWeight,
             shouldIncrease: shouldIncrease,
-            increment: shouldIncrease ? incrementInStoredPounds : 0,
             guidance: guidance
         )
     }
@@ -317,17 +314,25 @@ final class WorkoutStore: ObservableObject {
             return []
         }
 
-        let groupedBySession = Dictionary(grouping: records, by: \.sessionID)
-        let preferredRoutineRecords = groupedBySession.values.filter { grouped in
-            grouped.first?.routineName == preferredRoutineName
-        }
-        let candidateGroups = preferredRoutineRecords.isEmpty ? Array(groupedBySession.values) : preferredRoutineRecords
+        var latestAnySession: (id: UUID, date: Date)?
+        var latestPreferredSession: (id: UUID, date: Date)?
 
-        return candidateGroups.max { lhs, rhs in
-            let lhsDate = lhs.map(\.performedAt).max() ?? .distantPast
-            let rhsDate = rhs.map(\.performedAt).max() ?? .distantPast
-            return lhsDate < rhsDate
-        } ?? []
+        for record in records {
+            if latestAnySession == nil || record.performedAt > latestAnySession!.date {
+                latestAnySession = (id: record.sessionID, date: record.performedAt)
+            }
+
+            if record.routineName == preferredRoutineName,
+               latestPreferredSession == nil || record.performedAt > latestPreferredSession!.date {
+                latestPreferredSession = (id: record.sessionID, date: record.performedAt)
+            }
+        }
+
+        guard let targetSessionID = latestPreferredSession?.id ?? latestAnySession?.id else {
+            return []
+        }
+
+        return records.filter { $0.sessionID == targetSessionID }
     }
 
     private func didMeetAllRepTargets(_ targets: [Int], records: [LiftRecord]) -> Bool {
@@ -364,20 +369,9 @@ final class WorkoutStore: ObservableObject {
         minimumIncrease: Double,
         unit: WeightUnit
     ) -> Double {
-        isLowerBodyLift(exerciseName)
+        LiftClassifier.isLowerBodyLift(exerciseName)
             ? max(minimumIncrease, unit.lowerBodyDefaultIncrease)
             : max(minimumIncrease, unit.upperBodyDefaultIncrease)
-    }
-
-    private func isLowerBodyLift(_ exerciseName: String) -> Bool {
-        let normalized = exerciseName.lowercased()
-        return normalized.contains("squat")
-            || normalized.contains("deadlift")
-            || normalized.contains("clean")
-            || normalized.contains("lunge")
-            || normalized.contains("leg")
-            || normalized.contains("calf")
-            || normalized.contains("hip thrust")
     }
 
     private func roundToNearestIncrement(_ value: Double, increment: Double) -> Double {
@@ -406,59 +400,32 @@ final class WorkoutStore: ObservableObject {
     }
 
     private func scheduleRoutinesSave() {
-        let snapshot = routines
-        pendingRoutinesSave?.cancel()
-
-        let key = routinesKey
-        let defaults = self.defaults
-
-        let work = DispatchWorkItem {
-            let encoder = Self.makeEncoder()
-            guard let data = try? encoder.encode(snapshot) else { return }
-            defaults.set(data, forKey: key)
-        }
-
-        pendingRoutinesSave = work
-        persistenceQueue.asyncAfter(
-            deadline: .now() + .milliseconds(Persistence.saveDebounceMilliseconds),
-            execute: work
-        )
+        scheduleSave(snapshot: routines, key: routinesKey, pendingWorkItem: &pendingRoutinesSave)
     }
 
     private func scheduleHistorySave() {
-        let snapshot = workoutHistory
-        pendingHistorySave?.cancel()
-
-        let key = historyKey
-        let defaults = self.defaults
-
-        let work = DispatchWorkItem {
-            let encoder = Self.makeEncoder()
-            guard let data = try? encoder.encode(snapshot) else { return }
-            defaults.set(data, forKey: key)
-        }
-
-        pendingHistorySave = work
-        persistenceQueue.asyncAfter(
-            deadline: .now() + .milliseconds(Persistence.saveDebounceMilliseconds),
-            execute: work
-        )
+        scheduleSave(snapshot: workoutHistory, key: historyKey, pendingWorkItem: &pendingHistorySave)
     }
 
     private func scheduleLiftHistorySave() {
-        let snapshot = liftHistory
-        pendingLiftHistorySave?.cancel()
+        scheduleSave(snapshot: liftHistory, key: liftHistoryKey, pendingWorkItem: &pendingLiftHistorySave)
+    }
 
-        let key = liftHistoryKey
+    private func scheduleSave<T: Encodable>(
+        snapshot: T,
+        key: String,
+        pendingWorkItem: inout DispatchWorkItem?
+    ) {
+        pendingWorkItem?.cancel()
+
         let defaults = self.defaults
-
         let work = DispatchWorkItem {
             let encoder = Self.makeEncoder()
             guard let data = try? encoder.encode(snapshot) else { return }
             defaults.set(data, forKey: key)
         }
 
-        pendingLiftHistorySave = work
+        pendingWorkItem = work
         persistenceQueue.asyncAfter(
             deadline: .now() + .milliseconds(Persistence.saveDebounceMilliseconds),
             execute: work

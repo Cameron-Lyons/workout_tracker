@@ -316,7 +316,7 @@ enum WorkoutProgramEngine {
             return exercise
         }
 
-        let increment = isLowerBodyLift(exercise.name)
+        let increment = LiftClassifier.isLowerBodyLift(exercise.name)
             ? Constants.lowerBodyTrainingMaxIncrement
             : Constants.standardIncrement
         return Exercise(
@@ -324,14 +324,6 @@ enum WorkoutProgramEngine {
             name: exercise.name,
             trainingMax: roundToNearestTwoPointFive(trainingMax + increment)
         )
-    }
-
-    private static func isLowerBodyLift(_ name: String) -> Bool {
-        let normalized = name.lowercased()
-        return normalized.contains("squat")
-            || normalized.contains("deadlift")
-            || normalized.contains("clean")
-            || normalized.contains("leg")
     }
 
     private static func roundToNearestTwoPointFive(_ value: Double) -> Double {

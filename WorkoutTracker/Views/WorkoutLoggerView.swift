@@ -32,6 +32,8 @@ struct WorkoutLoggerView: View {
         static let sectionSpacing: CGFloat = 12
         static let compactSpacing: CGFloat = 8
         static let rowSpacing: CGFloat = 10
+        static let unitPickerWidth: CGFloat = 210
+        static let minimumIncreaseInputWidth: CGFloat = 66
         static let cardCornerRadius: CGFloat = 16
         static let setCardCornerRadius: CGFloat = 12
         static let setCardPadding: CGFloat = 10
@@ -266,7 +268,7 @@ struct WorkoutLoggerView: View {
                     }
                 }
                 .pickerStyle(.segmented)
-                .frame(width: 210)
+                .frame(width: Layout.unitPickerWidth)
             }
 
             HStack(spacing: Layout.compactSpacing) {
@@ -286,7 +288,7 @@ struct WorkoutLoggerView: View {
                     )
                         .keyboardType(.decimalPad)
                         .multilineTextAlignment(.trailing)
-                        .frame(width: 66)
+                        .frame(width: Layout.minimumIncreaseInputWidth)
                         .appInputField()
 
                     Text(weightUnit.symbol)
@@ -407,11 +409,11 @@ struct WorkoutLoggerView: View {
                     }
 
                     HStack(spacing: Layout.rowSpacing) {
-                        TextField("Weight", text: weightBinding(for: exercise.id, setID: set.id))
+                        TextField("Weight", text: weightBinding(for: exercise.id, setIndex: index))
                             .keyboardType(.decimalPad)
                             .appInputField()
 
-                        TextField("Reps", text: repsBinding(for: exercise.id, setID: set.id))
+                        TextField("Reps", text: repsBinding(for: exercise.id, setIndex: index))
                             .keyboardType(.numberPad)
                             .appInputField()
                     }
@@ -798,26 +800,48 @@ struct WorkoutLoggerView: View {
         drafts[exerciseID] = sets
     }
 
-    private func weightBinding(for exerciseID: UUID, setID: UUID) -> Binding<String> {
+    private func updateSet(
+        for exerciseID: UUID,
+        setIndex: Int,
+        update: (inout SetDraft) -> Void
+    ) {
+        guard var sets = drafts[exerciseID],
+              sets.indices.contains(setIndex) else {
+            return
+        }
+
+        update(&sets[setIndex])
+        drafts[exerciseID] = sets
+    }
+
+    private func weightBinding(for exerciseID: UUID, setIndex: Int) -> Binding<String> {
         Binding(
             get: {
-                drafts[exerciseID]?.first(where: { $0.id == setID })?.weight ?? ""
+                guard let sets = drafts[exerciseID],
+                      sets.indices.contains(setIndex) else {
+                    return ""
+                }
+                return sets[setIndex].weight
             },
             set: { value in
-                updateSet(for: exerciseID, setID: setID) { set in
+                updateSet(for: exerciseID, setIndex: setIndex) { set in
                     set.weight = value.filter { Constants.weightInputCharacters.contains($0) }
                 }
             }
         )
     }
 
-    private func repsBinding(for exerciseID: UUID, setID: UUID) -> Binding<String> {
+    private func repsBinding(for exerciseID: UUID, setIndex: Int) -> Binding<String> {
         Binding(
             get: {
-                drafts[exerciseID]?.first(where: { $0.id == setID })?.reps ?? ""
+                guard let sets = drafts[exerciseID],
+                      sets.indices.contains(setIndex) else {
+                    return ""
+                }
+                return sets[setIndex].reps
             },
             set: { value in
-                updateSet(for: exerciseID, setID: setID) { set in
+                updateSet(for: exerciseID, setIndex: setIndex) { set in
                     set.reps = value.filter(\.isNumber)
                 }
             }

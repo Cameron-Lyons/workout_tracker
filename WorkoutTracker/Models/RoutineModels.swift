@@ -9,6 +9,7 @@ enum WeightUnit: String, CaseIterable, Codable {
     private static let poundsPerKilogram = 2.2046226218
     private static let poundsDisplayIncrement = 2.5
     private static let kilogramsDisplayIncrement = 2.5
+    private static let minimumRoundingIncrement = 0.000_1
 
     var symbol: String {
         switch self {
@@ -99,7 +100,7 @@ enum WeightUnit: String, CaseIterable, Codable {
     }
 
     func roundedForGymDisplay(_ value: Double, increment: Double? = nil) -> Double {
-        let resolvedIncrement = max(increment ?? gymDisplayIncrement, 0.000_1)
+        let resolvedIncrement = max(increment ?? gymDisplayIncrement, Self.minimumRoundingIncrement)
         return (value / resolvedIncrement).rounded() * resolvedIncrement
     }
 
@@ -201,11 +202,24 @@ enum WeightFormatter {
         return String(format: "%.2f", twoDecimalValue)
     }
 
-    static func rawDisplayString(_ value: Double) -> String {
-        if value.rounded() == value {
-            return String(Int(value))
+}
+
+enum LiftClassifier {
+    private static let lowerBodyKeywords = [
+        "squat",
+        "deadlift",
+        "clean",
+        "lunge",
+        "leg",
+        "calf",
+        "hip thrust"
+    ]
+
+    static func isLowerBodyLift(_ exerciseName: String) -> Bool {
+        let normalized = exerciseName.lowercased()
+        return lowerBodyKeywords.contains { keyword in
+            normalized.contains(keyword)
         }
-        return String(format: "%.1f", value)
     }
 }
 
