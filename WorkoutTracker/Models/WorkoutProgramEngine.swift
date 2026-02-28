@@ -111,7 +111,19 @@ enum WorkoutProgramEngine {
     }
 
     static func contextLabel(for routine: Routine) -> String? {
-        plan(for: routine).contextLabel
+        guard let program = routine.program else {
+            return nil
+        }
+
+        switch program.kind {
+        case .startingStrength:
+            let isDayA = program.state.step % Constants.startingStrengthDayCount == 0
+            return "\(isDayA ? "Day A" : "Day B") • Session \(program.state.cycle)"
+        case .fiveThreeOne, .boringButBig:
+            let weekIndex = program.state.step % Constants.fiveThreeOneWeekCount
+            let week = Constants.fiveThreeOneWeekSpecs[weekIndex]
+            return "Cycle \(program.state.cycle) • \(week.name)"
+        }
     }
 
     static func advanceProgramState(in routine: inout Routine) {

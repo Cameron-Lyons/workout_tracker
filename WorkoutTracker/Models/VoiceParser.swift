@@ -21,9 +21,6 @@ enum VoiceParser {
             .lowercased()
             .replacingOccurrences(of: ",", with: ".")
 
-        let numbers = extractNumberStrings(in: normalized)
-            .compactMap(Double.init)
-
         var weight: Double?
         var reps: Int?
 
@@ -32,8 +29,6 @@ enum VoiceParser {
             in: normalized
         ) {
             weight = Double(explicitWeight)
-        } else {
-            weight = numbers.first
         }
 
         if let explicitReps = firstCapture(
@@ -46,8 +41,19 @@ enum VoiceParser {
             in: normalized
         ) {
             reps = Int(suffixReps)
-        } else if numbers.count >= 2 {
-            reps = Int(numbers[1])
+        }
+
+        if weight == nil || reps == nil {
+            let numbers = extractNumberStrings(in: normalized)
+                .compactMap(Double.init)
+
+            if weight == nil {
+                weight = numbers.first
+            }
+
+            if reps == nil, numbers.count >= 2 {
+                reps = Int(numbers[1])
+            }
         }
 
         return (weight, reps)

@@ -1,24 +1,30 @@
 import Foundation
 
 final class WorkoutStore: ObservableObject {
+    private enum Persistence {
+        static let saveDebounceMilliseconds = 300
+    }
+
     @Published var routines: [Routine] {
         didSet {
             guard !isHydrating else { return }
-            saveRoutines()
+            rebuildRoutineIndex()
+            scheduleRoutinesSave()
         }
     }
 
     @Published var workoutHistory: [WorkoutSession] {
         didSet {
             guard !isHydrating else { return }
-            saveHistory()
+            scheduleHistorySave()
         }
     }
 
     @Published var liftHistory: [LiftRecord] {
         didSet {
             guard !isHydrating else { return }
-            saveLiftHistory()
+            rebuildLiftHistoryIndex()
+            scheduleLiftHistorySave()
         }
     }
 
@@ -26,17 +32,32 @@ final class WorkoutStore: ObservableObject {
     private let historyKey = "workout_tracker_history_v1"
     private let liftHistoryKey = "workout_tracker_lift_history_v1"
     private let defaults = UserDefaults.standard
-    private let encoder = JSONEncoder()
     private let decoder = JSONDecoder()
+    private let persistenceQueue = DispatchQueue(label: "workout_tracker.persistence", qos: .utility)
+
+    private var pendingRoutinesSave: DispatchWorkItem?
+    private var pendingHistorySave: DispatchWorkItem?
+    private var pendingLiftHistorySave: DispatchWorkItem?
+
+    private var routineIndexByID: [UUID: Int] = [:]
+    private var liftHistoryByExerciseName: [String: [LiftRecord]] = [:]
+    private var cachedExerciseNamesWithHistory: [String] = []
     private var isHydrating = false
 
+    var exerciseNamesWithLiftHistory: [String] {
+        cachedExerciseNamesWithHistory
+    }
+
     init() {
-        encoder.dateEncodingStrategy = .iso8601
         decoder.dateDecodingStrategy = .iso8601
         routines = []
         workoutHistory = []
         liftHistory = []
         hydrate()
+    }
+
+    deinit {
+        flushPendingSaves()
     }
 
     func addRoutine(name: String, exerciseNames: [String]) {
@@ -61,7 +82,7 @@ final class WorkoutStore: ObservableObject {
     }
 
     func updateRoutine(id: UUID, name: String, exercises: [Exercise]) {
-        guard let index = routines.firstIndex(where: { $0.id == id }) else { return }
+        guard let index = routineIndexByID[id] else { return }
         guard let trimmedName = name.nonEmptyTrimmed else { return }
 
         let cleanedExercises = exercises
@@ -95,7 +116,7 @@ final class WorkoutStore: ObservableObject {
     }
 
     func logWorkout(routineID: UUID, entries: [ExerciseEntry]) {
-        guard let routineIndex = routines.firstIndex(where: { $0.id == routineID }) else {
+        guard let routineIndex = routineIndexByID[routineID] else {
             return
         }
 
@@ -120,7 +141,9 @@ final class WorkoutStore: ObservableObject {
 
         var progressedRoutine = routine
         WorkoutProgramEngine.advanceProgramState(in: &progressedRoutine)
-        routines[routineIndex] = progressedRoutine
+        if progressedRoutine != routine {
+            routines[routineIndex] = progressedRoutine
+        }
     }
 
     private func hydrate() {
@@ -149,21 +172,121 @@ final class WorkoutStore: ObservableObject {
             // Backfill normalized lift records from existing session history.
             liftHistory = workoutHistory.flatMap(Self.liftRecords(from:))
         }
+
+        rebuildRoutineIndex()
+        rebuildLiftHistoryIndex()
     }
 
-    private func saveRoutines() {
-        guard let data = try? encoder.encode(routines) else { return }
-        defaults.set(data, forKey: routinesKey)
+    func liftRecords(forExerciseName exerciseName: String) -> [LiftRecord] {
+        liftHistoryByExerciseName[exerciseName] ?? []
     }
 
-    private func saveHistory() {
-        guard let data = try? encoder.encode(workoutHistory) else { return }
-        defaults.set(data, forKey: historyKey)
+    func flushPendingSaves() {
+        pendingRoutinesSave?.cancel()
+        pendingHistorySave?.cancel()
+        pendingLiftHistorySave?.cancel()
+        pendingRoutinesSave = nil
+        pendingHistorySave = nil
+        pendingLiftHistorySave = nil
+
+        // Ensure any already-started background writes finish before this immediate flush.
+        persistenceQueue.sync { }
+
+        persist(routines, forKey: routinesKey)
+        persist(workoutHistory, forKey: historyKey)
+        persist(liftHistory, forKey: liftHistoryKey)
     }
 
-    private func saveLiftHistory() {
-        guard let data = try? encoder.encode(liftHistory) else { return }
-        defaults.set(data, forKey: liftHistoryKey)
+    private static func makeEncoder() -> JSONEncoder {
+        let encoder = JSONEncoder()
+        encoder.dateEncodingStrategy = .iso8601
+        return encoder
+    }
+
+    private func persist<T: Encodable>(_ value: T, forKey key: String) {
+        let encoder = Self.makeEncoder()
+        guard let data = try? encoder.encode(value) else { return }
+        defaults.set(data, forKey: key)
+    }
+
+    private func rebuildRoutineIndex() {
+        routineIndexByID = Dictionary(
+            uniqueKeysWithValues: routines.enumerated().map { index, routine in
+                (routine.id, index)
+            }
+        )
+    }
+
+    private func rebuildLiftHistoryIndex() {
+        var byExerciseName: [String: [LiftRecord]] = [:]
+        byExerciseName.reserveCapacity(liftHistoryByExerciseName.count)
+
+        for record in liftHistory {
+            byExerciseName[record.exerciseName, default: []].append(record)
+        }
+
+        liftHistoryByExerciseName = byExerciseName
+        cachedExerciseNamesWithHistory = byExerciseName.keys.sorted()
+    }
+
+    private func scheduleRoutinesSave() {
+        let snapshot = routines
+        pendingRoutinesSave?.cancel()
+
+        let key = routinesKey
+        let defaults = self.defaults
+
+        let work = DispatchWorkItem {
+            let encoder = Self.makeEncoder()
+            guard let data = try? encoder.encode(snapshot) else { return }
+            defaults.set(data, forKey: key)
+        }
+
+        pendingRoutinesSave = work
+        persistenceQueue.asyncAfter(
+            deadline: .now() + .milliseconds(Persistence.saveDebounceMilliseconds),
+            execute: work
+        )
+    }
+
+    private func scheduleHistorySave() {
+        let snapshot = workoutHistory
+        pendingHistorySave?.cancel()
+
+        let key = historyKey
+        let defaults = self.defaults
+
+        let work = DispatchWorkItem {
+            let encoder = Self.makeEncoder()
+            guard let data = try? encoder.encode(snapshot) else { return }
+            defaults.set(data, forKey: key)
+        }
+
+        pendingHistorySave = work
+        persistenceQueue.asyncAfter(
+            deadline: .now() + .milliseconds(Persistence.saveDebounceMilliseconds),
+            execute: work
+        )
+    }
+
+    private func scheduleLiftHistorySave() {
+        let snapshot = liftHistory
+        pendingLiftHistorySave?.cancel()
+
+        let key = liftHistoryKey
+        let defaults = self.defaults
+
+        let work = DispatchWorkItem {
+            let encoder = Self.makeEncoder()
+            guard let data = try? encoder.encode(snapshot) else { return }
+            defaults.set(data, forKey: key)
+        }
+
+        pendingLiftHistorySave = work
+        persistenceQueue.asyncAfter(
+            deadline: .now() + .milliseconds(Persistence.saveDebounceMilliseconds),
+            execute: work
+        )
     }
 
     private static func liftRecords(from session: WorkoutSession) -> [LiftRecord] {
@@ -187,6 +310,53 @@ final class WorkoutStore: ObservableObject {
             }
         }
     }
+
+#if DEBUG
+    func runHistoryQueryBenchmark(iterations: Int = 25) -> String {
+        let exerciseNames = cachedExerciseNamesWithHistory
+        guard !exerciseNames.isEmpty else {
+            return "No lift history available for benchmarking."
+        }
+
+        let loops = max(1, iterations)
+        let totalRecords = liftHistory.count
+
+        let indexedMs = measureMilliseconds {
+            for _ in 0..<loops {
+                for exerciseName in exerciseNames {
+                    _ = liftHistoryByExerciseName[exerciseName]?.count ?? 0
+                }
+            }
+        }
+
+        let naiveMs = measureMilliseconds {
+            for _ in 0..<loops {
+                for exerciseName in exerciseNames {
+                    _ = liftHistory.filter { $0.exerciseName == exerciseName }.count
+                }
+            }
+        }
+
+        let delta = naiveMs - indexedMs
+        let speedup = indexedMs > 0 ? naiveMs / indexedMs : 0
+
+        return """
+        Records: \(totalRecords)
+        Exercises: \(exerciseNames.count)
+        Iterations: \(loops)
+        Indexed lookup: \(String(format: "%.2f", indexedMs)) ms
+        Naive filter: \(String(format: "%.2f", naiveMs)) ms
+        Delta: \(String(format: "%.2f", delta)) ms
+        Speedup: \(String(format: "%.2fx", speedup))
+        """
+    }
+
+    private func measureMilliseconds(_ work: () -> Void) -> Double {
+        let start = CFAbsoluteTimeGetCurrent()
+        work()
+        return (CFAbsoluteTimeGetCurrent() - start) * 1000
+    }
+#endif
 }
 
 private extension WorkoutStore {

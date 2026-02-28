@@ -34,6 +34,10 @@ struct HistoryView: View {
     @State private var selectedCalendarDay: Date?
     @State private var displayedMonth = Date()
     @State private var hasInitializedCalendarMonth = false
+#if DEBUG
+    @State private var showBenchmarkAlert = false
+    @State private var benchmarkSummary = ""
+#endif
 
     var body: some View {
         NavigationStack {
@@ -45,18 +49,20 @@ struct HistoryView: View {
                         description: Text("Your completed workouts will appear here.")
                     )
                 } else {
+                    let sessions = filteredSessions
+
                     List {
-                        calendarSection
+                        calendarSection(filteredSessionCount: sessions.count)
                         progressSection
 
-                        if filteredSessions.isEmpty {
+                        if sessions.isEmpty {
                             Section("Logged Sessions") {
                                 Text("No workouts match the selected date.")
                                     .font(.subheadline)
                                     .foregroundStyle(.secondary)
                             }
                         } else {
-                            ForEach(filteredSessions) { session in
+                            ForEach(sessions) { session in
                                 Section {
                                     ForEach(session.entries) { entry in
                                         VStack(alignment: .leading, spacing: Constants.sessionEntrySpacing) {
@@ -110,20 +116,35 @@ struct HistoryView: View {
             .onChange(of: store.workoutHistory) { _, _ in
                 syncCalendarState()
             }
+#if DEBUG
+            .toolbar {
+                ToolbarItem(placement: .topBarTrailing) {
+                    Button("Benchmark") {
+                        benchmarkSummary = store.runHistoryQueryBenchmark()
+                        showBenchmarkAlert = true
+                    }
+                }
+            }
+            .alert("History Query Benchmark", isPresented: $showBenchmarkAlert) {
+                Button("OK", role: .cancel) { }
+            } message: {
+                Text(benchmarkSummary)
+            }
+#endif
         }
     }
 
     private var trackedExercises: [String] {
-        Array(Set(store.liftHistory.map(\.exerciseName))).sorted()
+        store.exerciseNamesWithLiftHistory
     }
 
-    private var selectedExerciseBinding: Binding<String> {
+    private func selectedExerciseBinding(options: [String]) -> Binding<String> {
         Binding(
             get: {
-                if trackedExercises.contains(selectedExerciseName) {
+                if options.contains(selectedExerciseName) {
                     return selectedExerciseName
                 }
-                return trackedExercises.first ?? ""
+                return options.first ?? ""
             },
             set: { newValue in
                 selectedExerciseName = newValue
@@ -203,7 +224,7 @@ struct HistoryView: View {
         displayedMonthStart.formatted(.dateTime.month(.wide).year())
     }
 
-    private var calendarSection: some View {
+    private func calendarSection(filteredSessionCount: Int) -> some View {
         Section("Workout Calendar") {
             VStack(spacing: Constants.calendarSectionSpacing) {
                 HStack {
@@ -256,7 +277,7 @@ struct HistoryView: View {
                 if let selectedCalendarDay {
                     HStack(alignment: .firstTextBaseline) {
                         Text(
-                            "Showing \(filteredSessions.count) workout\(filteredSessions.count == 1 ? "" : "s") on \(selectedCalendarDay.formatted(date: .abbreviated, time: .omitted))."
+                            "Showing \(filteredSessionCount) workout\(filteredSessionCount == 1 ? "" : "s") on \(selectedCalendarDay.formatted(date: .abbreviated, time: .omitted))."
                         )
                         .font(.caption)
                         .foregroundStyle(.secondary)
@@ -324,10 +345,10 @@ struct HistoryView: View {
         displayedMonth = calendar.startOfMonth(for: nextMonth)
     }
 
-    private var progressPoints: [LiftProgressPoint] {
-        guard !selectedExerciseName.isEmpty else { return [] }
+    private func progressPoints(for exerciseName: String) -> [LiftProgressPoint] {
+        guard !exerciseName.isEmpty else { return [] }
 
-        let records = store.liftHistory.filter { $0.exerciseName == selectedExerciseName }
+        let records = store.liftRecords(forExerciseName: exerciseName)
         let groupedBySession = Dictionary(grouping: records, by: \.sessionID)
 
         return groupedBySession.compactMap { sessionID, groupedRecords in
@@ -341,7 +362,7 @@ struct HistoryView: View {
         .sorted { $0.date < $1.date }
     }
 
-    private var trendSummary: String? {
+    private func trendSummary(for progressPoints: [LiftProgressPoint]) -> String? {
         guard let firstPoint = progressPoints.first else { return nil }
         let latestPoint = progressPoints.last ?? firstPoint
         let latestWeight = WeightFormatter.displayString(latestPoint.topWeight)
@@ -358,25 +379,29 @@ struct HistoryView: View {
     }
 
     private var progressSection: some View {
-        Section("Progress Over Time") {
-            if trackedExercises.isEmpty {
+        let exercises = trackedExercises
+        let points = progressPoints(for: selectedExerciseName)
+        let summary = trendSummary(for: points)
+
+        return Section("Progress Over Time") {
+            if exercises.isEmpty {
                 Text("Log sets with weight to see progress over time.")
                     .font(.subheadline)
                     .foregroundStyle(.secondary)
             } else {
-                Picker("Exercise", selection: selectedExerciseBinding) {
-                    ForEach(trackedExercises, id: \.self) { exerciseName in
+                Picker("Exercise", selection: selectedExerciseBinding(options: exercises)) {
+                    ForEach(exercises, id: \.self) { exerciseName in
                         Text(exerciseName).tag(exerciseName)
                     }
                 }
                 .pickerStyle(.menu)
 
-                if progressPoints.isEmpty {
+                if points.isEmpty {
                     Text("No weighted sets for this exercise yet.")
                         .font(.subheadline)
                         .foregroundStyle(.secondary)
                 } else {
-                    Chart(progressPoints) { point in
+                    Chart(points) { point in
                         LineMark(
                             x: .value("Date", point.date),
                             y: .value("Top Weight (lb)", point.topWeight)
@@ -396,8 +421,8 @@ struct HistoryView: View {
                         AxisMarks(position: .leading)
                     }
 
-                    if let trendSummary {
-                        Text(trendSummary)
+                    if let summary {
+                        Text(summary)
                             .font(.caption)
                             .foregroundStyle(.secondary)
                     }
