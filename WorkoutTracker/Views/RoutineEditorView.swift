@@ -23,61 +23,78 @@ struct RoutineEditorView: View {
     }
 
     var body: some View {
-        Form {
-            if let routine, let program = routine.program {
-                Section("Program") {
-                    Text(program.kind.displayName)
+        ZStack {
+            AppBackground()
+            Form {
+                if let routine, let program = routine.program {
+                    Section("Program") {
+                        Text(program.kind.displayName)
+                            .foregroundStyle(AppColors.textPrimary)
 
-                    if let context = WorkoutProgramEngine.contextLabel(for: routine) {
-                        Text(context)
-                            .font(.caption)
-                            .foregroundStyle(.secondary)
-                    }
-                }
-            }
-
-            Section("Routine") {
-                TextField("Name", text: $routineName)
-                    .textInputAutocapitalization(.words)
-            }
-
-            Section {
-                HStack {
-                    TextField("Add exercise", text: $pendingExerciseName)
-                        .textInputAutocapitalization(.words)
-
-                    Button("Add") {
-                        addExercise()
-                    }
-                    .disabled(pendingExerciseName.nonEmptyTrimmed == nil)
-                }
-            } header: {
-                Text("Exercises")
-            } footer: {
-                Text("Set TM/Working Weight for auto-calculated sets.")
-            }
-
-            if exercises.isEmpty {
-                Text("Add at least one exercise")
-                    .foregroundStyle(.secondary)
-            } else {
-                Section {
-                    ForEach($exercises) { $exercise in
-                        VStack(alignment: .leading, spacing: 8) {
-                            TextField("Exercise", text: $exercise.name)
-                                .textInputAutocapitalization(.words)
-
-                            TextField("TM / Working Weight (lbs)", text: $exercise.trainingMaxText)
-                                .keyboardType(.decimalPad)
+                        if let context = WorkoutProgramEngine.contextLabel(for: routine) {
+                            Text(context)
+                                .font(.caption)
+                                .foregroundStyle(AppColors.textSecondary)
                         }
-                        .padding(.vertical, 2)
                     }
-                    .onDelete(perform: deleteExercise)
-                    .onMove(perform: moveExercise)
+                    .listRowBackground(AppColors.surface)
+                }
+
+                Section("Routine") {
+                    TextField("Name", text: $routineName)
+                        .textInputAutocapitalization(.words)
+                        .foregroundStyle(AppColors.textPrimary)
+                }
+                .listRowBackground(AppColors.surface)
+
+                Section {
+                    HStack {
+                        TextField("Add exercise", text: $pendingExerciseName)
+                            .textInputAutocapitalization(.words)
+                            .foregroundStyle(AppColors.textPrimary)
+
+                        Button("Add") {
+                            addExercise()
+                        }
+                        .disabled(pendingExerciseName.nonEmptyTrimmed == nil)
+                        .tint(AppColors.accent)
+                    }
+                } header: {
+                    Text("Exercises")
+                } footer: {
+                    Text("Set TM/Working Weight for auto-calculated sets.")
+                }
+                .listRowBackground(AppColors.surface)
+
+                if exercises.isEmpty {
+                    Text("Add at least one exercise")
+                        .foregroundStyle(AppColors.textSecondary)
+                        .listRowBackground(AppColors.surface)
+                } else {
+                    Section {
+                        ForEach($exercises) { $exercise in
+                            VStack(alignment: .leading, spacing: 8) {
+                                TextField("Exercise", text: $exercise.name)
+                                    .textInputAutocapitalization(.words)
+                                    .foregroundStyle(AppColors.textPrimary)
+
+                                TextField("TM / Working Weight (lbs)", text: $exercise.trainingMaxText)
+                                    .keyboardType(.decimalPad)
+                                    .foregroundStyle(AppColors.textPrimary)
+                            }
+                            .padding(.vertical, 2)
+                        }
+                        .onDelete(perform: deleteExercise)
+                        .onMove(perform: moveExercise)
+                    }
+                    .listRowBackground(AppColors.surface)
                 }
             }
+            .scrollContentBackground(.hidden)
         }
         .navigationTitle("Edit Routine")
+        .toolbarBackground(AppColors.chrome, for: .navigationBar)
+        .toolbarBackground(.visible, for: .navigationBar)
         .onAppear(perform: loadRoutine)
         .alert("Could Not Save", isPresented: $showInvalidAlert) {
             Button("OK", role: .cancel) { }
@@ -94,6 +111,7 @@ struct RoutineEditorView: View {
                 }
             }
         }
+        .tint(AppColors.accent)
     }
 
     private func loadRoutine() {

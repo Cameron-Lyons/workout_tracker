@@ -71,66 +71,91 @@ struct WorkoutLoggerView: View {
 
     var body: some View {
         NavigationStack {
-            VStack(spacing: Layout.rootSpacing) {
-                let selectedRoutineWithPlan = selectedRoutine.map { routine in
-                    (routine: routine, plan: WorkoutProgramEngine.plan(for: routine))
-                }
+            ZStack {
+                AppBackground()
+                VStack(spacing: Layout.rootSpacing) {
+                    let selectedRoutineWithPlan = selectedRoutine.map { routine in
+                        (routine: routine, plan: WorkoutProgramEngine.plan(for: routine))
+                    }
 
-                routineSelector
+                    routineSelector
 
-                if let contextLabel = selectedRoutineWithPlan?.plan.contextLabel {
-                    Text(contextLabel)
-                        .font(.subheadline.weight(.semibold))
-                        .foregroundStyle(.secondary)
+                    if let contextLabel = selectedRoutineWithPlan?.plan.contextLabel {
+                        Text(contextLabel)
+                            .font(.caption.weight(.heavy))
+                            .tracking(0.7)
+                            .foregroundStyle(AppColors.textSecondary)
+                            .padding(.horizontal)
+                            .frame(maxWidth: .infinity, alignment: .leading)
+                    }
+
+                    Text("Manual input stays in control. Use voice as a quick shortcut when you want it.")
+                        .font(.footnote)
+                        .foregroundStyle(AppColors.textSecondary)
                         .padding(.horizontal)
                         .frame(maxWidth: .infinity, alignment: .leading)
-                }
 
-                Text("Manual entry is primary. Enable voice tools only if you want quick dictation.")
-                    .font(.footnote)
-                    .foregroundStyle(.secondary)
-                    .padding(.horizontal)
-                    .frame(maxWidth: .infinity, alignment: .leading)
-
-                restTimerCard
-                    .padding(.horizontal)
-
-                if let selectedRoutineWithPlan {
-                    let routine = selectedRoutineWithPlan.routine
-                    let plan = selectedRoutineWithPlan.plan
-
-                    ScrollView {
-                        LazyVStack(spacing: Layout.sectionSpacing) {
-                            ForEach(activeExercises(in: routine, plan: plan)) { exercise in
-                                exerciseCard(exercise, plan: plan)
-                            }
-                        }
+                    restTimerCard
                         .padding(.horizontal)
-                        .padding(.bottom, Layout.listBottomPadding)
-                    }
 
-                    Button {
-                        saveWorkout(routine: routine, plan: plan)
-                    } label: {
-                        Text("Save Workout")
-                            .font(.headline)
-                            .frame(maxWidth: .infinity)
+                    if let selectedRoutineWithPlan {
+                        let routine = selectedRoutineWithPlan.routine
+                        let plan = selectedRoutineWithPlan.plan
+
+                        ScrollView {
+                            LazyVStack(spacing: Layout.sectionSpacing) {
+                                ForEach(activeExercises(in: routine, plan: plan)) { exercise in
+                                    exerciseCard(exercise, plan: plan)
+                                        .scrollTransition(axis: .vertical) { content, phase in
+                                            content
+                                                .opacity(phase.isIdentity ? 1 : 0.84)
+                                                .scaleEffect(phase.isIdentity ? 1 : 0.985)
+                                        }
+                                }
+                            }
+                            .padding(.horizontal)
+                            .padding(.bottom, Layout.listBottomPadding)
+                        }
+
+                        Button {
+                            saveWorkout(routine: routine, plan: plan)
+                        } label: {
+                            Text("Save Workout")
+                                .font(.headline)
+                                .frame(maxWidth: .infinity)
+                        }
+                        .buttonStyle(.borderedProminent)
+                        .tint(AppColors.accent)
+                        .controlSize(.large)
+                        .padding(.horizontal)
+                        .padding(.bottom)
+                        .disabled(!hasAnyLoggedValues(in: routine, plan: plan))
+                    } else {
+                        Spacer()
+                        VStack(spacing: 12) {
+                            Image(systemName: "figure.strengthtraining.traditional")
+                                .font(.system(size: 38, weight: .semibold))
+                                .foregroundStyle(AppColors.accent)
+
+                            Text("No Routine Selected")
+                                .font(.system(.title3, design: .rounded).weight(.bold))
+                                .foregroundStyle(AppColors.textPrimary)
+
+                            Text("Create a routine first, then pick it here to start logging.")
+                                .font(.subheadline)
+                                .foregroundStyle(AppColors.textSecondary)
+                                .multilineTextAlignment(.center)
+                        }
+                        .padding(22)
+                        .appSurface()
+                        .padding(.horizontal)
+                        Spacer()
                     }
-                    .buttonStyle(.borderedProminent)
-                    .padding(.horizontal)
-                    .padding(.bottom)
-                    .disabled(!hasAnyLoggedValues(in: routine, plan: plan))
-                } else {
-                    Spacer()
-                    ContentUnavailableView(
-                        "No Routine Selected",
-                        systemImage: "figure.strengthtraining.traditional",
-                        description: Text("Create a routine first, then pick it here to start logging.")
-                    )
-                    Spacer()
                 }
             }
             .navigationTitle("Log Workout")
+            .toolbarBackground(AppColors.chrome, for: .navigationBar)
+            .toolbarBackground(.visible, for: .navigationBar)
             .onAppear(perform: syncSelection)
             .onChange(of: store.routines) { _, _ in
                 syncSelection()
@@ -161,12 +186,21 @@ struct WorkoutLoggerView: View {
                     }
                 }
             }
+            .tint(AppColors.accent)
             .overlay(alignment: .bottom) {
                 if showSavedToast {
                     Text("Workout saved")
+                        .foregroundStyle(AppColors.textPrimary)
                         .padding(.horizontal, Layout.toastHorizontalPadding)
                         .padding(.vertical, Layout.toastVerticalPadding)
-                        .background(.thinMaterial, in: Capsule())
+                        .background(
+                            Capsule()
+                                .fill(AppColors.surfaceStrong.opacity(0.98))
+                        )
+                        .overlay(
+                            Capsule()
+                                .stroke(AppColors.stroke, lineWidth: 1)
+                        )
                         .padding(.bottom, Layout.toastBottomPadding)
                         .transition(.move(edge: .bottom).combined(with: .opacity))
                 }
@@ -176,13 +210,24 @@ struct WorkoutLoggerView: View {
     }
 
     private var routineSelector: some View {
-        Picker("Routine", selection: $selectedRoutineID) {
-            Text("Choose Routine").tag(Optional<UUID>.none)
-            ForEach(store.routines) { routine in
-                Text(routine.name).tag(Optional(routine.id))
+        VStack(alignment: .leading, spacing: 10) {
+            Text("Routine")
+                .font(.caption.weight(.semibold))
+                .foregroundStyle(AppColors.textSecondary)
+                .textCase(.uppercase)
+                .tracking(0.6)
+
+            Picker("Routine", selection: $selectedRoutineID) {
+                Text("Choose Routine").tag(Optional<UUID>.none)
+                ForEach(store.routines) { routine in
+                    Text(routine.name).tag(Optional(routine.id))
+                }
             }
+            .pickerStyle(.menu)
+            .tint(AppColors.textPrimary)
         }
-        .pickerStyle(.menu)
+        .padding(14)
+        .appSurface(cornerRadius: Layout.cardCornerRadius, shadow: false)
         .padding(.horizontal)
     }
 
@@ -190,15 +235,16 @@ struct WorkoutLoggerView: View {
         VStack(alignment: .leading, spacing: Layout.sectionSpacing) {
             HStack {
                 Label("Rest Timer", systemImage: "timer")
-                    .font(.subheadline.weight(.semibold))
+                    .font(.system(.body, design: .rounded).weight(.black))
+                    .foregroundStyle(AppColors.textPrimary)
                 Spacer()
                 Text(restTimerDisplay)
                     .font(.title3.monospacedDigit().weight(.semibold))
-                    .foregroundStyle(restTimerRemaining == 0 && !isRestTimerRunning ? .secondary : .primary)
+                    .foregroundStyle(restTimerRemaining == 0 && !isRestTimerRunning ? AppColors.textSecondary : AppColors.textPrimary)
             }
 
             ProgressView(value: restProgress)
-                .tint(restTimerRemaining == 0 ? .green : .blue)
+                .tint(restTimerRemaining == 0 ? AppColors.accentAlt : AppColors.accent)
 
             HStack(spacing: Layout.compactSpacing) {
                 ForEach(Constants.restPresets, id: \.self) { seconds in
@@ -206,6 +252,7 @@ struct WorkoutLoggerView: View {
                         startRestTimer(seconds: seconds)
                     }
                     .buttonStyle(.bordered)
+                    .tint(AppColors.accentAlt.opacity(0.85))
                     .font(.caption)
                 }
             }
@@ -223,11 +270,13 @@ struct WorkoutLoggerView: View {
                     Label(restControlLabel, systemImage: restControlIcon)
                 }
                 .buttonStyle(.borderedProminent)
+                .tint(AppColors.accent)
 
                 Button("+30s") {
                     addRestTime(seconds: Constants.quickAddRestSeconds)
                 }
                 .buttonStyle(.bordered)
+                .tint(AppColors.accentAlt)
 
                 Button("Reset", role: .destructive) {
                     resetRestTimer()
@@ -239,18 +288,16 @@ struct WorkoutLoggerView: View {
             if restTimerRemaining == 0 && !isRestTimerRunning {
                 Text("Ready for your next set.")
                     .font(.caption)
-                    .foregroundStyle(.secondary)
+                    .foregroundStyle(AppColors.textSecondary)
             }
 
             Toggle("Auto-start after saving workout", isOn: $autoStartRestTimer)
                 .font(.caption)
+                .tint(AppColors.accentAlt)
         }
         .padding()
         .frame(maxWidth: .infinity, alignment: .leading)
-        .background(
-            Color(uiColor: .secondarySystemBackground),
-            in: RoundedRectangle(cornerRadius: Layout.cardCornerRadius)
-        )
+        .appSurface(cornerRadius: Layout.cardCornerRadius, shadow: false)
     }
 
     private func exerciseCard(
@@ -261,13 +308,16 @@ struct WorkoutLoggerView: View {
 
         return VStack(alignment: .leading, spacing: Layout.rowSpacing) {
             Text(exercise.name)
-                .font(.headline)
+                .font(.system(size: 20, weight: .black, design: .rounded))
+                .foregroundStyle(AppColors.textPrimary)
 
             ForEach(Array(sets.enumerated()), id: \.element.id) { index, set in
                 VStack(alignment: .leading, spacing: Layout.compactSpacing) {
                     HStack {
                         Text("Set \(index + 1)")
-                            .font(.subheadline.weight(.semibold))
+                            .font(.caption.weight(.heavy))
+                            .tracking(0.4)
+                            .foregroundStyle(AppColors.textSecondary)
 
                         Spacer()
 
@@ -278,23 +328,24 @@ struct WorkoutLoggerView: View {
                                 Image(systemName: "trash")
                             }
                             .buttonStyle(.plain)
+                            .foregroundStyle(Color.red.opacity(0.9))
                         }
                     }
 
                     HStack(spacing: Layout.rowSpacing) {
                         TextField("Weight", text: weightBinding(for: exercise.id, setID: set.id))
                             .keyboardType(.decimalPad)
-                            .textFieldStyle(.roundedBorder)
+                            .appInputField()
 
                         TextField("Reps", text: repsBinding(for: exercise.id, setID: set.id))
                             .keyboardType(.numberPad)
-                            .textFieldStyle(.roundedBorder)
+                            .appInputField()
                     }
 
                     if let note = set.prescriptionNote, !note.isEmpty {
                         Text(note)
                             .font(.caption)
-                            .foregroundStyle(.secondary)
+                            .foregroundStyle(AppColors.textSecondary)
                     }
 
                     if showVoiceTools {
@@ -308,22 +359,19 @@ struct WorkoutLoggerView: View {
                                 )
                             }
                             .buttonStyle(.bordered)
-                            .tint(isVoiceActive(for: exercise.id, setID: set.id) && speechInput.isRecording ? .red : .blue)
+                            .tint(isVoiceActive(for: exercise.id, setID: set.id) && speechInput.isRecording ? .red : AppColors.accentAlt)
 
                             if !set.transcript.isEmpty {
                                 Text("Heard: \(set.transcript)")
                                     .font(.caption)
-                                    .foregroundStyle(.secondary)
+                                    .foregroundStyle(AppColors.textSecondary)
                                     .lineLimit(2)
                             }
                         }
                     }
                 }
                 .padding(Layout.setCardPadding)
-                .background(
-                    Color(uiColor: .tertiarySystemBackground),
-                    in: RoundedRectangle(cornerRadius: Layout.setCardCornerRadius)
-                )
+                .appSurface(cornerRadius: Layout.setCardCornerRadius, shadow: false)
             }
 
             Button {
@@ -332,13 +380,11 @@ struct WorkoutLoggerView: View {
                 Label("Add Set", systemImage: "plus.circle")
             }
             .buttonStyle(.bordered)
+            .tint(AppColors.accentAlt)
         }
         .padding()
         .frame(maxWidth: .infinity, alignment: .leading)
-        .background(
-            Color(uiColor: .secondarySystemBackground),
-            in: RoundedRectangle(cornerRadius: Layout.cardCornerRadius)
-        )
+        .appSurface(cornerRadius: Layout.cardCornerRadius, shadow: false)
     }
 
     private func activeExercises(in routine: Routine, plan: ProgramWorkoutPlan) -> [Exercise] {

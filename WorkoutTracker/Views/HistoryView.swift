@@ -24,7 +24,6 @@ struct HistoryView: View {
         static let selectedDayOpacity = 0.2
         static let todayOutlineOpacity = 0.7
         static let todayOutlineWidth: CGFloat = 1
-        static let calendarSectionVerticalPadding: CGFloat = 4
         static let chartHeight: CGFloat = 220
         static let chartDesiredTickCount = 4
     }
@@ -41,71 +40,57 @@ struct HistoryView: View {
 
     var body: some View {
         NavigationStack {
-            Group {
-                if store.workoutHistory.isEmpty {
-                    ContentUnavailableView(
-                        "No Logged Workouts",
-                        systemImage: "calendar.badge.clock",
-                        description: Text("Your completed workouts will appear here.")
-                    )
-                } else {
-                    let sessions = filteredSessions
+            ZStack {
+                AppBackground()
+                Group {
+                    if store.workoutHistory.isEmpty {
+                        emptyState
+                    } else {
+                        let sessions = filteredSessions
 
-                    List {
-                        calendarSection(filteredSessionCount: sessions.count)
-                        progressSection
+                        List {
+                            calendarSection(filteredSessionCount: sessions.count)
+                            progressSection
 
-                        if sessions.isEmpty {
-                            Section("Logged Sessions") {
-                                Text("No workouts match the selected date.")
-                                    .font(.subheadline)
-                                    .foregroundStyle(.secondary)
-                            }
-                        } else {
-                            ForEach(sessions) { session in
-                                Section {
-                                    ForEach(session.entries) { entry in
-                                        VStack(alignment: .leading, spacing: Constants.sessionEntrySpacing) {
-                                            Text(entry.exerciseName)
-                                                .font(.subheadline.weight(.semibold))
-
-                                            if entry.sets.isEmpty {
-                                                Text("No sets logged")
-                                                    .font(.caption)
-                                                    .foregroundStyle(.secondary)
-                                            } else {
-                                                ForEach(Array(entry.sets.enumerated()), id: \.element.id) { index, set in
-                                                    HStack {
-                                                        Text("Set \(index + 1)")
-                                                            .foregroundStyle(.secondary)
-                                                        Spacer()
-                                                        Text(setSummary(set))
-                                                            .foregroundStyle(.secondary)
-                                                    }
-                                                    .font(.caption)
+                            if sessions.isEmpty {
+                                Section("Logged Sessions") {
+                                    Text("No workouts match the selected date.")
+                                        .font(.subheadline)
+                                        .foregroundStyle(AppColors.textSecondary)
+                                        .padding(14)
+                                        .appSurface(cornerRadius: 14, shadow: false)
+                                        .listRowBackground(Color.clear)
+                                        .listRowInsets(EdgeInsets(top: 6, leading: 14, bottom: 8, trailing: 14))
+                                        .listRowSeparator(.hidden)
+                                }
+                            } else {
+                                ForEach(sessions) { session in
+                                    Section {
+                                        ForEach(session.entries) { entry in
+                                            sessionEntryCard(entry)
+                                                .scrollTransition(axis: .vertical) { content, phase in
+                                                    content
+                                                        .opacity(phase.isIdentity ? 1 : 0.84)
+                                                        .scaleEffect(phase.isIdentity ? 1 : 0.985)
                                                 }
-                                            }
+                                                .listRowBackground(Color.clear)
+                                                .listRowSeparator(.hidden)
+                                                .listRowInsets(EdgeInsets(top: 6, leading: 14, bottom: 6, trailing: 14))
                                         }
-                                    }
-                                } header: {
-                                    VStack(alignment: .leading, spacing: Constants.sessionHeaderSpacing) {
-                                        Text(session.routineName)
-                                        if let context = session.programContext, !context.isEmpty {
-                                            Text(context)
-                                                .font(.caption)
-                                                .foregroundStyle(.secondary)
-                                        }
-                                        Text(session.performedAt.formatted(date: .abbreviated, time: .shortened))
-                                            .font(.caption)
-                                            .foregroundStyle(.secondary)
+                                    } header: {
+                                        sessionHeader(session)
                                     }
                                 }
                             }
                         }
+                        .listStyle(.plain)
+                        .scrollContentBackground(.hidden)
                     }
                 }
             }
             .navigationTitle("History")
+            .toolbarBackground(AppColors.chrome, for: .navigationBar)
+            .toolbarBackground(.visible, for: .navigationBar)
             .onAppear {
                 syncExerciseSelection()
                 syncCalendarState()
@@ -116,6 +101,7 @@ struct HistoryView: View {
             .onChange(of: store.workoutHistory) { _, _ in
                 syncCalendarState()
             }
+            .tint(AppColors.accent)
 #if DEBUG
             .toolbar {
                 ToolbarItem(placement: .topBarTrailing) {
@@ -132,6 +118,72 @@ struct HistoryView: View {
             }
 #endif
         }
+    }
+
+    private var emptyState: some View {
+        VStack(spacing: 14) {
+            Image(systemName: "calendar.badge.clock")
+                .font(.system(size: 40, weight: .semibold))
+                .foregroundStyle(AppColors.accent)
+
+            Text("No Logged Workouts")
+                .font(.system(size: 30, weight: .black, design: .rounded))
+                .foregroundStyle(AppColors.textPrimary)
+
+            Text("Your completed workouts and progress trends will appear here.")
+                .font(.subheadline)
+                .foregroundStyle(AppColors.textSecondary)
+                .multilineTextAlignment(.center)
+        }
+        .padding(24)
+        .appSurface()
+        .padding(.horizontal, 20)
+    }
+
+    private func sessionEntryCard(_ entry: ExerciseEntry) -> some View {
+        VStack(alignment: .leading, spacing: Constants.sessionEntrySpacing) {
+            Text(entry.exerciseName)
+                .font(.subheadline.weight(.semibold))
+                .foregroundStyle(AppColors.textPrimary)
+
+            if entry.sets.isEmpty {
+                Text("No sets logged")
+                    .font(.caption)
+                    .foregroundStyle(AppColors.textSecondary)
+            } else {
+                ForEach(Array(entry.sets.enumerated()), id: \.element.id) { index, set in
+                    HStack {
+                        Text("Set \(index + 1)")
+                            .foregroundStyle(AppColors.textSecondary)
+                        Spacer()
+                        Text(setSummary(set))
+                            .foregroundStyle(AppColors.textSecondary)
+                    }
+                    .font(.caption)
+                }
+            }
+        }
+        .padding(14)
+        .appSurface(cornerRadius: 14, shadow: false)
+    }
+
+    private func sessionHeader(_ session: WorkoutSession) -> some View {
+        VStack(alignment: .leading, spacing: Constants.sessionHeaderSpacing) {
+            Text(session.routineName)
+                .font(.system(size: 20, weight: .black, design: .rounded))
+                .foregroundStyle(AppColors.textPrimary)
+            if let context = session.programContext, !context.isEmpty {
+                Text(context)
+                    .font(.caption)
+                    .foregroundStyle(AppColors.textSecondary)
+            }
+            Text(session.performedAt.formatted(date: .abbreviated, time: .shortened))
+                .font(.caption)
+                .foregroundStyle(AppColors.textSecondary)
+        }
+        .textCase(nil)
+        .padding(.top, 16)
+        .padding(.horizontal, 14)
     }
 
     private var trackedExercises: [String] {
@@ -238,7 +290,8 @@ struct HistoryView: View {
                     Spacer()
 
                     Text(monthTitle)
-                        .font(.headline)
+                        .font(.system(size: 22, weight: .black, design: .rounded))
+                        .foregroundStyle(AppColors.textPrimary)
 
                     Spacer()
 
@@ -260,7 +313,7 @@ struct HistoryView: View {
                     ForEach(Array(orderedWeekdaySymbols.enumerated()), id: \.offset) { _, symbol in
                         Text(symbol)
                             .font(.caption.weight(.semibold))
-                            .foregroundStyle(.secondary)
+                            .foregroundStyle(AppColors.textSecondary)
                             .frame(maxWidth: .infinity)
                     }
 
@@ -280,7 +333,7 @@ struct HistoryView: View {
                             "Showing \(filteredSessionCount) workout\(filteredSessionCount == 1 ? "" : "s") on \(selectedCalendarDay.formatted(date: .abbreviated, time: .omitted))."
                         )
                         .font(.caption)
-                        .foregroundStyle(.secondary)
+                        .foregroundStyle(AppColors.textSecondary)
 
                         Spacer()
 
@@ -292,11 +345,15 @@ struct HistoryView: View {
                 } else {
                     Text("Tap a marked day to filter sessions by date.")
                         .font(.caption)
-                        .foregroundStyle(.secondary)
+                        .foregroundStyle(AppColors.textSecondary)
                         .frame(maxWidth: .infinity, alignment: .leading)
                 }
             }
-            .padding(.vertical, Constants.calendarSectionVerticalPadding)
+            .padding(14)
+            .appSurface(cornerRadius: 16, shadow: false)
+            .listRowBackground(Color.clear)
+            .listRowSeparator(.hidden)
+            .listRowInsets(EdgeInsets(top: 8, leading: 14, bottom: 8, trailing: 14))
         }
     }
 
@@ -312,21 +369,21 @@ struct HistoryView: View {
             VStack(spacing: Constants.calendarDayInnerSpacing) {
                 Text("\(calendar.component(.day, from: date))")
                     .font(.subheadline.weight(hasWorkout ? .semibold : .regular))
-                    .foregroundStyle(hasWorkout ? Color.primary : Color.secondary)
+                    .foregroundStyle(hasWorkout ? AppColors.textPrimary : AppColors.textSecondary)
 
                 Circle()
-                    .fill(hasWorkout ? (isSelected ? Color.accentColor : Color.secondary) : Color.clear)
+                    .fill(hasWorkout ? (isSelected ? AppColors.accent : AppColors.textSecondary) : Color.clear)
                     .frame(width: Constants.calendarDayMarkerSize, height: Constants.calendarDayMarkerSize)
             }
             .frame(maxWidth: .infinity, minHeight: Constants.calendarDayMinHeight)
             .background {
                 RoundedRectangle(cornerRadius: Constants.calendarDayCornerRadius)
-                    .fill(isSelected ? Color.accentColor.opacity(Constants.selectedDayOpacity) : Color.clear)
+                    .fill(isSelected ? AppColors.accent.opacity(Constants.selectedDayOpacity) : AppColors.surface.opacity(0.35))
             }
             .overlay {
                 RoundedRectangle(cornerRadius: Constants.calendarDayCornerRadius)
                     .stroke(
-                        isToday ? Color.accentColor.opacity(Constants.todayOutlineOpacity) : Color.clear,
+                        isToday ? AppColors.accentAlt.opacity(Constants.todayOutlineOpacity) : Color.clear,
                         lineWidth: Constants.todayOutlineWidth
                     )
             }
@@ -384,50 +441,84 @@ struct HistoryView: View {
         let summary = trendSummary(for: points)
 
         return Section("Progress Over Time") {
-            if exercises.isEmpty {
-                Text("Log sets with weight to see progress over time.")
-                    .font(.subheadline)
-                    .foregroundStyle(.secondary)
-            } else {
-                Picker("Exercise", selection: selectedExerciseBinding(options: exercises)) {
-                    ForEach(exercises, id: \.self) { exerciseName in
-                        Text(exerciseName).tag(exerciseName)
-                    }
-                }
-                .pickerStyle(.menu)
-
-                if points.isEmpty {
-                    Text("No weighted sets for this exercise yet.")
+            VStack(alignment: .leading, spacing: 12) {
+                if exercises.isEmpty {
+                    Text("Log sets with weight to see progress over time.")
                         .font(.subheadline)
-                        .foregroundStyle(.secondary)
+                        .foregroundStyle(AppColors.textSecondary)
                 } else {
-                    Chart(points) { point in
-                        LineMark(
-                            x: .value("Date", point.date),
-                            y: .value("Top Weight (lb)", point.topWeight)
-                        )
-                        .interpolationMethod(.catmullRom)
+                    Picker("Exercise", selection: selectedExerciseBinding(options: exercises)) {
+                        ForEach(exercises, id: \.self) { exerciseName in
+                            Text(exerciseName).tag(exerciseName)
+                        }
+                    }
+                    .pickerStyle(.menu)
+                    .tint(AppColors.textPrimary)
 
-                        PointMark(
-                            x: .value("Date", point.date),
-                            y: .value("Top Weight (lb)", point.topWeight)
-                        )
-                    }
-                    .frame(height: Constants.chartHeight)
-                    .chartXAxis {
-                        AxisMarks(values: .automatic(desiredCount: Constants.chartDesiredTickCount))
-                    }
-                    .chartYAxis {
-                        AxisMarks(position: .leading)
-                    }
+                    if points.isEmpty {
+                        Text("No weighted sets for this exercise yet.")
+                            .font(.subheadline)
+                            .foregroundStyle(AppColors.textSecondary)
+                    } else {
+                        Chart(points) { point in
+                            AreaMark(
+                                x: .value("Date", point.date),
+                                y: .value("Top Weight (lb)", point.topWeight)
+                            )
+                            .interpolationMethod(.catmullRom)
+                            .foregroundStyle(
+                                LinearGradient(
+                                    colors: [AppColors.accent.opacity(0.35), AppColors.accent.opacity(0.02)],
+                                    startPoint: .top,
+                                    endPoint: .bottom
+                                )
+                            )
 
-                    if let summary {
-                        Text(summary)
-                            .font(.caption)
-                            .foregroundStyle(.secondary)
+                            LineMark(
+                                x: .value("Date", point.date),
+                                y: .value("Top Weight (lb)", point.topWeight)
+                            )
+                            .interpolationMethod(.catmullRom)
+                            .lineStyle(StrokeStyle(lineWidth: 2.5, lineCap: .round, lineJoin: .round))
+                            .foregroundStyle(AppColors.accent)
+
+                            PointMark(
+                                x: .value("Date", point.date),
+                                y: .value("Top Weight (lb)", point.topWeight)
+                            )
+                            .foregroundStyle(AppColors.accentAlt)
+                        }
+                        .frame(height: Constants.chartHeight)
+                        .chartXAxis {
+                            AxisMarks(values: .automatic(desiredCount: Constants.chartDesiredTickCount))
+                        }
+                        .chartYAxis {
+                            AxisMarks(position: .leading)
+                        }
+                        .chartXAxisLabel(position: .bottom) {
+                            Text("Date")
+                                .font(.caption2)
+                                .foregroundStyle(AppColors.textSecondary)
+                        }
+                        .chartYAxisLabel(position: .leading) {
+                            Text("Top Weight (lb)")
+                                .font(.caption2)
+                                .foregroundStyle(AppColors.textSecondary)
+                        }
+
+                        if let summary {
+                            Text(summary)
+                                .font(.caption)
+                                .foregroundStyle(AppColors.textSecondary)
+                        }
                     }
                 }
             }
+            .padding(14)
+            .appSurface(cornerRadius: 16, shadow: false)
+            .listRowBackground(Color.clear)
+            .listRowSeparator(.hidden)
+            .listRowInsets(EdgeInsets(top: 8, leading: 14, bottom: 8, trailing: 14))
         }
     }
 

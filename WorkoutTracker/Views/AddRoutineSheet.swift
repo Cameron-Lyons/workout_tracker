@@ -11,35 +11,47 @@ struct AddRoutineSheet: View {
 
     var body: some View {
         NavigationStack {
-            Form {
-                Section("Routine") {
-                    TextField("Name", text: $routineName)
-                        .textInputAutocapitalization(.words)
-                }
-
-                Section("Exercises") {
-                    HStack {
-                        TextField("Add exercise", text: $pendingExercise)
+            ZStack {
+                AppBackground()
+                Form {
+                    Section("Routine") {
+                        TextField("Name", text: $routineName)
                             .textInputAutocapitalization(.words)
-
-                        Button("Add") {
-                            addExercise()
-                        }
-                        .disabled(pendingExercise.nonEmptyTrimmed == nil)
+                            .foregroundStyle(AppColors.textPrimary)
                     }
+                    .listRowBackground(AppColors.surface)
 
-                    if exercises.isEmpty {
-                        Text("Add at least one exercise")
-                            .foregroundStyle(.secondary)
-                    } else {
-                        ForEach(exercises, id: \.self) { exercise in
-                            Text(exercise)
+                    Section("Exercises") {
+                        HStack {
+                            TextField("Add exercise", text: $pendingExercise)
+                                .textInputAutocapitalization(.words)
+                                .foregroundStyle(AppColors.textPrimary)
+
+                            Button("Add") {
+                                addExercise()
+                            }
+                            .disabled(pendingExercise.nonEmptyTrimmed == nil)
+                            .tint(AppColors.accent)
                         }
-                        .onDelete(perform: deleteExercise)
+
+                        if exercises.isEmpty {
+                            Text("Add at least one exercise")
+                                .foregroundStyle(AppColors.textSecondary)
+                        } else {
+                            ForEach(exercises, id: \.self) { exercise in
+                                Text(exercise)
+                                    .foregroundStyle(AppColors.textPrimary)
+                            }
+                            .onDelete(perform: deleteExercise)
+                        }
                     }
+                    .listRowBackground(AppColors.surface)
                 }
+                .scrollContentBackground(.hidden)
             }
             .navigationTitle("New Routine")
+            .toolbarBackground(AppColors.chrome, for: .navigationBar)
+            .toolbarBackground(.visible, for: .navigationBar)
             .toolbar {
                 ToolbarItem(placement: .topBarLeading) {
                     Button("Cancel") {
@@ -54,6 +66,7 @@ struct AddRoutineSheet: View {
                     .disabled(!canSave)
                 }
             }
+            .tint(AppColors.accent)
         }
     }
 
