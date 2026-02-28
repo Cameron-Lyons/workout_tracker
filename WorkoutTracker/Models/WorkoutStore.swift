@@ -14,9 +14,6 @@ final class WorkoutStore: ObservableObject {
     }
 
     private enum Recommendation {
-        static let defaultMinimumIncrease = 2.5
-        static let defaultUpperBodyIncrement = 2.5
-        static let defaultLowerBodyIncrement = 5.0
         static let fallbackTopSetRepGoal = 8
         static let weightComparisonTolerance = 0.01
     }
@@ -216,7 +213,8 @@ final class WorkoutStore: ObservableObject {
         routineName: String,
         exerciseName: String,
         targetReps: [Int],
-        minimumIncrease: Double
+        minimumIncrease: Double,
+        unit: WeightUnit
     ) -> ExerciseWeightRecommendation? {
         let latestRecords = latestSessionRecords(
             forExerciseName: exerciseName,
@@ -230,10 +228,11 @@ final class WorkoutStore: ObservableObject {
             return nil
         }
 
-        let resolvedMinimumIncrease = max(minimumIncrease, Recommendation.defaultMinimumIncrease)
+        let resolvedMinimumIncrease = unit.normalizedDisplayIncrease(minimumIncrease)
         let increment = recommendedIncrement(
             forExerciseName: exerciseName,
-            minimumIncrease: resolvedMinimumIncrease
+            minimumIncrease: resolvedMinimumIncrease,
+            unit: unit
         )
         let cleanedTargets = targetReps.filter { $0 > 0 }
         let shouldIncrease: Bool
@@ -245,7 +244,7 @@ final class WorkoutStore: ObservableObject {
 
             if let topSetReps {
                 if shouldIncrease {
-                    guidance = "Top set reached \(topSetReps) reps last time. Add \(WeightFormatter.displayString(increment)) lb."
+                    guidance = "Top set reached \(topSetReps) reps last time. Add \(WeightFormatter.displayString(displayValue: increment, unit: unit)) \(unit.symbol)."
                 } else {
                     guidance = "Top set reached \(topSetReps) reps last time. Stay at this weight."
                 }
@@ -256,22 +255,27 @@ final class WorkoutStore: ObservableObject {
             shouldIncrease = didMeetAllRepTargets(cleanedTargets, records: latestRecords)
             let targetSummary = cleanedTargets.map(String.init).joined(separator: "/")
             if shouldIncrease {
-                guidance = "Hit all target reps (\(targetSummary)) last time. Add \(WeightFormatter.displayString(increment)) lb."
+                guidance = "Hit all target reps (\(targetSummary)) last time. Add \(WeightFormatter.displayString(displayValue: increment, unit: unit)) \(unit.symbol)."
             } else {
                 guidance = "Missed target reps (\(targetSummary)) last time. Stay at this weight."
             }
         }
 
-        let recommendedWeight = roundToNearestIncrement(
-            previousWeight + (shouldIncrease ? increment : 0),
+        let previousDisplayWeight = unit.displayValue(fromStoredPounds: previousWeight, snapToGymIncrement: false)
+        let recommendedDisplayWeight = roundToNearestIncrement(
+            previousDisplayWeight + (shouldIncrease ? increment : 0),
             increment: resolvedMinimumIncrease
         )
+        let recommendedWeight = unit.storedPounds(
+            fromDisplayValue: unit.roundedForGymDisplay(recommendedDisplayWeight)
+        )
+        let incrementInStoredPounds = unit.storedPounds(fromDisplayValue: increment)
 
         return ExerciseWeightRecommendation(
             recommendedWeight: recommendedWeight,
             previousWeight: previousWeight,
             shouldIncrease: shouldIncrease,
-            increment: shouldIncrease ? increment : 0,
+            increment: shouldIncrease ? incrementInStoredPounds : 0,
             guidance: guidance
         )
     }
@@ -357,11 +361,12 @@ final class WorkoutStore: ObservableObject {
 
     private func recommendedIncrement(
         forExerciseName exerciseName: String,
-        minimumIncrease: Double
+        minimumIncrease: Double,
+        unit: WeightUnit
     ) -> Double {
         isLowerBodyLift(exerciseName)
-            ? max(minimumIncrease, Recommendation.defaultLowerBodyIncrement)
-            : max(minimumIncrease, Recommendation.defaultUpperBodyIncrement)
+            ? max(minimumIncrease, unit.lowerBodyDefaultIncrease)
+            : max(minimumIncrease, unit.upperBodyDefaultIncrease)
     }
 
     private func isLowerBodyLift(_ exerciseName: String) -> Bool {

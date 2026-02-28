@@ -29,6 +29,7 @@ struct HistoryView: View {
     }
 
     @EnvironmentObject private var store: WorkoutStore
+    @AppStorage(WeightUnit.preferenceKey) private var weightUnitRawValue = WeightUnit.pounds.rawValue
     @State private var selectedExerciseName = ""
     @State private var selectedCalendarDay: Date?
     @State private var displayedMonth = Date()
@@ -37,6 +38,10 @@ struct HistoryView: View {
     @State private var showBenchmarkAlert = false
     @State private var benchmarkSummary = ""
 #endif
+
+    private var weightUnit: WeightUnit {
+        WeightUnit(rawValue: weightUnitRawValue) ?? .pounds
+    }
 
     var body: some View {
         NavigationStack {
@@ -410,11 +415,15 @@ struct HistoryView: View {
 
         return groupedBySession.compactMap { sessionID, groupedRecords in
             guard let date = groupedRecords.map(\.performedAt).max(),
-                  let topWeight = groupedRecords.compactMap(\.weight).max() else {
+                  let topWeightInStoredPounds = groupedRecords.compactMap(\.weight).max() else {
                 return nil
             }
 
-            return LiftProgressPoint(sessionID: sessionID, date: date, topWeight: topWeight)
+            return LiftProgressPoint(
+                sessionID: sessionID,
+                date: date,
+                topWeight: weightUnit.displayValue(fromStoredPounds: topWeightInStoredPounds)
+            )
         }
         .sorted { $0.date < $1.date }
     }
@@ -422,17 +431,17 @@ struct HistoryView: View {
     private func trendSummary(for progressPoints: [LiftProgressPoint]) -> String? {
         guard let firstPoint = progressPoints.first else { return nil }
         let latestPoint = progressPoints.last ?? firstPoint
-        let latestWeight = WeightFormatter.displayString(latestPoint.topWeight)
+        let latestWeight = WeightFormatter.displayString(displayValue: latestPoint.topWeight, unit: weightUnit)
 
         if progressPoints.count < 2 {
-            return "Latest top set: \(latestWeight) lb on \(latestPoint.date.formatted(date: .abbreviated, time: .omitted))."
+            return "Latest top set: \(latestWeight) \(weightUnit.symbol) on \(latestPoint.date.formatted(date: .abbreviated, time: .omitted))."
         }
 
         let change = latestPoint.topWeight - firstPoint.topWeight
         let changePrefix = change >= 0 ? "+" : "-"
-        let absoluteChange = WeightFormatter.displayString(abs(change))
+        let absoluteChange = WeightFormatter.displayString(displayValue: abs(change), unit: weightUnit)
 
-        return "Change since first logged workout: \(changePrefix)\(absoluteChange) lb (\(firstPoint.date.formatted(date: .abbreviated, time: .omitted)) -> \(latestPoint.date.formatted(date: .abbreviated, time: .omitted)))."
+        return "Change since first logged workout: \(changePrefix)\(absoluteChange) \(weightUnit.symbol) (\(firstPoint.date.formatted(date: .abbreviated, time: .omitted)) -> \(latestPoint.date.formatted(date: .abbreviated, time: .omitted)))."
     }
 
     private var progressSection: some View {
@@ -463,7 +472,7 @@ struct HistoryView: View {
                         Chart(points) { point in
                             AreaMark(
                                 x: .value("Date", point.date),
-                                y: .value("Top Weight (lb)", point.topWeight)
+                                y: .value("Top Weight (\(weightUnit.symbol))", point.topWeight)
                             )
                             .interpolationMethod(.catmullRom)
                             .foregroundStyle(
@@ -476,7 +485,7 @@ struct HistoryView: View {
 
                             LineMark(
                                 x: .value("Date", point.date),
-                                y: .value("Top Weight (lb)", point.topWeight)
+                                y: .value("Top Weight (\(weightUnit.symbol))", point.topWeight)
                             )
                             .interpolationMethod(.catmullRom)
                             .lineStyle(StrokeStyle(lineWidth: 2.5, lineCap: .round, lineJoin: .round))
@@ -484,7 +493,7 @@ struct HistoryView: View {
 
                             PointMark(
                                 x: .value("Date", point.date),
-                                y: .value("Top Weight (lb)", point.topWeight)
+                                y: .value("Top Weight (\(weightUnit.symbol))", point.topWeight)
                             )
                             .foregroundStyle(AppColors.accentAlt)
                         }
@@ -501,7 +510,7 @@ struct HistoryView: View {
                                 .foregroundStyle(AppColors.textSecondary)
                         }
                         .chartYAxisLabel(position: .leading) {
-                            Text("Top Weight (lb)")
+                            Text("Top Weight (\(weightUnit.symbol))")
                                 .font(.caption2)
                                 .foregroundStyle(AppColors.textSecondary)
                         }
@@ -525,7 +534,7 @@ struct HistoryView: View {
     private func setSummary(_ set: ExerciseSet) -> String {
         let weightText: String
         if let weight = set.weight {
-            weightText = WeightFormatter.displayString(weight)
+            weightText = "\(WeightFormatter.displayString(weight, unit: weightUnit)) \(weightUnit.symbol)"
         } else {
             weightText = "-"
         }

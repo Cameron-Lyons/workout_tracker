@@ -21,7 +21,7 @@ struct WorkoutLoggerView: View {
         static let defaultRestSeconds = 90
         static let minimumRestSeconds = 1
         static let quickAddRestSeconds = 30
-        static let defaultMinimumWeightIncrease = 10.0
+        static let defaultMinimumWeightIncreaseInPounds = 10.0
         static let restPresets = [60, 90, 120, 180]
         static let restTickerInterval = 1.0
         static let animationDuration = 0.2
@@ -44,12 +44,15 @@ struct WorkoutLoggerView: View {
     @EnvironmentObject private var store: WorkoutStore
     @StateObject private var speechInput = SpeechInputManager()
     @AppStorage("workout_tracker_rest_timer_auto_start_v1") private var autoStartRestTimer = false
-    @AppStorage("workout_tracker_min_weight_increase_v1") private var minimumWeightIncrease = Constants.defaultMinimumWeightIncrease
+    @AppStorage(WeightUnit.preferenceKey) private var weightUnitRawValue = WeightUnit.pounds.rawValue
+    @AppStorage("workout_tracker_min_weight_increase_v1")
+    private var minimumWeightIncreaseInPounds = Constants.defaultMinimumWeightIncreaseInPounds
 
     @State private var selectedRoutineID: UUID?
     @State private var drafts: [UUID: [SetDraft]] = [:]
     @State private var activeVoiceTarget: ActiveVoiceTarget?
     @State private var minimumWeightIncreaseInput = ""
+    @State private var previousWeightUnit: WeightUnit = .pounds
 
     @State private var showErrorAlert = false
     @State private var errorMessage = ""
@@ -70,6 +73,19 @@ struct WorkoutLoggerView: View {
     private var selectedRoutine: Routine? {
         guard let selectedRoutineID else { return nil }
         return store.routines.first { $0.id == selectedRoutineID }
+    }
+
+    private var weightUnit: WeightUnit {
+        WeightUnit(rawValue: weightUnitRawValue) ?? .pounds
+    }
+
+    private var weightUnitBinding: Binding<WeightUnit> {
+        Binding(
+            get: { weightUnit },
+            set: { newValue in
+                weightUnitRawValue = newValue.rawValue
+            }
+        )
     }
 
     var body: some View {
@@ -160,11 +176,16 @@ struct WorkoutLoggerView: View {
             .toolbarBackground(AppColors.chrome, for: .navigationBar)
             .toolbarBackground(.visible, for: .navigationBar)
             .onAppear {
+                normalizeStoredMinimumIncrease()
+                previousWeightUnit = weightUnit
                 syncSelection()
                 syncMinimumWeightIncreaseInput()
             }
             .onChange(of: store.routines) { _, _ in
                 syncSelection()
+            }
+            .onChange(of: weightUnitRawValue) { _, _ in
+                handleWeightUnitChange()
             }
             .onChange(of: selectedRoutineID) { _, _ in
                 rebuildDrafts()
@@ -233,6 +254,22 @@ struct WorkoutLoggerView: View {
             .tint(AppColors.textPrimary)
 
             HStack(spacing: Layout.compactSpacing) {
+                Text("Units")
+                    .font(.caption.weight(.semibold))
+                    .foregroundStyle(AppColors.textSecondary)
+
+                Spacer()
+
+                Picker("Units", selection: weightUnitBinding) {
+                    ForEach(WeightUnit.allCases, id: \.self) { unit in
+                        Text(unit.shortLabel).tag(unit)
+                    }
+                }
+                .pickerStyle(.segmented)
+                .frame(width: 210)
+            }
+
+            HStack(spacing: Layout.compactSpacing) {
                 Text("Min Increase")
                     .font(.caption.weight(.semibold))
                     .foregroundStyle(AppColors.textSecondary)
@@ -240,13 +277,19 @@ struct WorkoutLoggerView: View {
                 Spacer()
 
                 HStack(spacing: Layout.compactSpacing) {
-                    TextField("10", text: minimumWeightIncreaseBinding)
+                    TextField(
+                        WeightFormatter.displayString(
+                            displayValue: weightUnit.recommendedMinimumIncreaseDefault,
+                            unit: weightUnit
+                        ),
+                        text: minimumWeightIncreaseBinding
+                    )
                         .keyboardType(.decimalPad)
                         .multilineTextAlignment(.trailing)
                         .frame(width: 66)
                         .appInputField()
 
-                    Text("lb")
+                    Text(weightUnit.symbol)
                         .font(.caption.weight(.semibold))
                         .foregroundStyle(AppColors.textSecondary)
                 }
@@ -424,7 +467,7 @@ struct WorkoutLoggerView: View {
                 Image(systemName: recommendation.shouldIncrease ? "arrow.up.right.circle.fill" : "equal.circle.fill")
                     .foregroundStyle(recommendation.shouldIncrease ? AppColors.accent : AppColors.accentAlt)
 
-                Text("Suggested: \(WeightFormatter.displayString(recommendation.recommendedWeight)) lb")
+                Text("Suggested: \(WeightFormatter.displayString(recommendation.recommendedWeight, unit: weightUnit)) \(weightUnit.symbol)")
                     .font(.caption.weight(.semibold))
                     .foregroundStyle(AppColors.textPrimary)
             }
@@ -502,13 +545,73 @@ struct WorkoutLoggerView: View {
                     return
                 }
 
-                minimumWeightIncrease = parsed
+                let normalizedDisplayValue = weightUnit.normalizedDisplayIncrease(parsed)
+                minimumWeightIncreaseInPounds = weightUnit.storedPounds(fromDisplayValue: normalizedDisplayValue)
+                minimumWeightIncreaseInput = WeightFormatter.displayString(
+                    displayValue: normalizedDisplayValue,
+                    unit: weightUnit
+                )
             }
         )
     }
 
     private func syncMinimumWeightIncreaseInput() {
-        minimumWeightIncreaseInput = WeightFormatter.displayString(minimumWeightIncrease)
+        let displayValue = weightUnit.displayValue(
+            fromStoredPounds: minimumWeightIncreaseInPounds,
+            snapToGymIncrement: false
+        )
+        minimumWeightIncreaseInput = WeightFormatter.displayString(displayValue: displayValue, unit: weightUnit)
+    }
+
+    private func minimumWeightIncreaseDisplayValue() -> Double {
+        let displayValue = weightUnit.displayValue(
+            fromStoredPounds: minimumWeightIncreaseInPounds,
+            snapToGymIncrement: false
+        )
+        return weightUnit.normalizedDisplayIncrease(displayValue)
+    }
+
+    private func normalizeStoredMinimumIncrease() {
+        let displayValue = minimumWeightIncreaseDisplayValue()
+        minimumWeightIncreaseInPounds = weightUnit.storedPounds(fromDisplayValue: displayValue)
+    }
+
+    private func handleWeightUnitChange() {
+        let newUnit = weightUnit
+        let oldUnit = previousWeightUnit
+        previousWeightUnit = newUnit
+
+        guard newUnit != oldUnit else {
+            syncMinimumWeightIncreaseInput()
+            return
+        }
+
+        convertDraftWeights(from: oldUnit, to: newUnit)
+        normalizeStoredMinimumIncrease()
+        syncMinimumWeightIncreaseInput()
+    }
+
+    private func convertDraftWeights(from oldUnit: WeightUnit, to newUnit: WeightUnit) {
+        drafts = drafts.mapValues { sets in
+            sets.map { set in
+                guard let oldDisplayValue = Double(set.weight), oldDisplayValue > 0 else {
+                    return set
+                }
+
+                var converted = set
+                let storedWeight = oldUnit.storedPounds(fromDisplayValue: oldDisplayValue)
+                converted.weight = WeightFormatter.displayString(storedWeight, unit: newUnit)
+                return converted
+            }
+        }
+    }
+
+    private func parseStoredWeight(from text: String) -> Double? {
+        guard let displayWeight = Double(text), displayWeight >= 0 else {
+            return nil
+        }
+
+        return weightUnit.storedPounds(fromDisplayValue: displayWeight)
     }
 
     private func startRestTimer(seconds: Int) {
@@ -567,14 +670,16 @@ struct WorkoutLoggerView: View {
         if templates.isEmpty {
             return [
                 SetDraft(
-                    weight: recommendedWeight.map(WeightFormatter.displayString) ?? ""
+                    weight: recommendedWeight.map { WeightFormatter.displayString($0, unit: weightUnit) } ?? ""
                 )
             ]
         }
 
         return templates.map { template in
             SetDraft(
-                weight: (template.weight ?? recommendedWeight).map(WeightFormatter.displayString) ?? "",
+                weight: (template.weight ?? recommendedWeight).map {
+                    WeightFormatter.displayString($0, unit: weightUnit)
+                } ?? "",
                 reps: String(template.reps),
                 transcript: "",
                 prescriptionNote: template.note
@@ -649,7 +754,8 @@ struct WorkoutLoggerView: View {
             routineName: selectedRoutine.name,
             exerciseName: exercise.name,
             targetReps: targetReps,
-            minimumIncrease: minimumWeightIncrease
+            minimumIncrease: minimumWeightIncreaseDisplayValue(),
+            unit: weightUnit
         )
     }
 
@@ -747,7 +853,9 @@ struct WorkoutLoggerView: View {
 
                         let parsed = VoiceParser.parseWeightAndReps(from: transcript)
                         if let weight = parsed.weight {
-                            set.weight = WeightFormatter.displayString(weight)
+                            let spokenUnit = weight.unit ?? weightUnit
+                            let storedWeight = spokenUnit.storedPounds(fromDisplayValue: weight.value)
+                            set.weight = WeightFormatter.displayString(storedWeight, unit: weightUnit)
                         }
                         if let reps = parsed.reps {
                             set.reps = String(reps)
@@ -779,7 +887,7 @@ struct WorkoutLoggerView: View {
         let entries: [ExerciseEntry] = activeExercises(in: routine, plan: plan).map { exercise in
             let sets = (drafts[exercise.id] ?? []).compactMap { set -> ExerciseSet? in
                 let transcript = set.transcript.trimmingCharacters(in: .whitespacesAndNewlines)
-                let weight = Double(set.weight)
+                let weight = parseStoredWeight(from: set.weight)
                 let reps = Int(set.reps)
 
                 if weight == nil, reps == nil, transcript.isEmpty {

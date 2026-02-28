@@ -1,5 +1,114 @@
 import Foundation
 
+enum WeightUnit: String, CaseIterable, Codable {
+    case pounds
+    case kilograms
+
+    static let preferenceKey = "workout_tracker_weight_unit_v1"
+
+    private static let poundsPerKilogram = 2.2046226218
+    private static let poundsDisplayIncrement = 2.5
+    private static let kilogramsDisplayIncrement = 2.5
+
+    var symbol: String {
+        switch self {
+        case .pounds:
+            return "lb"
+        case .kilograms:
+            return "kg"
+        }
+    }
+
+    var shortLabel: String {
+        switch self {
+        case .pounds:
+            return "US (lb)"
+        case .kilograms:
+            return "Metric (kg)"
+        }
+    }
+
+    var minimumIncreaseFloor: Double {
+        switch self {
+        case .pounds:
+            return 2.5
+        case .kilograms:
+            return 2.5
+        }
+    }
+
+    var upperBodyDefaultIncrease: Double {
+        switch self {
+        case .pounds:
+            return 2.5
+        case .kilograms:
+            return 2.5
+        }
+    }
+
+    var lowerBodyDefaultIncrease: Double {
+        switch self {
+        case .pounds:
+            return 5
+        case .kilograms:
+            return 5
+        }
+    }
+
+    var recommendedMinimumIncreaseDefault: Double {
+        switch self {
+        case .pounds:
+            return 10
+        case .kilograms:
+            return 5
+        }
+    }
+
+    var gymDisplayIncrement: Double {
+        switch self {
+        case .pounds:
+            return Self.poundsDisplayIncrement
+        case .kilograms:
+            return Self.kilogramsDisplayIncrement
+        }
+    }
+
+    func storedPounds(fromDisplayValue value: Double) -> Double {
+        switch self {
+        case .pounds:
+            return value
+        case .kilograms:
+            return value * Self.poundsPerKilogram
+        }
+    }
+
+    func displayValue(fromStoredPounds pounds: Double, snapToGymIncrement: Bool = true) -> Double {
+        let converted: Double
+        switch self {
+        case .pounds:
+            converted = pounds
+        case .kilograms:
+            converted = pounds / Self.poundsPerKilogram
+        }
+
+        if snapToGymIncrement {
+            return roundedForGymDisplay(converted)
+        }
+
+        return converted
+    }
+
+    func roundedForGymDisplay(_ value: Double, increment: Double? = nil) -> Double {
+        let resolvedIncrement = max(increment ?? gymDisplayIncrement, 0.000_1)
+        return (value / resolvedIncrement).rounded() * resolvedIncrement
+    }
+
+    func normalizedDisplayIncrease(_ value: Double) -> Double {
+        let clamped = max(value, minimumIncreaseFloor)
+        return roundedForGymDisplay(clamped)
+    }
+}
+
 enum ProgramKind: String, Codable {
     case startingStrength
     case fiveThreeOne
@@ -58,11 +167,45 @@ enum PopularRoutinePack: String, CaseIterable, Identifiable {
 }
 
 enum WeightFormatter {
-    static func displayString(_ weight: Double) -> String {
-        if weight.rounded() == weight {
-            return String(Int(weight))
+    static func displayString(_ storedWeightInPounds: Double, unit: WeightUnit = .pounds) -> String {
+        let value = unit.displayValue(fromStoredPounds: storedWeightInPounds)
+        return displayString(displayValue: value, unit: unit)
+    }
+
+    static func displayString(displayValue value: Double, unit: WeightUnit) -> String {
+        let roundedValue = unit.roundedForGymDisplay(value)
+
+        if roundedValue.rounded() == roundedValue {
+            return String(Int(roundedValue))
         }
-        return String(format: "%.1f", weight)
+
+        // Gym-friendly values are typically whole or half-ish steps; one decimal keeps labels compact.
+        let oneDecimalValue = (roundedValue * 10).rounded() / 10
+        if oneDecimalValue.rounded() == oneDecimalValue {
+            return String(Int(oneDecimalValue))
+        }
+
+        if (oneDecimalValue * 10).rounded() == oneDecimalValue * 10 {
+            return String(format: "%.1f", oneDecimalValue)
+        }
+
+        let twoDecimalValue = (roundedValue * 100).rounded() / 100
+        if twoDecimalValue.rounded() == twoDecimalValue {
+            return String(Int(twoDecimalValue))
+        }
+
+        if (twoDecimalValue * 10).rounded() == twoDecimalValue * 10 {
+            return String(format: "%.1f", twoDecimalValue)
+        }
+
+        return String(format: "%.2f", twoDecimalValue)
+    }
+
+    static func rawDisplayString(_ value: Double) -> String {
+        if value.rounded() == value {
+            return String(Int(value))
+        }
+        return String(format: "%.1f", value)
     }
 }
 

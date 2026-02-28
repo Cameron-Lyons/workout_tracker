@@ -9,17 +9,23 @@ private struct EditableExercise: Identifiable {
 struct RoutineEditorView: View {
     @EnvironmentObject private var store: WorkoutStore
     @Environment(\.dismiss) private var dismiss
+    @AppStorage(WeightUnit.preferenceKey) private var weightUnitRawValue = WeightUnit.pounds.rawValue
 
     let routineID: UUID
 
     @State private var routineName = ""
     @State private var exercises: [EditableExercise] = []
     @State private var pendingExerciseName = ""
+    @State private var previousWeightUnit: WeightUnit = .pounds
 
     @State private var showInvalidAlert = false
 
     private var routine: Routine? {
         store.routines.first(where: { $0.id == routineID })
+    }
+
+    private var weightUnit: WeightUnit {
+        WeightUnit(rawValue: weightUnitRawValue) ?? .pounds
     }
 
     var body: some View {
@@ -78,7 +84,7 @@ struct RoutineEditorView: View {
                                     .textInputAutocapitalization(.words)
                                     .foregroundStyle(AppColors.textPrimary)
 
-                                TextField("TM / Working Weight (lbs)", text: $exercise.trainingMaxText)
+                                TextField("TM / Working Weight (\(weightUnit.symbol))", text: $exercise.trainingMaxText)
                                     .keyboardType(.decimalPad)
                                     .foregroundStyle(AppColors.textPrimary)
                             }
@@ -95,7 +101,13 @@ struct RoutineEditorView: View {
         .navigationTitle("Edit Routine")
         .toolbarBackground(AppColors.chrome, for: .navigationBar)
         .toolbarBackground(.visible, for: .navigationBar)
-        .onAppear(perform: loadRoutine)
+        .onAppear {
+            previousWeightUnit = weightUnit
+            loadRoutine()
+        }
+        .onChange(of: weightUnitRawValue) { _, _ in
+            handleWeightUnitChange()
+        }
         .alert("Could Not Save", isPresented: $showInvalidAlert) {
             Button("OK", role: .cancel) { }
         } message: {
@@ -182,13 +194,35 @@ struct RoutineEditorView: View {
             .replacingOccurrences(of: ",", with: ".")
 
         guard !sanitized.isEmpty else { return nil }
-        return Double(sanitized)
+        guard let displayValue = Double(sanitized) else { return nil }
+        return weightUnit.storedPounds(fromDisplayValue: displayValue)
     }
 
     private func formatTrainingMax(_ trainingMax: Double?) -> String {
         guard let trainingMax else {
             return ""
         }
-        return WeightFormatter.displayString(trainingMax)
+        return WeightFormatter.displayString(trainingMax, unit: weightUnit)
+    }
+
+    private func handleWeightUnitChange() {
+        let newUnit = weightUnit
+        let oldUnit = previousWeightUnit
+        previousWeightUnit = newUnit
+
+        guard newUnit != oldUnit else {
+            return
+        }
+
+        exercises = exercises.map { exercise in
+            guard let oldDisplayValue = Double(exercise.trainingMaxText), oldDisplayValue > 0 else {
+                return exercise
+            }
+
+            var updated = exercise
+            let storedWeight = oldUnit.storedPounds(fromDisplayValue: oldDisplayValue)
+            updated.trainingMaxText = WeightFormatter.displayString(storedWeight, unit: newUnit)
+            return updated
+        }
     }
 }
