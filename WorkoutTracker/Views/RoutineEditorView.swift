@@ -54,17 +54,7 @@ struct RoutineEditorView: View {
                 .listRowBackground(AppColors.surface)
 
                 Section {
-                    HStack {
-                        TextField("Add exercise name", text: $pendingExerciseName)
-                            .textInputAutocapitalization(.words)
-                            .foregroundStyle(AppColors.textPrimary)
-
-                        Button("Add") {
-                            addExercise()
-                        }
-                        .disabled(pendingExerciseName.nonEmptyTrimmed == nil)
-                        .tint(AppColors.accent)
-                    }
+                    ExerciseNameInputRow(exerciseName: $pendingExerciseName, addAction: addExercise)
                 } header: {
                     Text("Exercises")
                 } footer: {

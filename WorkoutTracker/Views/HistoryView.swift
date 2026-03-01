@@ -26,6 +26,33 @@ struct HistoryView: View {
         static let todayOutlineWidth: CGFloat = 1
         static let chartHeight: CGFloat = 220
         static let chartDesiredTickCount = 4
+        static let emptyStateIcon = "calendar.badge.clock"
+        static let emptyStateTitle = "No workouts logged yet"
+        static let emptyStateMessage = "Your completed workouts and progress trends will appear here."
+        static let emptyFilteredCardPadding: CGFloat = 14
+        static let emptyFilteredCardCornerRadius: CGFloat = 14
+        static let emptyFilteredTopInset: CGFloat = 6
+        static let emptyFilteredBottomInset: CGFloat = 8
+        static let standardHorizontalInset: CGFloat = 14
+        static let entryCardCornerRadius: CGFloat = 14
+        static let entryCardPadding: CGFloat = 14
+        static let sessionSectionTopInset: CGFloat = 6
+        static let sessionSectionBottomInset: CGFloat = 6
+        static let sessionScrollFadeOpacity = 0.84
+        static let sessionScrollScale = 0.985
+        static let sessionHeaderTopPadding: CGFloat = 16
+        static let monthTitleFontSize: CGFloat = 22
+        static let calendarCardCornerRadius: CGFloat = 16
+        static let calendarCardPadding: CGFloat = 14
+        static let calendarSectionInset: CGFloat = 8
+        static let unselectedDayOpacity = 0.35
+        static let progressSectionSpacing: CGFloat = 12
+        static let progressCardCornerRadius: CGFloat = 16
+        static let progressCardPadding: CGFloat = 14
+        static let progressSectionInset: CGFloat = 8
+        static let progressLineWidth: CGFloat = 2.5
+        static let progressAreaStartOpacity = 0.35
+        static let progressAreaEndOpacity = 0.02
     }
 
     @EnvironmentObject private var store: WorkoutStore
@@ -65,10 +92,17 @@ struct HistoryView: View {
                                     Text("No workouts match the selected date.")
                                         .font(.subheadline)
                                         .foregroundStyle(AppColors.textSecondary)
-                                        .padding(14)
-                                        .appSurface(cornerRadius: 14, shadow: false)
+                                        .padding(Constants.emptyFilteredCardPadding)
+                                        .appSurface(cornerRadius: Constants.emptyFilteredCardCornerRadius, shadow: false)
                                         .listRowBackground(Color.clear)
-                                        .listRowInsets(EdgeInsets(top: 6, leading: 14, bottom: 8, trailing: 14))
+                                        .listRowInsets(
+                                            EdgeInsets(
+                                                top: Constants.emptyFilteredTopInset,
+                                                leading: Constants.standardHorizontalInset,
+                                                bottom: Constants.emptyFilteredBottomInset,
+                                                trailing: Constants.standardHorizontalInset
+                                            )
+                                        )
                                         .listRowSeparator(.hidden)
                                 }
                             } else {
@@ -78,12 +112,19 @@ struct HistoryView: View {
                                             sessionEntryCard(entry)
                                                 .scrollTransition(axis: .vertical) { content, phase in
                                                     content
-                                                        .opacity(phase.isIdentity ? 1 : 0.84)
-                                                        .scaleEffect(phase.isIdentity ? 1 : 0.985)
+                                                        .opacity(phase.isIdentity ? 1 : Constants.sessionScrollFadeOpacity)
+                                                        .scaleEffect(phase.isIdentity ? 1 : Constants.sessionScrollScale)
                                                 }
                                                 .listRowBackground(Color.clear)
                                                 .listRowSeparator(.hidden)
-                                                .listRowInsets(EdgeInsets(top: 6, leading: 14, bottom: 6, trailing: 14))
+                                                .listRowInsets(
+                                                    EdgeInsets(
+                                                        top: Constants.sessionSectionTopInset,
+                                                        leading: Constants.standardHorizontalInset,
+                                                        bottom: Constants.sessionSectionBottomInset,
+                                                        trailing: Constants.standardHorizontalInset
+                                                    )
+                                                )
                                         }
                                     } header: {
                                         sessionHeader(session)
@@ -145,23 +186,11 @@ struct HistoryView: View {
     }
 
     private var emptyState: some View {
-        VStack(spacing: 14) {
-            Image(systemName: "calendar.badge.clock")
-                .font(.system(size: 40, weight: .semibold))
-                .foregroundStyle(AppColors.accent)
-
-            Text("No workouts logged yet")
-                .font(.system(size: 30, weight: .black, design: .rounded))
-                .foregroundStyle(AppColors.textPrimary)
-
-            Text("Your completed workouts and progress trends will appear here.")
-                .font(.subheadline)
-                .foregroundStyle(AppColors.textSecondary)
-                .multilineTextAlignment(.center)
-        }
-        .padding(24)
-        .appSurface()
-        .padding(.horizontal, 20)
+        AppEmptyStateCard(
+            systemImage: Constants.emptyStateIcon,
+            title: Constants.emptyStateTitle,
+            message: Constants.emptyStateMessage
+        )
     }
 
     private func sessionEntryCard(_ entry: ExerciseEntry) -> some View {
@@ -187,8 +216,8 @@ struct HistoryView: View {
                 }
             }
         }
-        .padding(14)
-        .appSurface(cornerRadius: 14, shadow: false)
+        .padding(Constants.entryCardPadding)
+        .appSurface(cornerRadius: Constants.entryCardCornerRadius, shadow: false)
     }
 
     private func sessionHeader(_ session: WorkoutSession) -> some View {
@@ -206,8 +235,8 @@ struct HistoryView: View {
                 .foregroundStyle(AppColors.textSecondary)
         }
         .textCase(nil)
-        .padding(.top, 16)
-        .padding(.horizontal, 14)
+        .padding(.top, Constants.sessionHeaderTopPadding)
+        .padding(.horizontal, Constants.standardHorizontalInset)
     }
 
     private var trackedExercises: [String] {
@@ -309,7 +338,7 @@ struct HistoryView: View {
                     Spacer()
 
                     Text(monthTitle)
-                        .font(.system(size: 22, weight: .black, design: .rounded))
+                        .font(.system(size: Constants.monthTitleFontSize, weight: .black, design: .rounded))
                         .foregroundStyle(AppColors.textPrimary)
 
                     Spacer()
@@ -368,11 +397,18 @@ struct HistoryView: View {
                         .frame(maxWidth: .infinity, alignment: .leading)
                 }
             }
-            .padding(14)
-            .appSurface(cornerRadius: 16, shadow: false)
+            .padding(Constants.calendarCardPadding)
+            .appSurface(cornerRadius: Constants.calendarCardCornerRadius, shadow: false)
             .listRowBackground(Color.clear)
             .listRowSeparator(.hidden)
-            .listRowInsets(EdgeInsets(top: 8, leading: 14, bottom: 8, trailing: 14))
+            .listRowInsets(
+                EdgeInsets(
+                    top: Constants.calendarSectionInset,
+                    leading: Constants.standardHorizontalInset,
+                    bottom: Constants.calendarSectionInset,
+                    trailing: Constants.standardHorizontalInset
+                )
+            )
         }
     }
 
@@ -397,7 +433,11 @@ struct HistoryView: View {
             .frame(maxWidth: .infinity, minHeight: Constants.calendarDayMinHeight)
             .background {
                 RoundedRectangle(cornerRadius: Constants.calendarDayCornerRadius)
-                    .fill(isSelected ? AppColors.accent.opacity(Constants.selectedDayOpacity) : AppColors.surface.opacity(0.35))
+                    .fill(
+                        isSelected
+                            ? AppColors.accent.opacity(Constants.selectedDayOpacity)
+                            : AppColors.surface.opacity(Constants.unselectedDayOpacity)
+                    )
             }
             .overlay {
                 RoundedRectangle(cornerRadius: Constants.calendarDayCornerRadius)
@@ -459,7 +499,7 @@ struct HistoryView: View {
         let summary = trendSummary(for: points)
 
         return Section("Progress over time") {
-            VStack(alignment: .leading, spacing: 12) {
+            VStack(alignment: .leading, spacing: Constants.progressSectionSpacing) {
                 if exercises.isEmpty {
                     Text("Log sets with weight to see progress over time.")
                         .font(.subheadline)
@@ -486,7 +526,10 @@ struct HistoryView: View {
                             .interpolationMethod(.catmullRom)
                             .foregroundStyle(
                                 LinearGradient(
-                                    colors: [AppColors.accent.opacity(0.35), AppColors.accent.opacity(0.02)],
+                                    colors: [
+                                        AppColors.accent.opacity(Constants.progressAreaStartOpacity),
+                                        AppColors.accent.opacity(Constants.progressAreaEndOpacity)
+                                    ],
                                     startPoint: .top,
                                     endPoint: .bottom
                                 )
@@ -497,7 +540,13 @@ struct HistoryView: View {
                                 y: .value("Top Weight (\(weightUnit.symbol))", point.topWeight)
                             )
                             .interpolationMethod(.catmullRom)
-                            .lineStyle(StrokeStyle(lineWidth: 2.5, lineCap: .round, lineJoin: .round))
+                            .lineStyle(
+                                StrokeStyle(
+                                    lineWidth: Constants.progressLineWidth,
+                                    lineCap: .round,
+                                    lineJoin: .round
+                                )
+                            )
                             .foregroundStyle(AppColors.accent)
 
                             PointMark(
@@ -532,11 +581,18 @@ struct HistoryView: View {
                     }
                 }
             }
-            .padding(14)
-            .appSurface(cornerRadius: 16, shadow: false)
+            .padding(Constants.progressCardPadding)
+            .appSurface(cornerRadius: Constants.progressCardCornerRadius, shadow: false)
             .listRowBackground(Color.clear)
             .listRowSeparator(.hidden)
-            .listRowInsets(EdgeInsets(top: 8, leading: 14, bottom: 8, trailing: 14))
+            .listRowInsets(
+                EdgeInsets(
+                    top: Constants.progressSectionInset,
+                    leading: Constants.standardHorizontalInset,
+                    bottom: Constants.progressSectionInset,
+                    trailing: Constants.standardHorizontalInset
+                )
+            )
         }
     }
 

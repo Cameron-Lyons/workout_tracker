@@ -477,25 +477,21 @@ final class WorkoutStore: ObservableObject {
             )
             recordsByExerciseSession[exerciseSessionKey, default: []].append(record)
 
-            if let existing = latestRecordByExerciseName[record.exerciseName] {
-                if record.performedAt > existing.performedAt {
-                    latestRecordByExerciseName[record.exerciseName] = record
-                }
-            } else {
-                latestRecordByExerciseName[record.exerciseName] = record
-            }
+            Self.updateLatestRecord(
+                in: &latestRecordByExerciseName,
+                key: record.exerciseName,
+                candidate: record
+            )
 
             let exerciseRoutineKey = ExerciseRoutineKey(
                 exerciseName: record.exerciseName,
                 routineName: record.routineName
             )
-            if let existing = latestRecordByExerciseAndRoutine[exerciseRoutineKey] {
-                if record.performedAt > existing.performedAt {
-                    latestRecordByExerciseAndRoutine[exerciseRoutineKey] = record
-                }
-            } else {
-                latestRecordByExerciseAndRoutine[exerciseRoutineKey] = record
-            }
+            Self.updateLatestRecord(
+                in: &latestRecordByExerciseAndRoutine,
+                key: exerciseRoutineKey,
+                candidate: record
+            )
         }
 
         var addedNewExerciseName = false
@@ -531,29 +527,8 @@ final class WorkoutStore: ObservableObject {
             liftProgressByExerciseName[exerciseSessionKey.exerciseName] = snapshots
         }
 
-        for (exerciseName, latestRecord) in latestRecordByExerciseName {
-            let currentDate = latestSessionIDByExerciseName[exerciseName].flatMap { sessionID in
-                liftHistoryByExerciseAndSession[
-                    ExerciseSessionKey(exerciseName: exerciseName, sessionID: sessionID)
-                ]?.first?.performedAt
-            } ?? .distantPast
-
-            if latestRecord.performedAt >= currentDate {
-                latestSessionIDByExerciseName[exerciseName] = latestRecord.sessionID
-            }
-        }
-
-        for (exerciseRoutineKey, latestRecord) in latestRecordByExerciseAndRoutine {
-            let currentDate = latestSessionIDByExerciseAndRoutine[exerciseRoutineKey].flatMap { sessionID in
-                liftHistoryByExerciseAndSession[
-                    ExerciseSessionKey(exerciseName: exerciseRoutineKey.exerciseName, sessionID: sessionID)
-                ]?.first?.performedAt
-            } ?? .distantPast
-
-            if latestRecord.performedAt >= currentDate {
-                latestSessionIDByExerciseAndRoutine[exerciseRoutineKey] = latestRecord.sessionID
-            }
-        }
+        updateLatestSessionIDsByExerciseName(with: latestRecordByExerciseName)
+        updateLatestSessionIDsByExerciseAndRoutine(with: latestRecordByExerciseAndRoutine)
 
         if addedNewExerciseName {
             cachedExerciseNamesWithHistory = liftHistoryByExerciseName.keys.sorted()
@@ -592,37 +567,21 @@ final class WorkoutStore: ObservableObject {
             )
             byExerciseAndSession[exerciseSessionKey, default: []].append(record)
 
-            if let existing = latestSessionByExercise[record.exerciseName] {
-                if record.performedAt > existing.performedAt {
-                    latestSessionByExercise[record.exerciseName] = (
-                        sessionID: record.sessionID,
-                        performedAt: record.performedAt
-                    )
-                }
-            } else {
-                latestSessionByExercise[record.exerciseName] = (
-                    sessionID: record.sessionID,
-                    performedAt: record.performedAt
-                )
-            }
+            Self.updateLatestSession(
+                in: &latestSessionByExercise,
+                key: record.exerciseName,
+                record: record
+            )
 
             let exerciseRoutineKey = ExerciseRoutineKey(
                 exerciseName: record.exerciseName,
                 routineName: record.routineName
             )
-            if let existing = latestSessionByExerciseAndRoutine[exerciseRoutineKey] {
-                if record.performedAt > existing.performedAt {
-                    latestSessionByExerciseAndRoutine[exerciseRoutineKey] = (
-                        sessionID: record.sessionID,
-                        performedAt: record.performedAt
-                    )
-                }
-            } else {
-                latestSessionByExerciseAndRoutine[exerciseRoutineKey] = (
-                    sessionID: record.sessionID,
-                    performedAt: record.performedAt
-                )
-            }
+            Self.updateLatestSession(
+                in: &latestSessionByExerciseAndRoutine,
+                key: exerciseRoutineKey,
+                record: record
+            )
         }
 
         var progressByExerciseName: [String: [LiftProgressSnapshot]] = [:]
@@ -691,6 +650,60 @@ final class WorkoutStore: ObservableObject {
             deadline: .now() + .milliseconds(Persistence.saveDebounceMilliseconds),
             execute: work
         )
+    }
+
+    private func updateLatestSessionIDsByExerciseName(with latestRecords: [String: LiftRecord]) {
+        for (exerciseName, latestRecord) in latestRecords {
+            let currentDate = latestSessionIDByExerciseName[exerciseName].map {
+                currentSessionDate(forExerciseName: exerciseName, sessionID: $0)
+            } ?? .distantPast
+
+            if latestRecord.performedAt >= currentDate {
+                latestSessionIDByExerciseName[exerciseName] = latestRecord.sessionID
+            }
+        }
+    }
+
+    private func updateLatestSessionIDsByExerciseAndRoutine(
+        with latestRecords: [ExerciseRoutineKey: LiftRecord]
+    ) {
+        for (exerciseRoutineKey, latestRecord) in latestRecords {
+            let currentDate = latestSessionIDByExerciseAndRoutine[exerciseRoutineKey].map {
+                currentSessionDate(forExerciseName: exerciseRoutineKey.exerciseName, sessionID: $0)
+            } ?? .distantPast
+
+            if latestRecord.performedAt >= currentDate {
+                latestSessionIDByExerciseAndRoutine[exerciseRoutineKey] = latestRecord.sessionID
+            }
+        }
+    }
+
+    private func currentSessionDate(forExerciseName exerciseName: String, sessionID: UUID) -> Date {
+        liftHistoryByExerciseAndSession[
+            ExerciseSessionKey(exerciseName: exerciseName, sessionID: sessionID)
+        ]?.first?.performedAt ?? .distantPast
+    }
+
+    private static func updateLatestRecord<Key: Hashable>(
+        in recordsByKey: inout [Key: LiftRecord],
+        key: Key,
+        candidate: LiftRecord
+    ) {
+        if let existing = recordsByKey[key], existing.performedAt >= candidate.performedAt {
+            return
+        }
+        recordsByKey[key] = candidate
+    }
+
+    private static func updateLatestSession<Key: Hashable>(
+        in sessionsByKey: inout [Key: (sessionID: UUID, performedAt: Date)],
+        key: Key,
+        record: LiftRecord
+    ) {
+        if let existing = sessionsByKey[key], existing.performedAt >= record.performedAt {
+            return
+        }
+        sessionsByKey[key] = (sessionID: record.sessionID, performedAt: record.performedAt)
     }
 
     private static func liftRecords(from session: WorkoutSession) -> [LiftRecord] {

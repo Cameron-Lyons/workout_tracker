@@ -6,6 +6,14 @@ enum VoiceParser {
         var unit: WeightUnit?
     }
 
+    private enum Parsing {
+        static let weightCaptureGroupIndex = 1
+        static let unitCaptureGroupIndex = 2
+        static let firstCaptureGroupIndex = 1
+        static let minimumNumbersForFallbackWeightAndReps = 2
+        static let fallbackRepsNumberIndex = 1
+    }
+
     private enum Patterns {
         static let number = makeRegex("\\d+(?:\\.\\d+)?")
         static let explicitWeight = makeRegex("(\\d+(?:\\.\\d+)?)\\s*(lb|lbs|pounds?|kg|kgs|kilograms?)")
@@ -55,8 +63,8 @@ enum VoiceParser {
                 }
             }
 
-            if reps == nil, numbers.count >= 2 {
-                reps = Int(numbers[1])
+            if reps == nil, numbers.count >= Parsing.minimumNumbersForFallbackWeightAndReps {
+                reps = Int(numbers[Parsing.fallbackRepsNumberIndex])
             }
         }
 
@@ -66,8 +74,8 @@ enum VoiceParser {
     private static func explicitWeight(in text: String) -> ParsedWeight? {
         let nsRange = NSRange(text.startIndex..<text.endIndex, in: text)
         guard let match = Patterns.explicitWeight.firstMatch(in: text, range: nsRange),
-              let valueRange = Range(match.range(at: 1), in: text),
-              let unitRange = Range(match.range(at: 2), in: text),
+              let valueRange = Range(match.range(at: Parsing.weightCaptureGroupIndex), in: text),
+              let unitRange = Range(match.range(at: Parsing.unitCaptureGroupIndex), in: text),
               let value = Double(text[valueRange]) else {
             return nil
         }
@@ -97,7 +105,7 @@ enum VoiceParser {
     private static func firstCapture(regex: NSRegularExpression, in text: String) -> String? {
         let nsRange = NSRange(text.startIndex..<text.endIndex, in: text)
         guard let match = regex.firstMatch(in: text, range: nsRange),
-              let range = Range(match.range(at: 1), in: text) else {
+              let range = Range(match.range(at: Parsing.firstCaptureGroupIndex), in: text) else {
             return nil
         }
 

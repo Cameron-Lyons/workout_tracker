@@ -18,6 +18,11 @@ enum AppColors {
 }
 
 enum AppAppearance {
+    private enum Metrics {
+        static let tabBarShadowOpacity = 0.45
+        static let largeTitleFontSize: CGFloat = 35
+    }
+
     private static var didConfigure = false
 
     static func configureIfNeeded() {
@@ -27,7 +32,7 @@ enum AppAppearance {
         let tabBarAppearance = UITabBarAppearance()
         tabBarAppearance.configureWithOpaqueBackground()
         tabBarAppearance.backgroundColor = UIColor(AppColors.chrome)
-        tabBarAppearance.shadowColor = UIColor(AppColors.stroke.opacity(0.45))
+        tabBarAppearance.shadowColor = UIColor(AppColors.stroke.opacity(Metrics.tabBarShadowOpacity))
         tabBarAppearance.stackedLayoutAppearance.normal.iconColor = UIColor(AppColors.textSecondary)
         tabBarAppearance.stackedLayoutAppearance.normal.titleTextAttributes = [
             .foregroundColor: UIColor(AppColors.textSecondary)
@@ -49,7 +54,7 @@ enum AppAppearance {
         ]
         navAppearance.largeTitleTextAttributes = [
             .foregroundColor: UIColor(AppColors.textPrimary),
-            .font: UIFont.systemFont(ofSize: 35, weight: .black)
+            .font: UIFont.systemFont(ofSize: Metrics.largeTitleFontSize, weight: .black)
         ]
 
         UINavigationBar.appearance().standardAppearance = navAppearance
@@ -59,6 +64,32 @@ enum AppAppearance {
 }
 
 struct AppBackground: View {
+    private enum Layout {
+        static let accentStartRadius: CGFloat = 40
+        static let accentEndRadius: CGFloat = 420
+        static let accentBlurRadius: CGFloat = 24
+        static let accentOpacity = 0.22
+
+        static let accentAltStartRadius: CGFloat = 20
+        static let accentAltEndRadius: CGFloat = 380
+        static let accentAltBlurRadius: CGFloat = 30
+        static let accentAltOpacity = 0.20
+
+        static let topGlowOpacity = 0.06
+        static let topGlowSize: CGFloat = 300
+        static let topGlowBlurRadius: CGFloat = 70
+        static let topGlowOffsetX: CGFloat = 90
+        static let topGlowOffsetY: CGFloat = -110
+
+        static let bottomGlowOpacity = 0.04
+        static let bottomGlowSize: CGFloat = 300
+        static let bottomGlowBlurRadius: CGFloat = 85
+        static let bottomGlowOffsetX: CGFloat = -100
+        static let bottomGlowOffsetY: CGFloat = 120
+
+        static let darkOverlayOpacity = 0.18
+    }
+
     var body: some View {
         LinearGradient(
             colors: [AppColors.canvasTop, AppColors.canvasMid, AppColors.canvasBottom],
@@ -68,50 +99,61 @@ struct AppBackground: View {
         .overlay {
             RadialGradient(
                 gradient: Gradient(colors: [
-                    AppColors.accent.opacity(0.22),
+                    AppColors.accent.opacity(Layout.accentOpacity),
                     .clear
                 ]),
                 center: .topTrailing,
-                startRadius: 40,
-                endRadius: 420
+                startRadius: Layout.accentStartRadius,
+                endRadius: Layout.accentEndRadius
             )
-            .blur(radius: 24)
+            .blur(radius: Layout.accentBlurRadius)
         }
         .overlay {
             RadialGradient(
                 gradient: Gradient(colors: [
-                    AppColors.accentAlt.opacity(0.20),
+                    AppColors.accentAlt.opacity(Layout.accentAltOpacity),
                     .clear
                 ]),
                 center: .bottomLeading,
-                startRadius: 20,
-                endRadius: 380
+                startRadius: Layout.accentAltStartRadius,
+                endRadius: Layout.accentAltEndRadius
             )
-            .blur(radius: 30)
+            .blur(radius: Layout.accentAltBlurRadius)
         }
         .overlay(alignment: .topTrailing) {
             Circle()
-                .fill(.white.opacity(0.06))
-                .frame(width: 300, height: 300)
-                .blur(radius: 70)
-                .offset(x: 90, y: -110)
+                .fill(.white.opacity(Layout.topGlowOpacity))
+                .frame(width: Layout.topGlowSize, height: Layout.topGlowSize)
+                .blur(radius: Layout.topGlowBlurRadius)
+                .offset(x: Layout.topGlowOffsetX, y: Layout.topGlowOffsetY)
         }
         .overlay(alignment: .bottomLeading) {
             Circle()
-                .fill(.white.opacity(0.04))
-                .frame(width: 300, height: 300)
-                .blur(radius: 85)
-                .offset(x: -100, y: 120)
+                .fill(.white.opacity(Layout.bottomGlowOpacity))
+                .frame(width: Layout.bottomGlowSize, height: Layout.bottomGlowSize)
+                .blur(radius: Layout.bottomGlowBlurRadius)
+                .offset(x: Layout.bottomGlowOffsetX, y: Layout.bottomGlowOffsetY)
         }
         .overlay {
             Rectangle()
-                .fill(.black.opacity(0.18))
+                .fill(.black.opacity(Layout.darkOverlayOpacity))
         }
         .ignoresSafeArea()
     }
 }
 
 private struct AppSurfaceModifier: ViewModifier {
+    private enum Style {
+        static let materialOpacity = 0.72
+        static let highlightOpacity = 0.11
+        static let accentHighlightOpacity = 0.08
+        static let edgeHighlightOpacity = 0.22
+        static let innerStrokeWidth: CGFloat = 1
+        static let highlightStrokeWidth: CGFloat = 0.9
+        static let shadowRadius: CGFloat = 18
+        static let shadowYOffset: CGFloat = 12
+    }
+
     let cornerRadius: CGFloat
     let shadowOpacity: Double
 
@@ -129,11 +171,15 @@ private struct AppSurfaceModifier: ViewModifier {
                         )
                     RoundedRectangle(cornerRadius: cornerRadius, style: .continuous)
                         .fill(.ultraThinMaterial)
-                        .opacity(0.72)
+                        .opacity(Style.materialOpacity)
                     RoundedRectangle(cornerRadius: cornerRadius, style: .continuous)
                         .fill(
                             LinearGradient(
-                                colors: [.white.opacity(0.11), .clear, AppColors.accentAlt.opacity(0.08)],
+                                colors: [
+                                    .white.opacity(Style.highlightOpacity),
+                                    .clear,
+                                    AppColors.accentAlt.opacity(Style.accentHighlightOpacity)
+                                ],
                                 startPoint: .topLeading,
                                 endPoint: .bottomTrailing
                             )
@@ -142,37 +188,108 @@ private struct AppSurfaceModifier: ViewModifier {
             }
             .overlay(
                 RoundedRectangle(cornerRadius: cornerRadius, style: .continuous)
-                    .stroke(AppColors.stroke, lineWidth: 1)
+                    .stroke(AppColors.stroke, lineWidth: Style.innerStrokeWidth)
             )
             .overlay(
                 RoundedRectangle(cornerRadius: cornerRadius, style: .continuous)
                     .stroke(
                         LinearGradient(
-                            colors: [.white.opacity(0.22), .clear, .clear],
+                            colors: [.white.opacity(Style.edgeHighlightOpacity), .clear, .clear],
                             startPoint: .topLeading,
                             endPoint: .bottomTrailing
                         ),
-                        lineWidth: 0.9
+                        lineWidth: Style.highlightStrokeWidth
                     )
             )
-            .shadow(color: .black.opacity(shadowOpacity), radius: shadowOpacity > 0 ? 18 : 0, x: 0, y: 12)
+            .shadow(
+                color: .black.opacity(shadowOpacity),
+                radius: shadowOpacity > 0 ? Style.shadowRadius : 0,
+                x: 0,
+                y: Style.shadowYOffset
+            )
     }
 }
 
 private struct AppInputFieldModifier: ViewModifier {
+    private enum Layout {
+        static let horizontalPadding: CGFloat = 12
+        static let verticalPadding: CGFloat = 10
+        static let cornerRadius: CGFloat = 10
+        static let fillOpacity = 0.88
+        static let borderOpacity = 0.7
+        static let borderWidth: CGFloat = 1
+    }
+
     func body(content: Content) -> some View {
         content
-            .padding(.horizontal, 12)
-            .padding(.vertical, 10)
+            .padding(.horizontal, Layout.horizontalPadding)
+            .padding(.vertical, Layout.verticalPadding)
             .background(
-                RoundedRectangle(cornerRadius: 10, style: .continuous)
+                RoundedRectangle(cornerRadius: Layout.cornerRadius, style: .continuous)
                     .fill(AppColors.input)
-                    .opacity(0.88)
+                    .opacity(Layout.fillOpacity)
             )
             .overlay(
-                RoundedRectangle(cornerRadius: 10, style: .continuous)
-                    .stroke(AppColors.stroke.opacity(0.7), lineWidth: 1)
+                RoundedRectangle(cornerRadius: Layout.cornerRadius, style: .continuous)
+                    .stroke(
+                        AppColors.stroke.opacity(Layout.borderOpacity),
+                        lineWidth: Layout.borderWidth
+                    )
             )
+    }
+}
+
+struct AppEmptyStateCard: View {
+    private enum Layout {
+        static let spacing: CGFloat = 14
+        static let iconSize: CGFloat = 40
+        static let titleSize: CGFloat = 30
+        static let outerPadding: CGFloat = 24
+        static let horizontalPadding: CGFloat = 20
+    }
+
+    let systemImage: String
+    let title: String
+    let message: String
+
+    var body: some View {
+        VStack(spacing: Layout.spacing) {
+            Image(systemName: systemImage)
+                .font(.system(size: Layout.iconSize, weight: .semibold))
+                .foregroundStyle(AppColors.accent)
+
+            Text(title)
+                .font(.system(size: Layout.titleSize, weight: .black, design: .rounded))
+                .foregroundStyle(AppColors.textPrimary)
+
+            Text(message)
+                .font(.subheadline)
+                .foregroundStyle(AppColors.textSecondary)
+                .multilineTextAlignment(.center)
+        }
+        .padding(Layout.outerPadding)
+        .appSurface()
+        .padding(.horizontal, Layout.horizontalPadding)
+    }
+}
+
+struct ExerciseNameInputRow: View {
+    @Binding var exerciseName: String
+    var placeholder: String = "Add exercise name"
+    let addAction: () -> Void
+
+    var body: some View {
+        HStack {
+            TextField(placeholder, text: $exerciseName)
+                .textInputAutocapitalization(.words)
+                .foregroundStyle(AppColors.textPrimary)
+
+            Button("Add") {
+                addAction()
+            }
+            .disabled(exerciseName.nonEmptyTrimmed == nil)
+            .tint(AppColors.accent)
+        }
     }
 }
 

@@ -1,6 +1,31 @@
 import SwiftUI
 
 struct RoutinesView: View {
+    private enum Constants {
+        static let scrollFadeOpacity = 0.82
+        static let scrollScale = 0.985
+        static let rowInsetTop: CGFloat = 7
+        static let rowInsetLeadingTrailing: CGFloat = 14
+        static let rowInsetBottom: CGFloat = 7
+        static let rowDotSize: CGFloat = 11
+        static let rowDotShadowOpacity = 0.65
+        static let rowDotShadowRadius: CGFloat = 6
+        static let rowDotTopPadding: CGFloat = 8
+        static let rowOuterPadding: CGFloat = 14
+        static let rowCornerRadius: CGFloat = 16
+        static let rowTitleSize: CGFloat = 22
+        static let rowProgramTagSpacing: CGFloat = 8
+        static let rowProgramTagVerticalPadding: CGFloat = 4
+        static let rowProgramTagTracking: CGFloat = 0.8
+        static let rowProgramTagFillOpacity = 0.12
+        static let rowProgramTagStrokeOpacity = 0.45
+        static let rowChevronOpacity = 0.8
+        static let rowDotGradientEndRadius: CGFloat = 8
+        static let rowDotGradientStartRadius: CGFloat = 1
+        static let rowDotGradientEndOpacity = 0.4
+        static let rowTextLineLimit = 2
+    }
+
     @EnvironmentObject private var store: WorkoutStore
     @State private var showingAddRoutine = false
 
@@ -75,12 +100,19 @@ struct RoutinesView: View {
                     }
                     .scrollTransition(axis: .vertical) { content, phase in
                         content
-                            .opacity(phase.isIdentity ? 1 : 0.82)
-                            .scaleEffect(phase.isIdentity ? 1 : 0.985)
+                            .opacity(phase.isIdentity ? 1 : Constants.scrollFadeOpacity)
+                            .scaleEffect(phase.isIdentity ? 1 : Constants.scrollScale)
                     }
                     .listRowBackground(Color.clear)
                     .listRowSeparator(.hidden)
-                    .listRowInsets(EdgeInsets(top: 7, leading: 14, bottom: 7, trailing: 14))
+                    .listRowInsets(
+                        EdgeInsets(
+                            top: Constants.rowInsetTop,
+                            leading: Constants.rowInsetLeadingTrailing,
+                            bottom: Constants.rowInsetBottom,
+                            trailing: Constants.rowInsetLeadingTrailing
+                        )
+                    )
                 }
                 .onDelete(perform: store.deleteRoutines)
                 .onMove(perform: store.moveRoutines)
@@ -95,23 +127,11 @@ struct RoutinesView: View {
     }
 
     private var emptyState: some View {
-        VStack(spacing: 14) {
-            Image(systemName: "list.bullet.rectangle")
-                .font(.system(size: 40, weight: .semibold))
-                .foregroundStyle(AppColors.accent)
-
-            Text("Build your first routine")
-                .font(.system(size: 30, weight: .black, design: .rounded))
-                .foregroundStyle(AppColors.textPrimary)
-
-            Text("Create a custom plan or start from a proven strength template.")
-                .font(.subheadline)
-                .foregroundStyle(AppColors.textSecondary)
-                .multilineTextAlignment(.center)
-        }
-        .padding(24)
-        .appSurface()
-        .padding(.horizontal, 20)
+        AppEmptyStateCard(
+            systemImage: "list.bullet.rectangle",
+            title: "Build your first routine",
+            message: "Create a custom plan or start from a proven strength template."
+        )
     }
 
     private func routineRow(_ routine: Routine) -> some View {
@@ -119,50 +139,60 @@ struct RoutinesView: View {
             Circle()
                 .fill(
                     RadialGradient(
-                        gradient: Gradient(colors: [AppColors.accent, AppColors.accent.opacity(0.4)]),
+                        gradient: Gradient(
+                            colors: [
+                                AppColors.accent,
+                                AppColors.accent.opacity(Constants.rowDotGradientEndOpacity)
+                            ]
+                        ),
                         center: .center,
-                        startRadius: 1,
-                        endRadius: 8
+                        startRadius: Constants.rowDotGradientStartRadius,
+                        endRadius: Constants.rowDotGradientEndRadius
                     )
                 )
-                .frame(width: 11, height: 11)
-                .shadow(color: AppColors.accent.opacity(0.65), radius: 6, x: 0, y: 0)
-                .padding(.top, 8)
+                .frame(width: Constants.rowDotSize, height: Constants.rowDotSize)
+                .shadow(
+                    color: AppColors.accent.opacity(Constants.rowDotShadowOpacity),
+                    radius: Constants.rowDotShadowRadius,
+                    x: 0,
+                    y: 0
+                )
+                .padding(.top, Constants.rowDotTopPadding)
 
             VStack(alignment: .leading, spacing: 10) {
                 HStack(alignment: .firstTextBaseline, spacing: 8) {
                     Text(routine.name)
-                        .font(.system(size: 22, weight: .black, design: .rounded))
+                        .font(.system(size: Constants.rowTitleSize, weight: .black, design: .rounded))
                         .foregroundStyle(AppColors.textPrimary)
 
                     Spacer()
 
                     Image(systemName: "chevron.right")
                         .font(.caption.weight(.bold))
-                        .foregroundStyle(AppColors.textSecondary.opacity(0.8))
+                        .foregroundStyle(AppColors.textSecondary.opacity(Constants.rowChevronOpacity))
                 }
 
                 if let program = routine.program {
                     Text(program.kind.displayName.uppercased())
                         .font(.caption2.weight(.heavy))
-                        .tracking(0.8)
+                        .tracking(Constants.rowProgramTagTracking)
                         .foregroundStyle(AppColors.accent)
-                        .padding(.horizontal, 8)
-                        .padding(.vertical, 4)
-                        .background(AppColors.accent.opacity(0.12), in: Capsule())
+                        .padding(.horizontal, Constants.rowProgramTagSpacing)
+                        .padding(.vertical, Constants.rowProgramTagVerticalPadding)
+                        .background(AppColors.accent.opacity(Constants.rowProgramTagFillOpacity), in: Capsule())
                         .overlay(
                             Capsule()
-                                .stroke(AppColors.accent.opacity(0.45), lineWidth: 1)
+                                .stroke(AppColors.accent.opacity(Constants.rowProgramTagStrokeOpacity), lineWidth: 1)
                         )
                 }
 
                 Text(routine.exercises.map(\.name).joined(separator: " • "))
                     .font(.subheadline)
                     .foregroundStyle(AppColors.textSecondary)
-                    .lineLimit(2)
+                    .lineLimit(Constants.rowTextLineLimit)
             }
         }
-        .padding(14)
-        .appSurface(cornerRadius: 16, shadow: false)
+        .padding(Constants.rowOuterPadding)
+        .appSurface(cornerRadius: Constants.rowCornerRadius, shadow: false)
     }
 }

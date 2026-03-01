@@ -22,17 +22,7 @@ struct AddRoutineSheet: View {
                     .listRowBackground(AppColors.surface)
 
                     Section("Exercises") {
-                        HStack {
-                            TextField("Add exercise name", text: $pendingExercise)
-                                .textInputAutocapitalization(.words)
-                                .foregroundStyle(AppColors.textPrimary)
-
-                            Button("Add") {
-                                addExercise()
-                            }
-                            .disabled(pendingExercise.nonEmptyTrimmed == nil)
-                            .tint(AppColors.accent)
-                        }
+                        ExerciseNameInputRow(exerciseName: $pendingExercise, addAction: addExercise)
 
                         if exercises.isEmpty {
                             Text("Add at least one exercise")

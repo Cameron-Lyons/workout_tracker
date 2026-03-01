@@ -13,6 +13,8 @@ enum WeightUnit: String, CaseIterable, Codable {
     private static let defaultMinimumIncreaseFloor = 2.5
     private static let defaultUpperBodyIncrease = 2.5
     private static let defaultLowerBodyIncrease = 5.0
+    private static let recommendedMinimumIncreasePounds = 10.0
+    private static let recommendedMinimumIncreaseKilograms = 5.0
 
     var symbol: String {
         switch self {
@@ -47,9 +49,9 @@ enum WeightUnit: String, CaseIterable, Codable {
     var recommendedMinimumIncreaseDefault: Double {
         switch self {
         case .pounds:
-            return 10
+            return Self.recommendedMinimumIncreasePounds
         case .kilograms:
-            return 5
+            return Self.recommendedMinimumIncreaseKilograms
         }
     }
 
