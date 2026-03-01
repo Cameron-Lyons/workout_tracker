@@ -43,6 +43,7 @@ final class WorkoutStore: ObservableObject {
     private let routinesKey = "workout_tracker_routines_v1"
     private let historyKey = "workout_tracker_history_v1"
     private let liftHistoryKey = "workout_tracker_lift_history_v1"
+    private let legacyPushPullLegsCleanupKey = "workout_tracker_legacy_push_pull_legs_cleanup_v1"
     private let defaults = UserDefaults.standard
     private let decoder = JSONDecoder()
     private let persistenceQueue = DispatchQueue(label: "workout_tracker.persistence", qos: .utility)
@@ -166,19 +167,34 @@ final class WorkoutStore: ObservableObject {
         isHydrating = true
         defer { isHydrating = false }
 
-        var didMigrateLegacyStarterRoutines = false
+        var didMigrateStoredRoutines = false
+        let hasAppliedLegacyPushPullLegsCleanup = defaults.bool(forKey: legacyPushPullLegsCleanupKey)
 
         if let data = defaults.data(forKey: routinesKey),
            let decodedRoutines = try? decoder.decode([Routine].self, from: data),
            !decodedRoutines.isEmpty {
-            if Self.matchesLegacyStarterRoutines(decodedRoutines) {
-                routines = Self.starterRoutines
-                didMigrateLegacyStarterRoutines = true
-            } else {
-                routines = decodedRoutines
+            var hydratedRoutines = decodedRoutines
+
+            if Self.matchesLegacyStarterRoutines(hydratedRoutines) {
+                hydratedRoutines = Self.starterRoutines
+                didMigrateStoredRoutines = true
             }
+
+            if !hasAppliedLegacyPushPullLegsCleanup {
+                let cleanedRoutines = Self.removingLegacyPushPullLegsRoutines(from: hydratedRoutines)
+                if cleanedRoutines.count != hydratedRoutines.count {
+                    hydratedRoutines = cleanedRoutines.isEmpty ? Self.starterRoutines : cleanedRoutines
+                    didMigrateStoredRoutines = true
+                }
+                defaults.set(true, forKey: legacyPushPullLegsCleanupKey)
+            }
+
+            routines = hydratedRoutines
         } else {
             routines = Self.starterRoutines
+            if !hasAppliedLegacyPushPullLegsCleanup {
+                defaults.set(true, forKey: legacyPushPullLegsCleanupKey)
+            }
         }
 
         if let data = defaults.data(forKey: historyKey),
@@ -199,7 +215,7 @@ final class WorkoutStore: ObservableObject {
         rebuildRoutineIndex()
         rebuildLiftHistoryIndex()
 
-        if didMigrateLegacyStarterRoutines {
+        if didMigrateStoredRoutines {
             persist(routines, forKey: routinesKey)
         }
     }
@@ -503,6 +519,24 @@ final class WorkoutStore: ObservableObject {
 }
 
 private extension WorkoutStore {
+    static let legacyPushPullLegsExerciseNamesByRoutineName: [String: [String]] = [
+        "Push": [
+            "Bench Press",
+            "Incline Dumbbell Press",
+            "Overhead Press"
+        ],
+        "Pull": [
+            "Deadlift",
+            "Pull Up",
+            "Barbell Row"
+        ],
+        "Legs": [
+            "Back Squat",
+            "Romanian Deadlift",
+            "Leg Press"
+        ]
+    ]
+
     enum ProgramTemplate {
         static let bigFourExerciseNames = [
             "Back Squat",
@@ -704,39 +738,25 @@ private extension WorkoutStore {
     }
 
     static func matchesLegacyStarterRoutines(_ routines: [Routine]) -> Bool {
-        let legacyRoutines: [(name: String, exerciseNames: [String])] = [
-            (
-                name: "Push",
-                exerciseNames: [
-                    "Bench Press",
-                    "Incline Dumbbell Press",
-                    "Overhead Press"
-                ]
-            ),
-            (
-                name: "Pull",
-                exerciseNames: [
-                    "Deadlift",
-                    "Pull Up",
-                    "Barbell Row"
-                ]
-            ),
-            (
-                name: "Legs",
-                exerciseNames: [
-                    "Back Squat",
-                    "Romanian Deadlift",
-                    "Leg Press"
-                ]
-            )
-        ]
+        let expectedRoutineCount = legacyPushPullLegsExerciseNamesByRoutineName.count
+        guard routines.count == expectedRoutineCount else { return false }
 
-        guard routines.count == legacyRoutines.count else { return false }
+        let migratedRoutineNames = Set(routines.map(\.name))
+        guard migratedRoutineNames.count == expectedRoutineCount else { return false }
 
-        return zip(routines, legacyRoutines).allSatisfy { routine, legacy in
-            routine.name == legacy.name &&
-            routine.program == nil &&
-            routine.exercises.map(\.name) == legacy.exerciseNames
+        return routines.allSatisfy(isLegacyPushPullLegsRoutine)
+    }
+
+    static func removingLegacyPushPullLegsRoutines(from routines: [Routine]) -> [Routine] {
+        routines.filter { !isLegacyPushPullLegsRoutine($0) }
+    }
+
+    static func isLegacyPushPullLegsRoutine(_ routine: Routine) -> Bool {
+        guard routine.program == nil else { return false }
+        guard let expectedExerciseNames = legacyPushPullLegsExerciseNamesByRoutineName[routine.name] else {
+            return false
         }
+
+        return routine.exercises.map(\.name) == expectedExerciseNames
     }
 }
