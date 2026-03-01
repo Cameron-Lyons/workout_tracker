@@ -10,6 +10,9 @@ enum WeightUnit: String, CaseIterable, Codable {
     private static let poundsDisplayIncrement = 2.5
     private static let kilogramsDisplayIncrement = 2.5
     private static let minimumRoundingIncrement = 0.000_1
+    private static let defaultMinimumIncreaseFloor = 2.5
+    private static let defaultUpperBodyIncrease = 2.5
+    private static let defaultLowerBodyIncrease = 5.0
 
     var symbol: String {
         switch self {
@@ -30,30 +33,15 @@ enum WeightUnit: String, CaseIterable, Codable {
     }
 
     var minimumIncreaseFloor: Double {
-        switch self {
-        case .pounds:
-            return 2.5
-        case .kilograms:
-            return 2.5
-        }
+        Self.defaultMinimumIncreaseFloor
     }
 
     var upperBodyDefaultIncrease: Double {
-        switch self {
-        case .pounds:
-            return 2.5
-        case .kilograms:
-            return 2.5
-        }
+        Self.defaultUpperBodyIncrease
     }
 
     var lowerBodyDefaultIncrease: Double {
-        switch self {
-        case .pounds:
-            return 5
-        case .kilograms:
-            return 5
-        }
+        Self.defaultLowerBodyIncrease
     }
 
     var recommendedMinimumIncreaseDefault: Double {
@@ -107,6 +95,15 @@ enum WeightUnit: String, CaseIterable, Codable {
     func normalizedDisplayIncrease(_ value: Double) -> Double {
         let clamped = max(value, minimumIncreaseFloor)
         return roundedForGymDisplay(clamped)
+    }
+
+    func convertedDisplayString(from oldUnit: WeightUnit, text: String) -> String? {
+        guard let oldDisplayValue = Double(text), oldDisplayValue > 0 else {
+            return nil
+        }
+
+        let storedWeight = oldUnit.storedPounds(fromDisplayValue: oldDisplayValue)
+        return WeightFormatter.displayString(storedWeight, unit: self)
     }
 }
 
@@ -168,6 +165,11 @@ enum PopularRoutinePack: String, CaseIterable, Identifiable {
 }
 
 enum WeightFormatter {
+    private enum Constants {
+        static let oneDecimalScale = 10.0
+        static let twoDecimalScale = 100.0
+    }
+
     static func displayString(_ storedWeightInPounds: Double, unit: WeightUnit = .pounds) -> String {
         let value = unit.displayValue(fromStoredPounds: storedWeightInPounds)
         return displayString(displayValue: value, unit: unit)
@@ -181,21 +183,21 @@ enum WeightFormatter {
         }
 
         // Gym-friendly values are typically whole or half-ish steps; one decimal keeps labels compact.
-        let oneDecimalValue = (roundedValue * 10).rounded() / 10
+        let oneDecimalValue = (roundedValue * Constants.oneDecimalScale).rounded() / Constants.oneDecimalScale
         if oneDecimalValue.rounded() == oneDecimalValue {
             return String(Int(oneDecimalValue))
         }
 
-        if (oneDecimalValue * 10).rounded() == oneDecimalValue * 10 {
+        if (oneDecimalValue * Constants.oneDecimalScale).rounded() == oneDecimalValue * Constants.oneDecimalScale {
             return String(format: "%.1f", oneDecimalValue)
         }
 
-        let twoDecimalValue = (roundedValue * 100).rounded() / 100
+        let twoDecimalValue = (roundedValue * Constants.twoDecimalScale).rounded() / Constants.twoDecimalScale
         if twoDecimalValue.rounded() == twoDecimalValue {
             return String(Int(twoDecimalValue))
         }
 
-        if (twoDecimalValue * 10).rounded() == twoDecimalValue * 10 {
+        if (twoDecimalValue * Constants.oneDecimalScale).rounded() == twoDecimalValue * Constants.oneDecimalScale {
             return String(format: "%.1f", twoDecimalValue)
         }
 

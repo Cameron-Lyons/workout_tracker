@@ -117,12 +117,9 @@ enum WorkoutProgramEngine {
 
         switch program.kind {
         case .startingStrength:
-            let isDayA = program.state.step % Constants.startingStrengthDayCount == 0
-            return "\(isDayA ? "Day A" : "Day B") • Workout \(program.state.cycle)"
+            return startingStrengthContextLabel(for: program.state)
         case .fiveThreeOne, .boringButBig:
-            let weekIndex = program.state.step % Constants.fiveThreeOneWeekCount
-            let week = Constants.fiveThreeOneWeekSpecs[weekIndex]
-            return "Cycle \(program.state.cycle) • \(week.name)"
+            return fiveThreeOneContextLabel(for: program.state)
         }
     }
 
@@ -205,7 +202,7 @@ enum WorkoutProgramEngine {
             )
         }
 
-        let context = "\(isDayA ? "Day A" : "Day B") • Workout \(state.cycle)"
+        let context = startingStrengthContextLabel(for: state, isDayA: isDayA)
 
         return ProgramWorkoutPlan(
             contextLabel: context,
@@ -255,10 +252,27 @@ enum WorkoutProgramEngine {
         }
 
         return ProgramWorkoutPlan(
-            contextLabel: "Cycle \(state.cycle) • \(week.name)",
+            contextLabel: fiveThreeOneContextLabel(for: state, weekName: week.name),
             activeExerciseIDs: nil,
             setTemplatesByExerciseID: setTemplatesByExerciseID
         )
+    }
+
+    private static func startingStrengthContextLabel(for state: ProgramState, isDayA: Bool? = nil) -> String {
+        let resolvedIsDayA = isDayA ?? (state.step % Constants.startingStrengthDayCount == 0)
+        return "\(resolvedIsDayA ? "Day A" : "Day B") • Workout \(state.cycle)"
+    }
+
+    private static func fiveThreeOneContextLabel(for state: ProgramState, weekName: String? = nil) -> String {
+        let resolvedWeekName: String
+        if let weekName {
+            resolvedWeekName = weekName
+        } else {
+            let weekIndex = state.step % Constants.fiveThreeOneWeekCount
+            resolvedWeekName = Constants.fiveThreeOneWeekSpecs[weekIndex].name
+        }
+
+        return "Cycle \(state.cycle) • \(resolvedWeekName)"
     }
 
     private static func buildRepeatedSets(

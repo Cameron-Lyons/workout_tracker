@@ -124,7 +124,13 @@ struct HistoryView: View {
             .toolbar {
                 ToolbarItem(placement: .topBarTrailing) {
                     Button("Benchmark") {
-                        benchmarkSummary = store.runHistoryQueryBenchmark()
+                        let historySummary = store.runHistoryQueryBenchmark()
+                        let progressSummary = store.runProgressQueryBenchmark(unit: weightUnit)
+                        benchmarkSummary = """
+                        \(historySummary)
+
+                        \(progressSummary)
+                        """
                         showBenchmarkAlert = true
                     }
                 }
@@ -418,40 +424,13 @@ struct HistoryView: View {
     private func progressPoints(for exerciseName: String, unit: WeightUnit) -> [LiftProgressPoint] {
         guard !exerciseName.isEmpty else { return [] }
 
-        let records = store.liftRecords(forExerciseName: exerciseName)
-        var summaryBySessionID: [UUID: (date: Date, topWeightInStoredPounds: Double)] = [:]
-
-        for record in records {
-            guard let weight = record.weight else {
-                continue
-            }
-
-            if var existing = summaryBySessionID[record.sessionID] {
-                if record.performedAt > existing.date {
-                    existing.date = record.performedAt
-                }
-
-                if weight > existing.topWeightInStoredPounds {
-                    existing.topWeightInStoredPounds = weight
-                }
-
-                summaryBySessionID[record.sessionID] = existing
-            } else {
-                summaryBySessionID[record.sessionID] = (
-                    date: record.performedAt,
-                    topWeightInStoredPounds: weight
-                )
-            }
-        }
-
-        return summaryBySessionID.map { sessionID, summary in
+        return store.liftProgress(forExerciseName: exerciseName).map { progress in
             LiftProgressPoint(
-                sessionID: sessionID,
-                date: summary.date,
-                topWeight: unit.displayValue(fromStoredPounds: summary.topWeightInStoredPounds)
+                sessionID: progress.sessionID,
+                date: progress.performedAt,
+                topWeight: unit.displayValue(fromStoredPounds: progress.topWeightInStoredPounds)
             )
         }
-        .sorted { $0.date < $1.date }
     }
 
     private var selectedProgressPoints: [LiftProgressPoint] {

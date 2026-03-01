@@ -215,13 +215,12 @@ struct RoutineEditorView: View {
         }
 
         exercises = exercises.map { exercise in
-            guard let oldDisplayValue = Double(exercise.trainingMaxText), oldDisplayValue > 0 else {
+            guard let convertedWeight = newUnit.convertedDisplayString(from: oldUnit, text: exercise.trainingMaxText) else {
                 return exercise
             }
 
             var updated = exercise
-            let storedWeight = oldUnit.storedPounds(fromDisplayValue: oldDisplayValue)
-            updated.trainingMaxText = WeightFormatter.displayString(storedWeight, unit: newUnit)
+            updated.trainingMaxText = convertedWeight
             return updated
         }
     }

@@ -96,7 +96,9 @@ struct WorkoutLoggerView: View {
                 AppBackground()
                 VStack(spacing: Layout.rootSpacing) {
                     let selectedRoutineWithPlan = selectedRoutine.map { routine in
-                        (routine: routine, plan: WorkoutProgramEngine.plan(for: routine))
+                        let plan = WorkoutProgramEngine.plan(for: routine)
+                        let visibleExercises = activeExercises(in: routine, plan: plan)
+                        return (routine: routine, plan: plan, visibleExercises: visibleExercises)
                     }
 
                     routineSelector
@@ -122,10 +124,11 @@ struct WorkoutLoggerView: View {
                     if let selectedRoutineWithPlan {
                         let routine = selectedRoutineWithPlan.routine
                         let plan = selectedRoutineWithPlan.plan
+                        let visibleExercises = selectedRoutineWithPlan.visibleExercises
 
                         ScrollView {
                             LazyVStack(spacing: Layout.sectionSpacing) {
-                                ForEach(activeExercises(in: routine, plan: plan)) { exercise in
+                                ForEach(visibleExercises) { exercise in
                                     exerciseCard(exercise, plan: plan)
                                         .scrollTransition(axis: .vertical) { content, phase in
                                             content
@@ -139,7 +142,7 @@ struct WorkoutLoggerView: View {
                         }
 
                         Button {
-                            saveWorkout(routine: routine, plan: plan)
+                            saveWorkout(routine: routine, activeExercises: visibleExercises)
                         } label: {
                             Text("Save Workout")
                                 .font(.headline)
@@ -150,7 +153,7 @@ struct WorkoutLoggerView: View {
                         .controlSize(.large)
                         .padding(.horizontal)
                         .padding(.bottom)
-                        .disabled(!hasAnyLoggedValues(in: routine, plan: plan))
+                        .disabled(!hasAnyLoggedValues(in: visibleExercises))
                     } else {
                         Spacer()
                         VStack(spacing: 12) {
@@ -600,13 +603,12 @@ struct WorkoutLoggerView: View {
     private func convertDraftWeights(from oldUnit: WeightUnit, to newUnit: WeightUnit) {
         drafts = drafts.mapValues { sets in
             sets.map { set in
-                guard let oldDisplayValue = Double(set.weight), oldDisplayValue > 0 else {
+                guard let convertedWeight = newUnit.convertedDisplayString(from: oldUnit, text: set.weight) else {
                     return set
                 }
 
                 var converted = set
-                let storedWeight = oldUnit.storedPounds(fromDisplayValue: oldDisplayValue)
-                converted.weight = WeightFormatter.displayString(storedWeight, unit: newUnit)
+                converted.weight = convertedWeight
                 return converted
             }
         }
@@ -902,8 +904,8 @@ struct WorkoutLoggerView: View {
         }
     }
 
-    private func hasAnyLoggedValues(in routine: Routine, plan: ProgramWorkoutPlan) -> Bool {
-        activeExercises(in: routine, plan: plan).contains { exercise in
+    private func hasAnyLoggedValues(in exercises: [Exercise]) -> Bool {
+        exercises.contains { exercise in
             let sets = drafts[exercise.id] ?? []
             return sets.contains { set in
                 !set.weight.isEmpty || !set.reps.isEmpty || !set.transcript.isEmpty
@@ -911,8 +913,8 @@ struct WorkoutLoggerView: View {
         }
     }
 
-    private func saveWorkout(routine: Routine, plan: ProgramWorkoutPlan) {
-        let entries: [ExerciseEntry] = activeExercises(in: routine, plan: plan).map { exercise in
+    private func saveWorkout(routine: Routine, activeExercises: [Exercise]) {
+        let entries: [ExerciseEntry] = activeExercises.map { exercise in
             let sets = (drafts[exercise.id] ?? []).compactMap { set -> ExerciseSet? in
                 let transcript = set.transcript.trimmingCharacters(in: .whitespacesAndNewlines)
                 let weight = parseStoredWeight(from: set.weight)

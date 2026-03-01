@@ -7,6 +7,12 @@ struct ExerciseWeightRecommendation: Equatable {
     var guidance: String
 }
 
+struct LiftProgressSnapshot: Equatable {
+    var sessionID: UUID
+    var performedAt: Date
+    var topWeightInStoredPounds: Double
+}
+
 final class WorkoutStore: ObservableObject {
     private enum Persistence {
         static let saveDebounceMilliseconds = 300
@@ -15,6 +21,30 @@ final class WorkoutStore: ObservableObject {
     private enum Recommendation {
         static let fallbackTopSetRepGoal = 8
         static let weightComparisonTolerance = 0.01
+        static let cacheEntryLimit = 512
+    }
+
+    private struct RecommendationCacheKey: Hashable {
+        var routineName: String
+        var exerciseName: String
+        var targetReps: [Int]
+        var minimumIncrease: Double
+        var unit: WeightUnit
+    }
+
+    private enum CachedRecommendationResult {
+        case value(ExerciseWeightRecommendation)
+        case noResult
+    }
+
+    private struct ExerciseSessionKey: Hashable {
+        var exerciseName: String
+        var sessionID: UUID
+    }
+
+    private struct ExerciseRoutineKey: Hashable {
+        var exerciseName: String
+        var routineName: String
     }
 
     @Published var routines: [Routine] {
@@ -35,6 +65,10 @@ final class WorkoutStore: ObservableObject {
     @Published var liftHistory: [LiftRecord] {
         didSet {
             guard !isHydrating else { return }
+            if isApplyingIncrementalLiftHistoryUpdate {
+                scheduleLiftHistorySave()
+                return
+            }
             rebuildLiftHistoryIndex()
             scheduleLiftHistorySave()
         }
@@ -54,11 +88,21 @@ final class WorkoutStore: ObservableObject {
 
     private var routineIndexByID: [UUID: Int] = [:]
     private var liftHistoryByExerciseName: [String: [LiftRecord]] = [:]
+    private var liftHistoryByExerciseAndSession: [ExerciseSessionKey: [LiftRecord]] = [:]
+    private var latestSessionIDByExerciseName: [String: UUID] = [:]
+    private var latestSessionIDByExerciseAndRoutine: [ExerciseRoutineKey: UUID] = [:]
+    private var liftProgressByExerciseName: [String: [LiftProgressSnapshot]] = [:]
     private var cachedExerciseNamesWithHistory: [String] = []
+    private var recommendationCache: [RecommendationCacheKey: CachedRecommendationResult] = [:]
     private var isHydrating = false
+    private var isApplyingIncrementalLiftHistoryUpdate = false
 
     var exerciseNamesWithLiftHistory: [String] {
         cachedExerciseNamesWithHistory
+    }
+
+    func liftProgress(forExerciseName exerciseName: String) -> [LiftProgressSnapshot] {
+        liftProgressByExerciseName[exerciseName] ?? []
     }
 
     init() {
@@ -85,17 +129,13 @@ final class WorkoutStore: ObservableObject {
     }
 
     func addProgramTemplate(_ kind: ProgramKind) {
-        addRoutine(
-            Routine(
-                name: kind.displayName,
-                exercises: ProgramTemplate.exerciseNames(for: kind).map { Exercise(name: $0) },
-                program: ProgramConfig(kind: kind)
-            )
-        )
+        addRoutine(Self.makeProgramRoutine(kind))
     }
 
     func addPopularRoutinePack(_ pack: PopularRoutinePack) {
-        Self.popularRoutines(for: pack).forEach { addRoutine($0) }
+        let routinesToAdd = Self.popularRoutines(for: pack)
+        guard !routinesToAdd.isEmpty else { return }
+        routines.append(contentsOf: routinesToAdd)
     }
 
     func updateRoutine(id: UUID, name: String, exercises: [Exercise]) {
@@ -152,9 +192,7 @@ final class WorkoutStore: ObservableObject {
         workoutHistory.insert(session, at: 0)
 
         let records = Self.liftRecords(from: session)
-        if !records.isEmpty {
-            liftHistory.insert(contentsOf: records, at: 0)
-        }
+        appendLiftHistoryRecords(records)
 
         var progressedRoutine = routine
         WorkoutProgramEngine.advanceProgramState(in: &progressedRoutine)
@@ -231,25 +269,44 @@ final class WorkoutStore: ObservableObject {
         minimumIncrease: Double,
         unit: WeightUnit
     ) -> ExerciseWeightRecommendation? {
+        let cleanedTargets = targetReps.filter { $0 > 0 }
+        let resolvedMinimumIncrease = unit.normalizedDisplayIncrease(minimumIncrease)
+        let cacheKey = RecommendationCacheKey(
+            routineName: routineName,
+            exerciseName: exerciseName,
+            targetReps: cleanedTargets,
+            minimumIncrease: resolvedMinimumIncrease,
+            unit: unit
+        )
+
+        if let cached = recommendationCache[cacheKey] {
+            switch cached {
+            case .value(let recommendation):
+                return recommendation
+            case .noResult:
+                return nil
+            }
+        }
+
         let latestRecords = latestSessionRecords(
             forExerciseName: exerciseName,
             preferredRoutineName: routineName
         )
         guard !latestRecords.isEmpty else {
+            cacheRecommendation(.noResult, for: cacheKey)
             return nil
         }
 
         guard let previousWeight = latestRecords.compactMap(\.weight).max() else {
+            cacheRecommendation(.noResult, for: cacheKey)
             return nil
         }
 
-        let resolvedMinimumIncrease = unit.normalizedDisplayIncrease(minimumIncrease)
         let increment = recommendedIncrement(
             forExerciseName: exerciseName,
             minimumIncrease: resolvedMinimumIncrease,
             unit: unit
         )
-        let cleanedTargets = targetReps.filter { $0 > 0 }
         let shouldIncrease: Bool
         let guidance: String
 
@@ -285,12 +342,14 @@ final class WorkoutStore: ObservableObject {
             fromDisplayValue: unit.roundedForGymDisplay(recommendedDisplayWeight)
         )
 
-        return ExerciseWeightRecommendation(
+        let recommendation = ExerciseWeightRecommendation(
             recommendedWeight: recommendedWeight,
             previousWeight: previousWeight,
             shouldIncrease: shouldIncrease,
             guidance: guidance
         )
+        cacheRecommendation(.value(recommendation), for: cacheKey)
+        return recommendation
     }
 
     func flushPendingSaves() {
@@ -325,30 +384,22 @@ final class WorkoutStore: ObservableObject {
         forExerciseName exerciseName: String,
         preferredRoutineName: String
     ) -> [LiftRecord] {
-        let records = liftHistoryByExerciseName[exerciseName] ?? []
-        guard !records.isEmpty else {
+        let preferredSessionKey = ExerciseRoutineKey(
+            exerciseName: exerciseName,
+            routineName: preferredRoutineName
+        )
+        let resolvedSessionID = latestSessionIDByExerciseAndRoutine[preferredSessionKey]
+            ?? latestSessionIDByExerciseName[exerciseName]
+
+        guard let targetSessionID = resolvedSessionID else {
             return []
         }
 
-        var latestAnySession: (id: UUID, date: Date)?
-        var latestPreferredSession: (id: UUID, date: Date)?
-
-        for record in records {
-            if latestAnySession == nil || record.performedAt > latestAnySession!.date {
-                latestAnySession = (id: record.sessionID, date: record.performedAt)
-            }
-
-            if record.routineName == preferredRoutineName,
-               latestPreferredSession == nil || record.performedAt > latestPreferredSession!.date {
-                latestPreferredSession = (id: record.sessionID, date: record.performedAt)
-            }
-        }
-
-        guard let targetSessionID = latestPreferredSession?.id ?? latestAnySession?.id else {
-            return []
-        }
-
-        return records.filter { $0.sessionID == targetSessionID }
+        let exerciseSessionKey = ExerciseSessionKey(
+            exerciseName: exerciseName,
+            sessionID: targetSessionID
+        )
+        return liftHistoryByExerciseAndSession[exerciseSessionKey] ?? []
     }
 
     private func didMeetAllRepTargets(_ targets: [Int], records: [LiftRecord]) -> Bool {
@@ -395,24 +446,218 @@ final class WorkoutStore: ObservableObject {
         return (value / increment).rounded() * increment
     }
 
-    private func rebuildRoutineIndex() {
-        routineIndexByID = Dictionary(
-            uniqueKeysWithValues: routines.enumerated().map { index, routine in
-                (routine.id, index)
+    private func appendLiftHistoryRecords(_ records: [LiftRecord]) {
+        guard !records.isEmpty else {
+            return
+        }
+
+        applyIncrementalLiftHistoryIndexUpdate(with: records)
+
+        isApplyingIncrementalLiftHistoryUpdate = true
+        defer { isApplyingIncrementalLiftHistoryUpdate = false }
+        liftHistory.insert(contentsOf: records, at: 0)
+    }
+
+    private func applyIncrementalLiftHistoryIndexUpdate(with records: [LiftRecord]) {
+        var recordsByExerciseName: [String: [LiftRecord]] = [:]
+        recordsByExerciseName.reserveCapacity(records.count)
+        var recordsByExerciseSession: [ExerciseSessionKey: [LiftRecord]] = [:]
+        recordsByExerciseSession.reserveCapacity(records.count)
+        var latestRecordByExerciseName: [String: LiftRecord] = [:]
+        latestRecordByExerciseName.reserveCapacity(records.count)
+        var latestRecordByExerciseAndRoutine: [ExerciseRoutineKey: LiftRecord] = [:]
+        latestRecordByExerciseAndRoutine.reserveCapacity(records.count)
+
+        for record in records {
+            recordsByExerciseName[record.exerciseName, default: []].append(record)
+
+            let exerciseSessionKey = ExerciseSessionKey(
+                exerciseName: record.exerciseName,
+                sessionID: record.sessionID
+            )
+            recordsByExerciseSession[exerciseSessionKey, default: []].append(record)
+
+            if let existing = latestRecordByExerciseName[record.exerciseName] {
+                if record.performedAt > existing.performedAt {
+                    latestRecordByExerciseName[record.exerciseName] = record
+                }
+            } else {
+                latestRecordByExerciseName[record.exerciseName] = record
             }
-        )
+
+            let exerciseRoutineKey = ExerciseRoutineKey(
+                exerciseName: record.exerciseName,
+                routineName: record.routineName
+            )
+            if let existing = latestRecordByExerciseAndRoutine[exerciseRoutineKey] {
+                if record.performedAt > existing.performedAt {
+                    latestRecordByExerciseAndRoutine[exerciseRoutineKey] = record
+                }
+            } else {
+                latestRecordByExerciseAndRoutine[exerciseRoutineKey] = record
+            }
+        }
+
+        var addedNewExerciseName = false
+        for (exerciseName, newRecords) in recordsByExerciseName {
+            if liftHistoryByExerciseName[exerciseName] == nil {
+                addedNewExerciseName = true
+            }
+            liftHistoryByExerciseName[exerciseName, default: []].insert(contentsOf: newRecords, at: 0)
+        }
+
+        for (exerciseSessionKey, newRecords) in recordsByExerciseSession {
+            if var existingRecords = liftHistoryByExerciseAndSession[exerciseSessionKey] {
+                existingRecords.insert(contentsOf: newRecords, at: 0)
+                liftHistoryByExerciseAndSession[exerciseSessionKey] = existingRecords
+            } else {
+                liftHistoryByExerciseAndSession[exerciseSessionKey] = newRecords
+            }
+
+            guard let combinedRecords = liftHistoryByExerciseAndSession[exerciseSessionKey],
+                  let snapshot = Self.makeProgressSnapshot(from: combinedRecords) else {
+                continue
+            }
+
+            var snapshots = liftProgressByExerciseName[exerciseSessionKey.exerciseName] ?? []
+            if let existingIndex = snapshots.firstIndex(where: { $0.sessionID == snapshot.sessionID }) {
+                snapshots[existingIndex] = snapshot
+            } else {
+                snapshots.append(snapshot)
+            }
+            snapshots.sort { lhs, rhs in
+                lhs.performedAt < rhs.performedAt
+            }
+            liftProgressByExerciseName[exerciseSessionKey.exerciseName] = snapshots
+        }
+
+        for (exerciseName, latestRecord) in latestRecordByExerciseName {
+            let currentDate = latestSessionIDByExerciseName[exerciseName].flatMap { sessionID in
+                liftHistoryByExerciseAndSession[
+                    ExerciseSessionKey(exerciseName: exerciseName, sessionID: sessionID)
+                ]?.first?.performedAt
+            } ?? .distantPast
+
+            if latestRecord.performedAt >= currentDate {
+                latestSessionIDByExerciseName[exerciseName] = latestRecord.sessionID
+            }
+        }
+
+        for (exerciseRoutineKey, latestRecord) in latestRecordByExerciseAndRoutine {
+            let currentDate = latestSessionIDByExerciseAndRoutine[exerciseRoutineKey].flatMap { sessionID in
+                liftHistoryByExerciseAndSession[
+                    ExerciseSessionKey(exerciseName: exerciseRoutineKey.exerciseName, sessionID: sessionID)
+                ]?.first?.performedAt
+            } ?? .distantPast
+
+            if latestRecord.performedAt >= currentDate {
+                latestSessionIDByExerciseAndRoutine[exerciseRoutineKey] = latestRecord.sessionID
+            }
+        }
+
+        if addedNewExerciseName {
+            cachedExerciseNamesWithHistory = liftHistoryByExerciseName.keys.sorted()
+        }
+
+        recommendationCache.removeAll(keepingCapacity: true)
+    }
+
+    private func rebuildRoutineIndex() {
+        var indexByID: [UUID: Int] = [:]
+        indexByID.reserveCapacity(routines.count)
+
+        for (index, routine) in routines.enumerated() {
+            indexByID[routine.id] = index
+        }
+
+        routineIndexByID = indexByID
     }
 
     private func rebuildLiftHistoryIndex() {
         var byExerciseName: [String: [LiftRecord]] = [:]
         byExerciseName.reserveCapacity(liftHistoryByExerciseName.count)
+        var byExerciseAndSession: [ExerciseSessionKey: [LiftRecord]] = [:]
+        byExerciseAndSession.reserveCapacity(liftHistoryByExerciseAndSession.count)
+        var latestSessionByExercise: [String: (sessionID: UUID, performedAt: Date)] = [:]
+        latestSessionByExercise.reserveCapacity(latestSessionIDByExerciseName.count)
+        var latestSessionByExerciseAndRoutine: [ExerciseRoutineKey: (sessionID: UUID, performedAt: Date)] = [:]
+        latestSessionByExerciseAndRoutine.reserveCapacity(latestSessionIDByExerciseAndRoutine.count)
 
         for record in liftHistory {
             byExerciseName[record.exerciseName, default: []].append(record)
+
+            let exerciseSessionKey = ExerciseSessionKey(
+                exerciseName: record.exerciseName,
+                sessionID: record.sessionID
+            )
+            byExerciseAndSession[exerciseSessionKey, default: []].append(record)
+
+            if let existing = latestSessionByExercise[record.exerciseName] {
+                if record.performedAt > existing.performedAt {
+                    latestSessionByExercise[record.exerciseName] = (
+                        sessionID: record.sessionID,
+                        performedAt: record.performedAt
+                    )
+                }
+            } else {
+                latestSessionByExercise[record.exerciseName] = (
+                    sessionID: record.sessionID,
+                    performedAt: record.performedAt
+                )
+            }
+
+            let exerciseRoutineKey = ExerciseRoutineKey(
+                exerciseName: record.exerciseName,
+                routineName: record.routineName
+            )
+            if let existing = latestSessionByExerciseAndRoutine[exerciseRoutineKey] {
+                if record.performedAt > existing.performedAt {
+                    latestSessionByExerciseAndRoutine[exerciseRoutineKey] = (
+                        sessionID: record.sessionID,
+                        performedAt: record.performedAt
+                    )
+                }
+            } else {
+                latestSessionByExerciseAndRoutine[exerciseRoutineKey] = (
+                    sessionID: record.sessionID,
+                    performedAt: record.performedAt
+                )
+            }
         }
 
+        var progressByExerciseName: [String: [LiftProgressSnapshot]] = [:]
+        progressByExerciseName.reserveCapacity(byExerciseName.count)
+
+        for (key, records) in byExerciseAndSession {
+            guard let summary = Self.makeProgressSnapshot(from: records) else {
+                continue
+            }
+            progressByExerciseName[key.exerciseName, default: []].append(summary)
+        }
+
+        for exerciseName in progressByExerciseName.keys {
+            progressByExerciseName[exerciseName]?.sort { lhs, rhs in
+                lhs.performedAt < rhs.performedAt
+            }
+        }
+
+        liftHistoryByExerciseAndSession = byExerciseAndSession
+        latestSessionIDByExerciseName = latestSessionByExercise.mapValues(\.sessionID)
+        latestSessionIDByExerciseAndRoutine = latestSessionByExerciseAndRoutine.mapValues(\.sessionID)
+        liftProgressByExerciseName = progressByExerciseName
         liftHistoryByExerciseName = byExerciseName
         cachedExerciseNamesWithHistory = byExerciseName.keys.sorted()
+        recommendationCache.removeAll(keepingCapacity: true)
+    }
+
+    private func cacheRecommendation(
+        _ result: CachedRecommendationResult,
+        for key: RecommendationCacheKey
+    ) {
+        if recommendationCache.count >= Recommendation.cacheEntryLimit {
+            recommendationCache.removeAll(keepingCapacity: true)
+        }
+        recommendationCache[key] = result
     }
 
     private func scheduleRoutinesSave() {
@@ -470,6 +715,51 @@ final class WorkoutStore: ObservableObject {
         }
     }
 
+    private static func makeProgressSnapshot(from records: [LiftRecord]) -> LiftProgressSnapshot? {
+        guard let firstRecord = records.first else {
+            return nil
+        }
+
+        var latestDate = firstRecord.performedAt
+        var topWeightInStoredPounds: Double?
+
+        for record in records {
+            if record.performedAt > latestDate {
+                latestDate = record.performedAt
+            }
+
+            guard let weight = record.weight else {
+                continue
+            }
+
+            if let existingTopWeight = topWeightInStoredPounds {
+                if weight > existingTopWeight {
+                    topWeightInStoredPounds = weight
+                }
+            } else {
+                topWeightInStoredPounds = weight
+            }
+        }
+
+        guard let topWeightInStoredPounds else {
+            return nil
+        }
+
+        return LiftProgressSnapshot(
+            sessionID: firstRecord.sessionID,
+            performedAt: latestDate,
+            topWeightInStoredPounds: topWeightInStoredPounds
+        )
+    }
+
+    private static func makeProgramRoutine(_ kind: ProgramKind) -> Routine {
+        Routine(
+            name: kind.displayName,
+            exercises: ProgramTemplate.exerciseNames(for: kind).map { Exercise(name: $0) },
+            program: ProgramConfig(kind: kind)
+        )
+    }
+
 #if DEBUG
     func runHistoryQueryBenchmark(iterations: Int = 25) -> String {
         let exerciseNames = cachedExerciseNamesWithHistory
@@ -505,6 +795,73 @@ final class WorkoutStore: ObservableObject {
         Iterations: \(loops)
         Indexed lookup: \(String(format: "%.2f", indexedMs)) ms
         Naive filter: \(String(format: "%.2f", naiveMs)) ms
+        Delta: \(String(format: "%.2f", delta)) ms
+        Speedup: \(String(format: "%.2fx", speedup))
+        """
+    }
+
+    func runProgressQueryBenchmark(iterations: Int = 25, unit: WeightUnit = .pounds) -> String {
+        let exerciseNames = cachedExerciseNamesWithHistory
+        guard !exerciseNames.isEmpty else {
+            return "No lift history available for progress benchmarking."
+        }
+
+        let loops = max(1, iterations)
+
+        let indexedMs = measureMilliseconds {
+            for _ in 0..<loops {
+                for exerciseName in exerciseNames {
+                    _ = (liftProgressByExerciseName[exerciseName] ?? []).map {
+                        unit.displayValue(fromStoredPounds: $0.topWeightInStoredPounds)
+                    }
+                }
+            }
+        }
+
+        let naiveMs = measureMilliseconds {
+            for _ in 0..<loops {
+                for exerciseName in exerciseNames {
+                    let records = liftHistory.filter { $0.exerciseName == exerciseName }
+                    var summaryBySessionID: [UUID: (date: Date, topWeightInStoredPounds: Double)] = [:]
+
+                    for record in records {
+                        guard let weight = record.weight else {
+                            continue
+                        }
+
+                        if var existing = summaryBySessionID[record.sessionID] {
+                            if record.performedAt > existing.date {
+                                existing.date = record.performedAt
+                            }
+
+                            if weight > existing.topWeightInStoredPounds {
+                                existing.topWeightInStoredPounds = weight
+                            }
+
+                            summaryBySessionID[record.sessionID] = existing
+                        } else {
+                            summaryBySessionID[record.sessionID] = (
+                                date: record.performedAt,
+                                topWeightInStoredPounds: weight
+                            )
+                        }
+                    }
+
+                    _ = summaryBySessionID.values.map {
+                        unit.displayValue(fromStoredPounds: $0.topWeightInStoredPounds)
+                    }
+                }
+            }
+        }
+
+        let delta = naiveMs - indexedMs
+        let speedup = indexedMs > 0 ? naiveMs / indexedMs : 0
+
+        return """
+        Exercises: \(exerciseNames.count)
+        Iterations: \(loops)
+        Indexed progress lookup: \(String(format: "%.2f", indexedMs)) ms
+        Naive progress rebuild: \(String(format: "%.2f", naiveMs)) ms
         Delta: \(String(format: "%.2f", delta)) ms
         Speedup: \(String(format: "%.2fx", speedup))
         """
@@ -728,13 +1085,7 @@ private extension WorkoutStore {
             .startingStrength,
             .fiveThreeOne,
             .boringButBig
-        ].map { kind in
-            Routine(
-                name: kind.displayName,
-                exercises: ProgramTemplate.exerciseNames(for: kind).map { Exercise(name: $0) },
-                program: ProgramConfig(kind: kind)
-            )
-        }
+        ].map(makeProgramRoutine)
     }
 
     static func matchesLegacyStarterRoutines(_ routines: [Routine]) -> Bool {
