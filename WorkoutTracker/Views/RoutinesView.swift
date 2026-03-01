@@ -100,7 +100,7 @@ struct RoutinesView: View {
                 .font(.system(size: 40, weight: .semibold))
                 .foregroundStyle(AppColors.accent)
 
-            Text("Build Your First Routine")
+            Text("Build your first routine")
                 .font(.system(size: 30, weight: .black, design: .rounded))
                 .foregroundStyle(AppColors.textPrimary)
 

@@ -54,38 +54,38 @@ enum WorkoutProgramEngine {
         static let bbbSupplementalPercent = 0.50
         static let bbbSupplementalSetCount = 5
         static let bbbSupplementalReps = 10
-        static let bbbNote = "BBB"
-        static let noTrainingMaxNote = "Set TM in routine editor"
+        static let bbbNote = "BBB (5x10)"
+        static let noTrainingMaxNote = "Set training max (TM) in Edit Routine"
         static let lowerBodyTrainingMaxIncrement = 10.0
         static let roundingIncrement = 2.5
 
         static let fiveThreeOneWeekSpecs: [WeekPlanSpec] = [
             WeekPlanSpec(
-                name: "5s Week",
+                name: "Week 1 (5-rep week)",
                 primarySpecs: [
                     PercentageSetSpec(0.65, 5),
                     PercentageSetSpec(0.75, 5),
-                    PercentageSetSpec(0.85, 5, note: "AMRAP")
+                    PercentageSetSpec(0.85, 5, note: "AMRAP (as many reps as possible)")
                 ]
             ),
             WeekPlanSpec(
-                name: "3s Week",
+                name: "Week 2 (3-rep week)",
                 primarySpecs: [
                     PercentageSetSpec(0.70, 3),
                     PercentageSetSpec(0.80, 3),
-                    PercentageSetSpec(0.90, 3, note: "AMRAP")
+                    PercentageSetSpec(0.90, 3, note: "AMRAP (as many reps as possible)")
                 ]
             ),
             WeekPlanSpec(
-                name: "5/3/1 Week",
+                name: "Week 3 (5/3/1 week)",
                 primarySpecs: [
                     PercentageSetSpec(0.75, 5),
                     PercentageSetSpec(0.85, 3),
-                    PercentageSetSpec(0.95, 1, note: "AMRAP")
+                    PercentageSetSpec(0.95, 1, note: "AMRAP (as many reps as possible)")
                 ]
             ),
             WeekPlanSpec(
-                name: "Deload Week",
+                name: "Week 4 (Deload)",
                 primarySpecs: [
                     PercentageSetSpec(0.40, 5),
                     PercentageSetSpec(0.50, 5),
@@ -118,7 +118,7 @@ enum WorkoutProgramEngine {
         switch program.kind {
         case .startingStrength:
             let isDayA = program.state.step % Constants.startingStrengthDayCount == 0
-            return "\(isDayA ? "Day A" : "Day B") • Session \(program.state.cycle)"
+            return "\(isDayA ? "Day A" : "Day B") • Workout \(program.state.cycle)"
         case .fiveThreeOne, .boringButBig:
             let weekIndex = program.state.step % Constants.fiveThreeOneWeekCount
             let week = Constants.fiveThreeOneWeekSpecs[weekIndex]
@@ -205,7 +205,7 @@ enum WorkoutProgramEngine {
             )
         }
 
-        let context = "\(isDayA ? "Day A" : "Day B") • Session \(state.cycle)"
+        let context = "\(isDayA ? "Day A" : "Day B") • Workout \(state.cycle)"
 
         return ProgramWorkoutPlan(
             contextLabel: context,

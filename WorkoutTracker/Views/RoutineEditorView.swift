@@ -33,7 +33,7 @@ struct RoutineEditorView: View {
             AppBackground()
             Form {
                 if let routine, let program = routine.program {
-                    Section("Program") {
+                    Section("Program template") {
                         Text(program.kind.displayName)
                             .foregroundStyle(AppColors.textPrimary)
 
@@ -47,7 +47,7 @@ struct RoutineEditorView: View {
                 }
 
                 Section("Routine") {
-                    TextField("Name", text: $routineName)
+                    TextField("Routine name", text: $routineName)
                         .textInputAutocapitalization(.words)
                         .foregroundStyle(AppColors.textPrimary)
                 }
@@ -55,7 +55,7 @@ struct RoutineEditorView: View {
 
                 Section {
                     HStack {
-                        TextField("Add exercise", text: $pendingExerciseName)
+                        TextField("Add exercise name", text: $pendingExerciseName)
                             .textInputAutocapitalization(.words)
                             .foregroundStyle(AppColors.textPrimary)
 
@@ -68,7 +68,7 @@ struct RoutineEditorView: View {
                 } header: {
                     Text("Exercises")
                 } footer: {
-                    Text("Set TM/Working Weight for auto-calculated sets.")
+                    Text("Set a training max (TM) or working weight to auto-calculate sets.")
                 }
                 .listRowBackground(AppColors.surface)
 
@@ -84,7 +84,7 @@ struct RoutineEditorView: View {
                                     .textInputAutocapitalization(.words)
                                     .foregroundStyle(AppColors.textPrimary)
 
-                                TextField("TM / Working Weight (\(weightUnit.symbol))", text: $exercise.trainingMaxText)
+                                TextField("Training max (TM) / working weight (\(weightUnit.symbol))", text: $exercise.trainingMaxText)
                                     .keyboardType(.decimalPad)
                                     .foregroundStyle(AppColors.textPrimary)
                             }

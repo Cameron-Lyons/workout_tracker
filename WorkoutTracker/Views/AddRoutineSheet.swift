@@ -15,7 +15,7 @@ struct AddRoutineSheet: View {
                 AppBackground()
                 Form {
                     Section("Routine") {
-                        TextField("Name", text: $routineName)
+                        TextField("Routine name", text: $routineName)
                             .textInputAutocapitalization(.words)
                             .foregroundStyle(AppColors.textPrimary)
                     }
@@ -23,7 +23,7 @@ struct AddRoutineSheet: View {
 
                     Section("Exercises") {
                         HStack {
-                            TextField("Add exercise", text: $pendingExercise)
+                            TextField("Add exercise name", text: $pendingExercise)
                                 .textInputAutocapitalization(.words)
                                 .foregroundStyle(AppColors.textPrimary)
 

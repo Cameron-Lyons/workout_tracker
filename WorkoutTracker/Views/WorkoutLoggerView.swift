@@ -110,7 +110,7 @@ struct WorkoutLoggerView: View {
                             .frame(maxWidth: .infinity, alignment: .leading)
                     }
 
-                    Text("Manual input stays in control. Use voice as a quick shortcut when you want it.")
+                    Text("Use manual entry by default. Voice input is optional for quick logging.")
                         .font(.footnote)
                         .foregroundStyle(AppColors.textSecondary)
                         .padding(.horizontal)
@@ -158,7 +158,7 @@ struct WorkoutLoggerView: View {
                                 .font(.system(size: 38, weight: .semibold))
                                 .foregroundStyle(AppColors.accent)
 
-                            Text("No Routine Selected")
+                            Text("No routine selected")
                                 .font(.system(.title3, design: .rounded).weight(.bold))
                                 .foregroundStyle(AppColors.textPrimary)
 
@@ -211,7 +211,7 @@ struct WorkoutLoggerView: View {
                     Button {
                         showVoiceTools.toggle()
                     } label: {
-                        Label(showVoiceTools ? "Voice On" : "Voice Off", systemImage: showVoiceTools ? "mic.fill" : "mic.slash")
+                        Label(showVoiceTools ? "Voice tools on" : "Voice tools off", systemImage: showVoiceTools ? "mic.fill" : "mic.slash")
                     }
                 }
             }
@@ -247,7 +247,7 @@ struct WorkoutLoggerView: View {
                 .tracking(0.6)
 
             Picker("Routine", selection: $selectedRoutineID) {
-                Text("Choose Routine").tag(Optional<UUID>.none)
+                Text("Choose a routine").tag(Optional<UUID>.none)
                 ForEach(store.routines) { routine in
                     Text(routine.name).tag(Optional(routine.id))
                 }
@@ -272,7 +272,7 @@ struct WorkoutLoggerView: View {
             }
 
             HStack(spacing: Layout.compactSpacing) {
-                Text("Min Increase")
+                Text("Min Weight Increase")
                     .font(.caption.weight(.semibold))
                     .foregroundStyle(AppColors.textSecondary)
 
@@ -296,6 +296,10 @@ struct WorkoutLoggerView: View {
                         .foregroundStyle(AppColors.textSecondary)
                 }
             }
+
+            Text("Used by auto-suggestions when recommending your next weight.")
+                .font(.caption2)
+                .foregroundStyle(AppColors.textSecondary)
         }
         .padding(14)
         .appSurface(cornerRadius: Layout.cardCornerRadius, shadow: false)
@@ -362,7 +366,7 @@ struct WorkoutLoggerView: View {
                     .foregroundStyle(AppColors.textSecondary)
             }
 
-            Toggle("Auto-start after saving workout", isOn: $autoStartRestTimer)
+            Toggle("Auto-start rest timer after saving workout", isOn: $autoStartRestTimer)
                 .font(.caption)
                 .tint(AppColors.accentAlt)
         }
@@ -409,7 +413,7 @@ struct WorkoutLoggerView: View {
                     }
 
                     HStack(spacing: Layout.rowSpacing) {
-                        TextField("Weight", text: weightBinding(for: exercise.id, setIndex: index))
+                        TextField("Weight (\(weightUnit.symbol))", text: weightBinding(for: exercise.id, setIndex: index))
                             .keyboardType(.decimalPad)
                             .appInputField()
 
@@ -469,7 +473,7 @@ struct WorkoutLoggerView: View {
                 Image(systemName: recommendation.shouldIncrease ? "arrow.up.right.circle.fill" : "equal.circle.fill")
                     .foregroundStyle(recommendation.shouldIncrease ? AppColors.accent : AppColors.accentAlt)
 
-                Text("Suggested: \(WeightFormatter.displayString(recommendation.recommendedWeight, unit: weightUnit)) \(weightUnit.symbol)")
+                Text("Suggested next weight: \(WeightFormatter.displayString(recommendation.recommendedWeight, unit: weightUnit)) \(weightUnit.symbol)")
                     .font(.caption.weight(.semibold))
                     .foregroundStyle(AppColors.textPrimary)
             }

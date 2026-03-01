@@ -61,7 +61,7 @@ struct HistoryView: View {
                             progressSection
 
                             if sessions.isEmpty {
-                                Section("Logged Sessions") {
+                                Section("Logged workouts") {
                                     Text("No workouts match the selected date.")
                                         .font(.subheadline)
                                         .foregroundStyle(AppColors.textSecondary)
@@ -144,7 +144,7 @@ struct HistoryView: View {
                 .font(.system(size: 40, weight: .semibold))
                 .foregroundStyle(AppColors.accent)
 
-            Text("No Logged Workouts")
+            Text("No workouts logged yet")
                 .font(.system(size: 30, weight: .black, design: .rounded))
                 .foregroundStyle(AppColors.textPrimary)
 
@@ -290,7 +290,7 @@ struct HistoryView: View {
     }
 
     private func calendarSection(filteredSessionCount: Int) -> some View {
-        Section("Workout Calendar") {
+        Section("Workout calendar") {
             VStack(spacing: Constants.calendarSectionSpacing) {
                 HStack {
                     Button {
@@ -350,13 +350,13 @@ struct HistoryView: View {
 
                         Spacer()
 
-                        Button("Show All") {
+                        Button("Show all") {
                             self.selectedCalendarDay = nil
                         }
                         .font(.caption.weight(.semibold))
                     }
                 } else {
-                    Text("Tap a marked day to filter sessions by date.")
+                    Text("Tap a marked day to filter workouts by date.")
                         .font(.caption)
                         .foregroundStyle(AppColors.textSecondary)
                         .frame(maxWidth: .infinity, alignment: .leading)
@@ -471,7 +471,7 @@ struct HistoryView: View {
         let changePrefix = change >= 0 ? "+" : "-"
         let absoluteChange = WeightFormatter.displayString(displayValue: abs(change), unit: weightUnit)
 
-        return "Change since first logged workout: \(changePrefix)\(absoluteChange) \(weightUnit.symbol) (\(firstPoint.date.formatted(date: .abbreviated, time: .omitted)) -> \(latestPoint.date.formatted(date: .abbreviated, time: .omitted)))."
+        return "Change since first logged workout: \(changePrefix)\(absoluteChange) \(weightUnit.symbol) (\(firstPoint.date.formatted(date: .abbreviated, time: .omitted)) to \(latestPoint.date.formatted(date: .abbreviated, time: .omitted)))."
     }
 
     private var progressSection: some View {
@@ -479,7 +479,7 @@ struct HistoryView: View {
         let points = selectedProgressPoints
         let summary = trendSummary(for: points)
 
-        return Section("Progress Over Time") {
+        return Section("Progress over time") {
             VStack(alignment: .leading, spacing: 12) {
                 if exercises.isEmpty {
                     Text("Log sets with weight to see progress over time.")
