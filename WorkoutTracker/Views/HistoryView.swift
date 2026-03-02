@@ -11,6 +11,7 @@ private struct LiftProgressPoint: Identifiable {
 
 struct HistoryView: View {
     private enum Constants {
+        static let filterAnimation = Animation.easeInOut(duration: 0.22)
         static let weekDayCount = 7
         static let sessionEntrySpacing: CGFloat = 6
         static let sessionHeaderSpacing: CGFloat = 2
@@ -38,6 +39,7 @@ struct HistoryView: View {
         static let entryCardPadding: CGFloat = 14
         static let sessionSectionTopInset: CGFloat = 6
         static let sessionSectionBottomInset: CGFloat = 6
+        static let sessionTitleFontSize: CGFloat = 20
         static let sessionScrollFadeOpacity = 0.84
         static let sessionScrollScale = 0.985
         static let sessionHeaderTopPadding: CGFloat = 16
@@ -51,8 +53,10 @@ struct HistoryView: View {
         static let progressCardPadding: CGFloat = 14
         static let progressSectionInset: CGFloat = 8
         static let progressLineWidth: CGFloat = 2.5
+        static let progressPointOpacity = 0.88
         static let progressAreaStartOpacity = 0.35
         static let progressAreaEndOpacity = 0.02
+        static let cellSelectionAnimationDuration = 0.18
     }
 
     @EnvironmentObject private var store: WorkoutStore
@@ -64,6 +68,8 @@ struct HistoryView: View {
     @State private var cachedWorkoutDays: Set<Date> = []
     @State private var cachedFilteredSessions: [WorkoutSession] = []
     @State private var cachedProgressPointsByExerciseName: [String: [LiftProgressPoint]] = [:]
+    @State private var cachedOrderedWeekdaySymbols: [String] = []
+    @State private var cachedMonthGridDates: [Date?] = []
 #if DEBUG
     @State private var showBenchmarkAlert = false
     @State private var benchmarkSummary = ""
@@ -134,6 +140,9 @@ struct HistoryView: View {
                         }
                         .listStyle(.plain)
                         .scrollContentBackground(.hidden)
+                        .scrollIndicators(.hidden)
+                        .animation(Constants.filterAnimation, value: selectedCalendarDay)
+                        .animation(Constants.filterAnimation, value: selectedExerciseName)
                     }
                 }
             }
@@ -145,6 +154,7 @@ struct HistoryView: View {
                 syncExerciseSelection()
                 rebuildProgressPointsCache()
                 syncCalendarState()
+                rebuildCalendarGridCache()
             }
             .onChange(of: store.liftHistory) { _, _ in
                 syncExerciseSelection()
@@ -153,12 +163,19 @@ struct HistoryView: View {
             .onChange(of: store.workoutHistory) { _, _ in
                 rebuildHistoryCaches()
                 syncCalendarState()
+                rebuildCalendarGridCache()
             }
             .onChange(of: selectedCalendarDay) { _, _ in
                 updateFilteredSessions()
             }
+            .onChange(of: displayedMonth) { _, _ in
+                rebuildCalendarGridCache()
+            }
             .onChange(of: weightUnitRawValue) { _, _ in
                 rebuildProgressPointsCache()
+            }
+            .onReceive(NotificationCenter.default.publisher(for: NSLocale.currentLocaleDidChangeNotification)) { _ in
+                rebuildCalendarGridCache()
             }
             .tint(AppColors.accent)
 #if DEBUG
@@ -196,7 +213,7 @@ struct HistoryView: View {
     private func sessionEntryCard(_ entry: ExerciseEntry) -> some View {
         VStack(alignment: .leading, spacing: Constants.sessionEntrySpacing) {
             Text(entry.exerciseName)
-                .font(.subheadline.weight(.semibold))
+                .font(.subheadline.weight(.medium))
                 .foregroundStyle(AppColors.textPrimary)
 
             if entry.sets.isEmpty {
@@ -223,7 +240,7 @@ struct HistoryView: View {
     private func sessionHeader(_ session: WorkoutSession) -> some View {
         VStack(alignment: .leading, spacing: Constants.sessionHeaderSpacing) {
             Text(session.routineName)
-                .font(.system(size: 20, weight: .black, design: .rounded))
+                .font(.system(size: Constants.sessionTitleFontSize, weight: .bold, design: .rounded))
                 .foregroundStyle(AppColors.textPrimary)
             if let context = session.programContext, !context.isEmpty {
                 Text(context)
@@ -291,35 +308,6 @@ struct HistoryView: View {
         return displayedMonthStart < monthBounds.latest
     }
 
-    private var orderedWeekdaySymbols: [String] {
-        let symbols = calendar.veryShortStandaloneWeekdaySymbols
-        let startIndex = max(0, calendar.firstWeekday - 1)
-        return (0..<symbols.count).map { symbols[(startIndex + $0) % symbols.count] }
-    }
-
-    private var monthGridDates: [Date?] {
-        guard let monthInterval = calendar.dateInterval(of: .month, for: displayedMonthStart),
-              let days = calendar.range(of: .day, in: .month, for: displayedMonthStart) else {
-            return []
-        }
-
-        let firstWeekday = calendar.component(.weekday, from: monthInterval.start)
-        let leadingSlots = (firstWeekday - calendar.firstWeekday + Constants.weekDayCount) % Constants.weekDayCount
-        var gridDates = Array(repeating: Date?.none, count: leadingSlots)
-
-        for day in days {
-            if let date = calendar.date(byAdding: .day, value: day - 1, to: monthInterval.start) {
-                gridDates.append(date)
-            }
-        }
-
-        while gridDates.count % Constants.weekDayCount != 0 {
-            gridDates.append(nil)
-        }
-
-        return gridDates
-    }
-
     private var monthTitle: String {
         displayedMonthStart.formatted(.dateTime.month(.wide).year())
     }
@@ -338,7 +326,8 @@ struct HistoryView: View {
                     Spacer()
 
                     Text(monthTitle)
-                        .font(.system(size: Constants.monthTitleFontSize, weight: .black, design: .rounded))
+                        .font(.system(size: Constants.monthTitleFontSize, weight: .bold, design: .rounded))
+                        .contentTransition(.numericText())
                         .foregroundStyle(AppColors.textPrimary)
 
                     Spacer()
@@ -358,14 +347,14 @@ struct HistoryView: View {
                     ),
                     spacing: Constants.calendarGridRowSpacing
                 ) {
-                    ForEach(Array(orderedWeekdaySymbols.enumerated()), id: \.offset) { _, symbol in
+                    ForEach(Array(cachedOrderedWeekdaySymbols.enumerated()), id: \.offset) { _, symbol in
                         Text(symbol)
                             .font(.caption.weight(.semibold))
                             .foregroundStyle(AppColors.textSecondary)
                             .frame(maxWidth: .infinity)
                     }
 
-                    ForEach(Array(monthGridDates.enumerated()), id: \.offset) { _, date in
+                    ForEach(Array(cachedMonthGridDates.enumerated()), id: \.offset) { _, date in
                         if let date {
                             calendarDayCell(for: date)
                         } else {
@@ -399,6 +388,7 @@ struct HistoryView: View {
             }
             .padding(Constants.calendarCardPadding)
             .appSurface(cornerRadius: Constants.calendarCardCornerRadius, shadow: false)
+            .appReveal(delay: 0.03)
             .listRowBackground(Color.clear)
             .listRowSeparator(.hidden)
             .listRowInsets(
@@ -442,12 +432,13 @@ struct HistoryView: View {
             .overlay {
                 RoundedRectangle(cornerRadius: Constants.calendarDayCornerRadius)
                     .stroke(
-                        isToday ? AppColors.accentAlt.opacity(Constants.todayOutlineOpacity) : Color.clear,
+                        isToday ? AppColors.accent.opacity(Constants.todayOutlineOpacity) : Color.clear,
                         lineWidth: Constants.todayOutlineWidth
                     )
             }
         }
         .buttonStyle(.plain)
+        .animation(.easeInOut(duration: Constants.cellSelectionAnimationDuration), value: isSelected)
         .disabled(!hasWorkout)
         .accessibilityLabel(date.formatted(date: .complete, time: .omitted))
         .accessibilityValue(hasWorkout ? "Workout logged" : "No workout logged")
@@ -553,7 +544,7 @@ struct HistoryView: View {
                                 x: .value("Date", point.date),
                                 y: .value("Top Weight (\(weightUnit.symbol))", point.topWeight)
                             )
-                            .foregroundStyle(AppColors.accentAlt)
+                            .foregroundStyle(AppColors.accent.opacity(Constants.progressPointOpacity))
                         }
                         .frame(height: Constants.chartHeight)
                         .chartXAxis {
@@ -583,6 +574,7 @@ struct HistoryView: View {
             }
             .padding(Constants.progressCardPadding)
             .appSurface(cornerRadius: Constants.progressCardCornerRadius, shadow: false)
+            .appReveal(delay: 0.08)
             .listRowBackground(Color.clear)
             .listRowSeparator(.hidden)
             .listRowInsets(
@@ -616,7 +608,7 @@ struct HistoryView: View {
         }
 
         if options.contains(selectedExerciseName) == false {
-            selectedExerciseName = options[0]
+            selectedExerciseName = options.first ?? ""
         }
     }
 
@@ -629,11 +621,11 @@ struct HistoryView: View {
     private func updateFilteredSessions(using history: [WorkoutSession]? = nil) {
         let sessions = history ?? store.workoutHistory
         guard let selectedCalendarDay else {
-            cachedFilteredSessions = sessions
+            cachedFilteredSessions = Array(sessions.reversed())
             return
         }
 
-        cachedFilteredSessions = sessions.filter {
+        cachedFilteredSessions = sessions.reversed().filter {
             calendar.isDate($0.performedAt, inSameDayAs: selectedCalendarDay)
         }
     }
@@ -653,7 +645,7 @@ struct HistoryView: View {
 
     private func syncCalendarState() {
         if hasInitializedCalendarMonth == false {
-            if let latestWorkoutDate = store.workoutHistory.first?.performedAt {
+            if let latestWorkoutDate = store.workoutHistory.last?.performedAt {
                 displayedMonth = calendar.startOfMonth(for: latestWorkoutDate)
             } else {
                 displayedMonth = calendar.startOfMonth(for: Date())
@@ -679,6 +671,40 @@ struct HistoryView: View {
                 displayedMonth = monthBounds.latest
             }
         }
+    }
+
+    private func rebuildCalendarGridCache() {
+        cachedOrderedWeekdaySymbols = orderedWeekdaySymbols()
+        cachedMonthGridDates = monthGridDates(for: displayedMonthStart)
+    }
+
+    private func orderedWeekdaySymbols() -> [String] {
+        let symbols = calendar.veryShortStandaloneWeekdaySymbols
+        let startIndex = max(0, calendar.firstWeekday - 1)
+        return (0..<symbols.count).map { symbols[(startIndex + $0) % symbols.count] }
+    }
+
+    private func monthGridDates(for monthStart: Date) -> [Date?] {
+        guard let monthInterval = calendar.dateInterval(of: .month, for: monthStart),
+              let days = calendar.range(of: .day, in: .month, for: monthStart) else {
+            return []
+        }
+
+        let firstWeekday = calendar.component(.weekday, from: monthInterval.start)
+        let leadingSlots = (firstWeekday - calendar.firstWeekday + Constants.weekDayCount) % Constants.weekDayCount
+        var gridDates = Array(repeating: Date?.none, count: leadingSlots)
+
+        for day in days {
+            if let date = calendar.date(byAdding: .day, value: day - 1, to: monthInterval.start) {
+                gridDates.append(date)
+            }
+        }
+
+        while gridDates.count % Constants.weekDayCount != 0 {
+            gridDates.append(nil)
+        }
+
+        return gridDates
     }
 }
 

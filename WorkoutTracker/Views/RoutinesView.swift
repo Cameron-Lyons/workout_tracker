@@ -2,6 +2,7 @@ import SwiftUI
 
 struct RoutinesView: View {
     private enum Constants {
+        static let listAnimation = Animation.spring(response: 0.42, dampingFraction: 0.86)
         static let scrollFadeOpacity = 0.82
         static let scrollScale = 0.985
         static let rowInsetTop: CGFloat = 7
@@ -11,9 +12,9 @@ struct RoutinesView: View {
         static let rowDotShadowOpacity = 0.65
         static let rowDotShadowRadius: CGFloat = 6
         static let rowDotTopPadding: CGFloat = 8
-        static let rowOuterPadding: CGFloat = 14
+        static let rowOuterPadding: CGFloat = 16
         static let rowCornerRadius: CGFloat = 16
-        static let rowTitleSize: CGFloat = 22
+        static let rowTitleSize: CGFloat = 21
         static let rowProgramTagSpacing: CGFloat = 8
         static let rowProgramTagVerticalPadding: CGFloat = 4
         static let rowProgramTagTracking: CGFloat = 0.8
@@ -24,10 +25,12 @@ struct RoutinesView: View {
         static let rowDotGradientStartRadius: CGFloat = 1
         static let rowDotGradientEndOpacity = 0.4
         static let rowTextLineLimit = 2
+        static let rowSpacing: CGFloat = 12
     }
 
     @EnvironmentObject private var store: WorkoutStore
     @State private var showingAddRoutine = false
+    @State private var exerciseSummaryByRoutineID: [UUID: String] = [:]
 
     var body: some View {
         NavigationStack {
@@ -36,8 +39,10 @@ struct RoutinesView: View {
                 Group {
                     if store.routines.isEmpty {
                         emptyState
+                            .appReveal(delay: 0.03)
                     } else {
                         routinesList
+                            .appReveal(delay: 0.03)
                     }
                 }
             }
@@ -86,6 +91,12 @@ struct RoutinesView: View {
                     store.addRoutine(name: name, exerciseNames: exercises)
                 }
             }
+            .onAppear {
+                rebuildExerciseSummaryCache()
+            }
+            .onChange(of: store.routines) { _, _ in
+                rebuildExerciseSummaryCache()
+            }
         }
     }
 
@@ -124,6 +135,8 @@ struct RoutinesView: View {
         }
         .listStyle(.plain)
         .scrollContentBackground(.hidden)
+        .scrollIndicators(.hidden)
+        .animation(Constants.listAnimation, value: store.routines)
     }
 
     private var emptyState: some View {
@@ -135,7 +148,7 @@ struct RoutinesView: View {
     }
 
     private func routineRow(_ routine: Routine) -> some View {
-        HStack(alignment: .top, spacing: 12) {
+        HStack(alignment: .top, spacing: Constants.rowSpacing) {
             Circle()
                 .fill(
                     RadialGradient(
@@ -162,19 +175,19 @@ struct RoutinesView: View {
             VStack(alignment: .leading, spacing: 10) {
                 HStack(alignment: .firstTextBaseline, spacing: 8) {
                     Text(routine.name)
-                        .font(.system(size: Constants.rowTitleSize, weight: .black, design: .rounded))
+                        .font(.system(size: Constants.rowTitleSize, weight: .bold, design: .rounded))
                         .foregroundStyle(AppColors.textPrimary)
 
                     Spacer()
 
                     Image(systemName: "chevron.right")
-                        .font(.caption.weight(.bold))
+                        .font(.caption.weight(.semibold))
                         .foregroundStyle(AppColors.textSecondary.opacity(Constants.rowChevronOpacity))
                 }
 
                 if let program = routine.program {
                     Text(program.kind.displayName.uppercased())
-                        .font(.caption2.weight(.heavy))
+                        .font(.caption2.weight(.semibold))
                         .tracking(Constants.rowProgramTagTracking)
                         .foregroundStyle(AppColors.accent)
                         .padding(.horizontal, Constants.rowProgramTagSpacing)
@@ -186,7 +199,7 @@ struct RoutinesView: View {
                         )
                 }
 
-                Text(routine.exercises.map(\.name).joined(separator: " • "))
+                Text(exerciseSummaryByRoutineID[routine.id] ?? routine.exercises.map(\.name).joined(separator: " • "))
                     .font(.subheadline)
                     .foregroundStyle(AppColors.textSecondary)
                     .lineLimit(Constants.rowTextLineLimit)
@@ -194,5 +207,16 @@ struct RoutinesView: View {
         }
         .padding(Constants.rowOuterPadding)
         .appSurface(cornerRadius: Constants.rowCornerRadius, shadow: false)
+    }
+
+    private func rebuildExerciseSummaryCache() {
+        var summaries: [UUID: String] = [:]
+        summaries.reserveCapacity(store.routines.count)
+
+        for routine in store.routines {
+            summaries[routine.id] = routine.exercises.map(\.name).joined(separator: " • ")
+        }
+
+        exerciseSummaryByRoutineID = summaries
     }
 }

@@ -14,22 +14,214 @@ private struct ActiveVoiceTarget: Equatable {
     var setID: UUID
 }
 
+private struct RestTimerCardView: View {
+    private enum Constants {
+        static let defaultRestSeconds = 90
+        static let minimumRestSeconds = 1
+        static let quickAddRestSeconds = 30
+        static let restPresets = [60, 90, 120, 180]
+        static let restTickerInterval = 1.0
+        static let restPresetTintOpacity = 0.88
+    }
+
+    private enum Layout {
+        static let sectionSpacing: CGFloat = 12
+        static let compactSpacing: CGFloat = 8
+        static let rowSpacing: CGFloat = 10
+        static let cardCornerRadius: CGFloat = 16
+    }
+
+    @Binding var autoStartRestTimer: Bool
+    let autoStartTrigger: Int
+
+    @State private var restTimerDuration = Constants.defaultRestSeconds
+    @State private var restTimerRemaining = 0
+    @State private var isRestTimerRunning = false
+
+    private let restTicker = Timer.publish(
+        every: Constants.restTickerInterval,
+        on: .main,
+        in: .common
+    ).autoconnect()
+
+    var body: some View {
+        VStack(alignment: .leading, spacing: Layout.sectionSpacing) {
+            HStack {
+                Label("Rest Timer", systemImage: "timer")
+                    .font(.system(.body, design: .rounded).weight(.semibold))
+                    .foregroundStyle(AppColors.textPrimary)
+                Spacer()
+                Text(restTimerDisplay)
+                    .font(.title3.monospacedDigit().weight(.semibold))
+                    .contentTransition(.numericText())
+                    .foregroundStyle(restTimerRemaining == 0 && !isRestTimerRunning ? AppColors.textSecondary : AppColors.textPrimary)
+            }
+
+            ProgressView(value: restProgress)
+                .tint(AppColors.accent)
+
+            HStack(spacing: Layout.compactSpacing) {
+                ForEach(Constants.restPresets, id: \.self) { seconds in
+                    Button(presetLabel(for: seconds)) {
+                        startRestTimer(seconds: seconds)
+                    }
+                    .buttonStyle(.bordered)
+                    .tint(AppColors.accent.opacity(Constants.restPresetTintOpacity))
+                    .font(.caption)
+                }
+            }
+
+            HStack(spacing: Layout.rowSpacing) {
+                Button {
+                    if isRestTimerRunning {
+                        pauseRestTimer()
+                    } else if restTimerRemaining > 0 {
+                        resumeRestTimer()
+                    } else {
+                        startRestTimer(seconds: restTimerDuration)
+                    }
+                } label: {
+                    Label(restControlLabel, systemImage: restControlIcon)
+                }
+                .buttonStyle(.borderedProminent)
+                .tint(AppColors.accent)
+
+                Button("+30s") {
+                    addRestTime(seconds: Constants.quickAddRestSeconds)
+                }
+                .buttonStyle(.bordered)
+                .tint(AppColors.accent)
+
+                Button("Reset", role: .destructive) {
+                    resetRestTimer()
+                }
+                .buttonStyle(.bordered)
+                .disabled(restTimerRemaining == 0 && !isRestTimerRunning)
+            }
+
+            if restTimerRemaining == 0 && !isRestTimerRunning {
+                Text("Ready for your next set.")
+                    .font(.caption)
+                    .foregroundStyle(AppColors.textSecondary)
+            }
+
+            Toggle("Auto-start rest timer after saving workout", isOn: $autoStartRestTimer)
+                .font(.caption)
+                .tint(AppColors.accent)
+        }
+        .padding()
+        .frame(maxWidth: .infinity, alignment: .leading)
+        .appSurface(cornerRadius: Layout.cardCornerRadius, shadow: false)
+        .onReceive(restTicker) { _ in
+            handleRestTimerTick()
+        }
+        .onChange(of: autoStartTrigger) { _, _ in
+            guard autoStartRestTimer else {
+                return
+            }
+            startRestTimer(seconds: restTimerDuration)
+        }
+    }
+
+    private var restControlLabel: String {
+        if isRestTimerRunning {
+            return "Pause"
+        }
+
+        if restTimerRemaining > 0 {
+            return "Resume"
+        }
+
+        return "Start"
+    }
+
+    private var restControlIcon: String {
+        isRestTimerRunning ? "pause.fill" : "play.fill"
+    }
+
+    private var restProgress: Double {
+        guard restTimerDuration > 0 else { return 0 }
+        let elapsed = Double(restTimerDuration - restTimerRemaining)
+        return max(0, min(1, elapsed / Double(restTimerDuration)))
+    }
+
+    private var restTimerDisplay: String {
+        durationText(from: restTimerRemaining)
+    }
+
+    private func presetLabel(for seconds: Int) -> String {
+        durationText(from: seconds)
+    }
+
+    private func durationText(from totalSeconds: Int) -> String {
+        let minutes = totalSeconds / 60
+        let remainingSeconds = totalSeconds % 60
+        return "\(minutes):\(String(format: "%02d", remainingSeconds))"
+    }
+
+    private func startRestTimer(seconds: Int) {
+        let safeSeconds = max(seconds, Constants.minimumRestSeconds)
+        restTimerDuration = safeSeconds
+        restTimerRemaining = safeSeconds
+        isRestTimerRunning = true
+    }
+
+    private func pauseRestTimer() {
+        isRestTimerRunning = false
+    }
+
+    private func resumeRestTimer() {
+        if restTimerRemaining == 0 {
+            restTimerRemaining = restTimerDuration
+        }
+        isRestTimerRunning = true
+    }
+
+    private func resetRestTimer() {
+        isRestTimerRunning = false
+        restTimerRemaining = 0
+    }
+
+    private func addRestTime(seconds: Int) {
+        guard seconds > 0 else { return }
+
+        if restTimerRemaining == 0 {
+            startRestTimer(seconds: seconds)
+            return
+        }
+
+        restTimerRemaining += seconds
+        restTimerDuration = max(restTimerDuration, restTimerRemaining)
+    }
+
+    private func handleRestTimerTick() {
+        guard isRestTimerRunning, restTimerRemaining > 0 else { return }
+
+        restTimerRemaining -= 1
+        if restTimerRemaining <= 0 {
+            restTimerRemaining = 0
+            isRestTimerRunning = false
+        }
+    }
+}
+
 struct WorkoutLoggerView: View {
     private enum Constants {
         static let weightInputCharacters = "0123456789."
         static let savedToastDuration = 1.4
-        static let defaultRestSeconds = 90
-        static let minimumRestSeconds = 1
-        static let quickAddRestSeconds = 30
         static let defaultMinimumWeightIncreaseInPounds = 10.0
-        static let restPresets = [60, 90, 120, 180]
-        static let restTickerInterval = 1.0
+        static let scrollFadeOpacity = 0.84
+        static let scrollScale = 0.985
+        static let destructiveControlOpacity = 0.9
+        static let voiceToolsAnimationDuration = 0.18
         static let animationDuration = 0.2
+        static let setAnimation = Animation.spring(response: 0.40, dampingFraction: 0.84)
     }
 
     private enum Layout {
-        static let rootSpacing: CGFloat = 16
+        static let rootSpacing: CGFloat = 18
         static let sectionSpacing: CGFloat = 12
+        static let selectorSectionSpacing: CGFloat = 10
         static let compactSpacing: CGFloat = 8
         static let rowSpacing: CGFloat = 10
         static let unitPickerWidth: CGFloat = 210
@@ -37,7 +229,16 @@ struct WorkoutLoggerView: View {
         static let cardCornerRadius: CGFloat = 16
         static let setCardCornerRadius: CGFloat = 12
         static let setCardPadding: CGFloat = 10
+        static let routineSelectorPadding: CGFloat = 14
         static let listBottomPadding: CGFloat = 6
+        static let emptyStateSpacing: CGFloat = 12
+        static let emptyStateIconSize: CGFloat = 38
+        static let emptyStatePadding: CGFloat = 22
+        static let recommendationSpacing: CGFloat = 4
+        static let recommendationRowSpacing: CGFloat = 6
+        static let recommendationHorizontalPadding: CGFloat = 10
+        static let recommendationVerticalPadding: CGFloat = 8
+        static let recommendationBorderOpacity = 0.75
         static let toastHorizontalPadding: CGFloat = 14
         static let toastVerticalPadding: CGFloat = 10
         static let toastBottomPadding: CGFloat = 24
@@ -62,19 +263,11 @@ struct WorkoutLoggerView: View {
     @State private var showSavedToast = false
     @State private var showVoiceTools = false
 
-    @State private var restTimerDuration = Constants.defaultRestSeconds
-    @State private var restTimerRemaining = 0
-    @State private var isRestTimerRunning = false
-
-    private let restTicker = Timer.publish(
-        every: Constants.restTickerInterval,
-        on: .main,
-        in: .common
-    ).autoconnect()
+    @State private var restTimerAutoStartTrigger = 0
 
     private var selectedRoutine: Routine? {
         guard let selectedRoutineID else { return nil }
-        return store.routines.first { $0.id == selectedRoutineID }
+        return store.routine(withID: selectedRoutineID)
     }
 
     private var weightUnit: WeightUnit {
@@ -102,10 +295,11 @@ struct WorkoutLoggerView: View {
                     }
 
                     routineSelector
+                        .appReveal(delay: 0.02)
 
                     if let contextLabel = selectedRoutineWithPlan?.plan.contextLabel {
                         Text(contextLabel)
-                            .font(.caption.weight(.heavy))
+                            .font(.caption.weight(.semibold))
                             .tracking(0.7)
                             .foregroundStyle(AppColors.textSecondary)
                             .padding(.horizontal)
@@ -118,8 +312,12 @@ struct WorkoutLoggerView: View {
                         .padding(.horizontal)
                         .frame(maxWidth: .infinity, alignment: .leading)
 
-                    restTimerCard
+                    RestTimerCardView(
+                        autoStartRestTimer: $autoStartRestTimer,
+                        autoStartTrigger: restTimerAutoStartTrigger
+                    )
                         .padding(.horizontal)
+                        .appReveal(delay: 0.08)
 
                     if let selectedRoutineWithPlan {
                         let routine = selectedRoutineWithPlan.routine
@@ -132,14 +330,15 @@ struct WorkoutLoggerView: View {
                                     exerciseCard(exercise, plan: plan)
                                         .scrollTransition(axis: .vertical) { content, phase in
                                             content
-                                                .opacity(phase.isIdentity ? 1 : 0.84)
-                                                .scaleEffect(phase.isIdentity ? 1 : 0.985)
+                                                .opacity(phase.isIdentity ? 1 : Constants.scrollFadeOpacity)
+                                                .scaleEffect(phase.isIdentity ? 1 : Constants.scrollScale)
                                         }
                                 }
                             }
                             .padding(.horizontal)
                             .padding(.bottom, Layout.listBottomPadding)
                         }
+                        .scrollIndicators(.hidden)
 
                         Button {
                             saveWorkout(routine: routine, activeExercises: visibleExercises)
@@ -154,11 +353,12 @@ struct WorkoutLoggerView: View {
                         .padding(.horizontal)
                         .padding(.bottom)
                         .disabled(!hasAnyLoggedValues(in: visibleExercises))
+                        .appReveal(delay: 0.12)
                     } else {
                         Spacer()
-                        VStack(spacing: 12) {
+                        VStack(spacing: Layout.emptyStateSpacing) {
                             Image(systemName: "figure.strengthtraining.traditional")
-                                .font(.system(size: 38, weight: .semibold))
+                                .font(.system(size: Layout.emptyStateIconSize, weight: .semibold))
                                 .foregroundStyle(AppColors.accent)
 
                             Text("No routine selected")
@@ -170,7 +370,7 @@ struct WorkoutLoggerView: View {
                                 .foregroundStyle(AppColors.textSecondary)
                                 .multilineTextAlignment(.center)
                         }
-                        .padding(22)
+                        .padding(Layout.emptyStatePadding)
                         .appSurface()
                         .padding(.horizontal)
                         Spacer()
@@ -200,9 +400,6 @@ struct WorkoutLoggerView: View {
                     speechInput.stopRecording()
                     activeVoiceTarget = nil
                 }
-            }
-            .onReceive(restTicker) { _ in
-                handleRestTimerTick()
             }
             .alert("Voice Input", isPresented: $showErrorAlert) {
                 Button("OK", role: .cancel) { }
@@ -242,7 +439,7 @@ struct WorkoutLoggerView: View {
     }
 
     private var routineSelector: some View {
-        VStack(alignment: .leading, spacing: 10) {
+        VStack(alignment: .leading, spacing: Layout.selectorSectionSpacing) {
             Text("Routine")
                 .font(.caption.weight(.semibold))
                 .foregroundStyle(AppColors.textSecondary)
@@ -304,78 +501,9 @@ struct WorkoutLoggerView: View {
                 .font(.caption2)
                 .foregroundStyle(AppColors.textSecondary)
         }
-        .padding(14)
+        .padding(Layout.routineSelectorPadding)
         .appSurface(cornerRadius: Layout.cardCornerRadius, shadow: false)
         .padding(.horizontal)
-    }
-
-    private var restTimerCard: some View {
-        VStack(alignment: .leading, spacing: Layout.sectionSpacing) {
-            HStack {
-                Label("Rest Timer", systemImage: "timer")
-                    .font(.system(.body, design: .rounded).weight(.black))
-                    .foregroundStyle(AppColors.textPrimary)
-                Spacer()
-                Text(restTimerDisplay)
-                    .font(.title3.monospacedDigit().weight(.semibold))
-                    .foregroundStyle(restTimerRemaining == 0 && !isRestTimerRunning ? AppColors.textSecondary : AppColors.textPrimary)
-            }
-
-            ProgressView(value: restProgress)
-                .tint(restTimerRemaining == 0 ? AppColors.accentAlt : AppColors.accent)
-
-            HStack(spacing: Layout.compactSpacing) {
-                ForEach(Constants.restPresets, id: \.self) { seconds in
-                    Button(presetLabel(for: seconds)) {
-                        startRestTimer(seconds: seconds)
-                    }
-                    .buttonStyle(.bordered)
-                    .tint(AppColors.accentAlt.opacity(0.85))
-                    .font(.caption)
-                }
-            }
-
-            HStack(spacing: Layout.rowSpacing) {
-                Button {
-                    if isRestTimerRunning {
-                        pauseRestTimer()
-                    } else if restTimerRemaining > 0 {
-                        resumeRestTimer()
-                    } else {
-                        startRestTimer(seconds: restTimerDuration)
-                    }
-                } label: {
-                    Label(restControlLabel, systemImage: restControlIcon)
-                }
-                .buttonStyle(.borderedProminent)
-                .tint(AppColors.accent)
-
-                Button("+30s") {
-                    addRestTime(seconds: Constants.quickAddRestSeconds)
-                }
-                .buttonStyle(.bordered)
-                .tint(AppColors.accentAlt)
-
-                Button("Reset", role: .destructive) {
-                    resetRestTimer()
-                }
-                .buttonStyle(.bordered)
-                .disabled(restTimerRemaining == 0 && !isRestTimerRunning)
-            }
-
-            if restTimerRemaining == 0 && !isRestTimerRunning {
-                Text("Ready for your next set.")
-                    .font(.caption)
-                    .foregroundStyle(AppColors.textSecondary)
-            }
-
-            Toggle("Auto-start rest timer after saving workout", isOn: $autoStartRestTimer)
-                .font(.caption)
-                .tint(AppColors.accentAlt)
-        }
-        .padding()
-        .frame(maxWidth: .infinity, alignment: .leading)
-        .appSurface(cornerRadius: Layout.cardCornerRadius, shadow: false)
     }
 
     private func exerciseCard(
@@ -387,7 +515,7 @@ struct WorkoutLoggerView: View {
 
         return VStack(alignment: .leading, spacing: Layout.rowSpacing) {
             Text(exercise.name)
-                .font(.system(size: 20, weight: .black, design: .rounded))
+                .font(.system(size: 20, weight: .bold, design: .rounded))
                 .foregroundStyle(AppColors.textPrimary)
 
             if let recommendation {
@@ -398,7 +526,7 @@ struct WorkoutLoggerView: View {
                 VStack(alignment: .leading, spacing: Layout.compactSpacing) {
                     HStack {
                         Text("Set \(index + 1)")
-                            .font(.caption.weight(.heavy))
+                            .font(.caption.weight(.semibold))
                             .tracking(0.4)
                             .foregroundStyle(AppColors.textSecondary)
 
@@ -411,7 +539,7 @@ struct WorkoutLoggerView: View {
                                 Image(systemName: "trash")
                             }
                             .buttonStyle(.plain)
-                            .foregroundStyle(Color.red.opacity(0.9))
+                            .foregroundStyle(Color.red.opacity(Constants.destructiveControlOpacity))
                         }
                     }
 
@@ -442,7 +570,7 @@ struct WorkoutLoggerView: View {
                                 )
                             }
                             .buttonStyle(.bordered)
-                            .tint(isVoiceActive(for: exercise.id, setID: set.id) && speechInput.isRecording ? .red : AppColors.accentAlt)
+                            .tint(isVoiceActive(for: exercise.id, setID: set.id) && speechInput.isRecording ? .red : AppColors.accent)
 
                             if !set.transcript.isEmpty {
                                 Text("Heard: \(set.transcript)")
@@ -451,11 +579,14 @@ struct WorkoutLoggerView: View {
                                     .lineLimit(2)
                             }
                         }
+                        .transition(.move(edge: .top).combined(with: .opacity))
                     }
                 }
                 .padding(Layout.setCardPadding)
                 .appSurface(cornerRadius: Layout.setCardCornerRadius, shadow: false)
             }
+            .animation(Constants.setAnimation, value: sets.count)
+            .animation(.easeInOut(duration: Constants.voiceToolsAnimationDuration), value: showVoiceTools)
 
             Button {
                 addSet(to: exercise.id)
@@ -463,7 +594,7 @@ struct WorkoutLoggerView: View {
                 Label("Add Set", systemImage: "plus.circle")
             }
             .buttonStyle(.bordered)
-            .tint(AppColors.accentAlt)
+            .tint(AppColors.accent)
         }
         .padding()
         .frame(maxWidth: .infinity, alignment: .leading)
@@ -471,10 +602,10 @@ struct WorkoutLoggerView: View {
     }
 
     private func recommendationCallout(_ recommendation: ExerciseWeightRecommendation) -> some View {
-        VStack(alignment: .leading, spacing: 4) {
-            HStack(spacing: 6) {
+        VStack(alignment: .leading, spacing: Layout.recommendationSpacing) {
+            HStack(spacing: Layout.recommendationRowSpacing) {
                 Image(systemName: recommendation.shouldIncrease ? "arrow.up.right.circle.fill" : "equal.circle.fill")
-                    .foregroundStyle(recommendation.shouldIncrease ? AppColors.accent : AppColors.accentAlt)
+                    .foregroundStyle(recommendation.shouldIncrease ? AppColors.accent : AppColors.textSecondary)
 
                 Text("Suggested next weight: \(WeightFormatter.displayString(recommendation.recommendedWeight, unit: weightUnit)) \(weightUnit.symbol)")
                     .font(.caption.weight(.semibold))
@@ -485,16 +616,9 @@ struct WorkoutLoggerView: View {
                 .font(.caption2)
                 .foregroundStyle(AppColors.textSecondary)
         }
-        .padding(.horizontal, 10)
-        .padding(.vertical, 8)
-        .background(
-            RoundedRectangle(cornerRadius: 10, style: .continuous)
-                .fill(AppColors.input.opacity(0.85))
-        )
-        .overlay(
-            RoundedRectangle(cornerRadius: 10, style: .continuous)
-                .stroke(AppColors.stroke.opacity(0.75), lineWidth: 1)
-        )
+        .padding(.horizontal, Layout.recommendationHorizontalPadding)
+        .padding(.vertical, Layout.recommendationVerticalPadding)
+        .appInsetCard(borderOpacity: Layout.recommendationBorderOpacity)
     }
 
     private func activeExercises(in routine: Routine, plan: ProgramWorkoutPlan) -> [Exercise] {
@@ -503,42 +627,6 @@ struct WorkoutLoggerView: View {
         }
 
         return routine.exercises
-    }
-
-    private var restControlLabel: String {
-        if isRestTimerRunning {
-            return "Pause"
-        }
-
-        if restTimerRemaining > 0 {
-            return "Resume"
-        }
-
-        return "Start"
-    }
-
-    private var restControlIcon: String {
-        isRestTimerRunning ? "pause.fill" : "play.fill"
-    }
-
-    private var restProgress: Double {
-        guard restTimerDuration > 0 else { return 0 }
-        let elapsed = Double(restTimerDuration - restTimerRemaining)
-        return max(0, min(1, elapsed / Double(restTimerDuration)))
-    }
-
-    private var restTimerDisplay: String {
-        durationText(from: restTimerRemaining)
-    }
-
-    private func presetLabel(for seconds: Int) -> String {
-        durationText(from: seconds)
-    }
-
-    private func durationText(from totalSeconds: Int) -> String {
-        let minutes = totalSeconds / 60
-        let remainingSeconds = totalSeconds % 60
-        return "\(minutes):\(String(format: "%02d", remainingSeconds))"
     }
 
     private var minimumWeightIncreaseBinding: Binding<String> {
@@ -622,51 +710,6 @@ struct WorkoutLoggerView: View {
         return weightUnit.storedPounds(fromDisplayValue: displayWeight)
     }
 
-    private func startRestTimer(seconds: Int) {
-        let safeSeconds = max(seconds, Constants.minimumRestSeconds)
-        restTimerDuration = safeSeconds
-        restTimerRemaining = safeSeconds
-        isRestTimerRunning = true
-    }
-
-    private func pauseRestTimer() {
-        isRestTimerRunning = false
-    }
-
-    private func resumeRestTimer() {
-        if restTimerRemaining == 0 {
-            restTimerRemaining = restTimerDuration
-        }
-        isRestTimerRunning = true
-    }
-
-    private func resetRestTimer() {
-        isRestTimerRunning = false
-        restTimerRemaining = 0
-    }
-
-    private func addRestTime(seconds: Int) {
-        guard seconds > 0 else { return }
-
-        if restTimerRemaining == 0 {
-            startRestTimer(seconds: seconds)
-            return
-        }
-
-        restTimerRemaining += seconds
-        restTimerDuration = max(restTimerDuration, restTimerRemaining)
-    }
-
-    private func handleRestTimerTick() {
-        guard isRestTimerRunning, restTimerRemaining > 0 else { return }
-
-        restTimerRemaining -= 1
-        if restTimerRemaining <= 0 {
-            restTimerRemaining = 0
-            isRestTimerRunning = false
-        }
-    }
-
     private func defaultDrafts(
         for exercise: Exercise,
         plan: ProgramWorkoutPlan
@@ -701,7 +744,7 @@ struct WorkoutLoggerView: View {
         }
 
         if let selectedRoutineID,
-           store.routines.contains(where: { $0.id == selectedRoutineID }) == false {
+           store.routine(withID: selectedRoutineID) == nil {
             self.selectedRoutineID = store.routines.first?.id
         }
 
@@ -937,7 +980,7 @@ struct WorkoutLoggerView: View {
         store.logWorkout(routineID: routine.id, entries: entries)
 
         if autoStartRestTimer {
-            startRestTimer(seconds: restTimerDuration)
+            restTimerAutoStartTrigger += 1
         }
 
         speechInput.stopRecording()

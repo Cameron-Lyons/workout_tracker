@@ -7,6 +7,21 @@ private struct EditableExercise: Identifiable {
 }
 
 struct RoutineEditorView: View {
+    private enum Layout {
+        static let listAnimation = Animation.spring(response: 0.40, dampingFraction: 0.84)
+        static let sectionSpacing: CGFloat = 14
+        static let sectionTitleSpacing: CGFloat = 8
+        static let sectionTitleTracking: CGFloat = 0.6
+        static let cardPadding: CGFloat = 14
+        static let contentVerticalPadding: CGFloat = 14
+        static let fieldSpacing: CGFloat = 10
+        static let exerciseRowSpacing: CGFloat = 10
+        static let exerciseControlSpacing: CGFloat = 10
+        static let exerciseRowPadding: CGFloat = 12
+        static let cardCornerRadius: CGFloat = 14
+        static let controlOpacity = 0.82
+    }
+
     @EnvironmentObject private var store: WorkoutStore
     @Environment(\.dismiss) private var dismiss
     @AppStorage(WeightUnit.preferenceKey) private var weightUnitRawValue = WeightUnit.pounds.rawValue
@@ -21,7 +36,7 @@ struct RoutineEditorView: View {
     @State private var showInvalidAlert = false
 
     private var routine: Routine? {
-        store.routines.first(where: { $0.id == routineID })
+        store.routine(withID: routineID)
     }
 
     private var weightUnit: WeightUnit {
@@ -31,62 +46,17 @@ struct RoutineEditorView: View {
     var body: some View {
         ZStack {
             AppBackground()
-            Form {
-                if let routine, let program = routine.program {
-                    Section("Program template") {
-                        Text(program.kind.displayName)
-                            .foregroundStyle(AppColors.textPrimary)
-
-                        if let context = WorkoutProgramEngine.contextLabel(for: routine) {
-                            Text(context)
-                                .font(.caption)
-                                .foregroundStyle(AppColors.textSecondary)
-                        }
-                    }
-                    .listRowBackground(AppColors.surface)
+            ScrollView {
+                VStack(spacing: Layout.sectionSpacing) {
+                    programSection
+                    routineSection
+                    exerciseSetupSection
+                    exercisesSection
                 }
-
-                Section("Routine") {
-                    TextField("Routine name", text: $routineName)
-                        .textInputAutocapitalization(.words)
-                        .foregroundStyle(AppColors.textPrimary)
-                }
-                .listRowBackground(AppColors.surface)
-
-                Section {
-                    ExerciseNameInputRow(exerciseName: $pendingExerciseName, addAction: addExercise)
-                } header: {
-                    Text("Exercises")
-                } footer: {
-                    Text("Set a training max (TM) or working weight to auto-calculate sets.")
-                }
-                .listRowBackground(AppColors.surface)
-
-                if exercises.isEmpty {
-                    Text("Add at least one exercise")
-                        .foregroundStyle(AppColors.textSecondary)
-                        .listRowBackground(AppColors.surface)
-                } else {
-                    Section {
-                        ForEach($exercises) { $exercise in
-                            VStack(alignment: .leading, spacing: 8) {
-                                TextField("Exercise", text: $exercise.name)
-                                    .textInputAutocapitalization(.words)
-                                    .foregroundStyle(AppColors.textPrimary)
-
-                                TextField("Training max (TM) / working weight (\(weightUnit.symbol))", text: $exercise.trainingMaxText)
-                                    .keyboardType(.decimalPad)
-                                    .foregroundStyle(AppColors.textPrimary)
-                            }
-                            .padding(.vertical, 2)
-                        }
-                        .onDelete(perform: deleteExercise)
-                        .onMove(perform: moveExercise)
-                    }
-                    .listRowBackground(AppColors.surface)
-                }
+                .padding(.horizontal)
+                .padding(.vertical, Layout.contentVerticalPadding)
             }
-            .scrollContentBackground(.hidden)
+            .scrollIndicators(.hidden)
         }
         .navigationTitle("Edit Routine")
         .toolbarBackground(AppColors.chrome, for: .navigationBar)
@@ -104,9 +74,6 @@ struct RoutineEditorView: View {
             Text("Routine name and at least one exercise are required.")
         }
         .toolbar {
-            ToolbarItem(placement: .topBarLeading) {
-                EditButton()
-            }
             ToolbarItem(placement: .topBarTrailing) {
                 Button("Save") {
                     saveRoutine()
@@ -114,6 +81,91 @@ struct RoutineEditorView: View {
             }
         }
         .tint(AppColors.accent)
+    }
+
+    @ViewBuilder
+    private var programSection: some View {
+        if let routine, let program = routine.program {
+            VStack(alignment: .leading, spacing: Layout.sectionTitleSpacing) {
+                Text("Program Template")
+                    .font(.caption.weight(.semibold))
+                    .tracking(Layout.sectionTitleTracking)
+                    .textCase(.uppercase)
+                    .foregroundStyle(AppColors.textSecondary)
+
+                Text(program.kind.displayName)
+                    .font(.headline.weight(.semibold))
+                    .foregroundStyle(AppColors.textPrimary)
+
+                if let context = WorkoutProgramEngine.contextLabel(for: routine) {
+                    Text(context)
+                        .font(.caption)
+                        .foregroundStyle(AppColors.textSecondary)
+                }
+            }
+            .padding(Layout.cardPadding)
+            .appSurface(cornerRadius: Layout.cardCornerRadius, shadow: false)
+            .appReveal(delay: 0.02)
+        }
+    }
+
+    private var routineSection: some View {
+        VStack(alignment: .leading, spacing: Layout.sectionTitleSpacing) {
+            Text("Routine")
+                .font(.caption.weight(.semibold))
+                .tracking(Layout.sectionTitleTracking)
+                .textCase(.uppercase)
+                .foregroundStyle(AppColors.textSecondary)
+
+            TextField("Routine name", text: $routineName)
+                .textInputAutocapitalization(.words)
+                .foregroundStyle(AppColors.textPrimary)
+                .appInputField()
+        }
+        .padding(Layout.cardPadding)
+        .appSurface(cornerRadius: Layout.cardCornerRadius, shadow: false)
+        .appReveal(delay: 0.05)
+    }
+
+    private var exerciseSetupSection: some View {
+        VStack(alignment: .leading, spacing: Layout.sectionTitleSpacing) {
+            Text("Exercises")
+                .font(.caption.weight(.semibold))
+                .tracking(Layout.sectionTitleTracking)
+                .textCase(.uppercase)
+                .foregroundStyle(AppColors.textSecondary)
+
+            ExerciseNameInputRow(exerciseName: $pendingExerciseName, addAction: addExercise)
+
+            Text("Set a training max (TM) or working weight to auto-calculate sets.")
+                .font(.caption2)
+                .foregroundStyle(AppColors.textSecondary)
+        }
+        .padding(Layout.cardPadding)
+        .appSurface(cornerRadius: Layout.cardCornerRadius, shadow: false)
+        .appReveal(delay: 0.08)
+    }
+
+    private var exercisesSection: some View {
+        VStack(alignment: .leading, spacing: Layout.exerciseRowSpacing) {
+            if exercises.isEmpty {
+                Text("Add at least one exercise")
+                    .font(.subheadline)
+                    .foregroundStyle(AppColors.textSecondary)
+            } else {
+                ForEach(Array(exercises.indices), id: \.self) { index in
+                    editableExerciseRow(at: index)
+                }
+
+                Text("Use arrows to reorder exercises.")
+                    .font(.caption2)
+                    .foregroundStyle(AppColors.textSecondary)
+            }
+        }
+        .padding(Layout.cardPadding)
+        .appSurface(cornerRadius: Layout.cardCornerRadius, shadow: false)
+        .animation(Layout.listAnimation, value: exercises.count)
+        .appReveal(delay: 0.11)
     }
 
     private func loadRoutine() {
@@ -134,22 +186,16 @@ struct RoutineEditorView: View {
     private func addExercise() {
         guard let trimmed = pendingExerciseName.nonEmptyTrimmed else { return }
 
-        exercises.append(
-            EditableExercise(
-                id: UUID(),
-                name: trimmed,
-                trainingMaxText: ""
+        withAnimation(Layout.listAnimation) {
+            exercises.append(
+                EditableExercise(
+                    id: UUID(),
+                    name: trimmed,
+                    trainingMaxText: ""
+                )
             )
-        )
+        }
         pendingExerciseName = ""
-    }
-
-    private func deleteExercise(at offsets: IndexSet) {
-        exercises.remove(atOffsets: offsets)
-    }
-
-    private func moveExercise(from source: IndexSet, to destination: Int) {
-        exercises.move(fromOffsets: source, toOffset: destination)
     }
 
     private func saveRoutine() {
@@ -195,6 +241,71 @@ struct RoutineEditorView: View {
         return WeightFormatter.displayString(trainingMax, unit: weightUnit)
     }
 
+    private func editableExerciseRow(at index: Int) -> some View {
+        VStack(alignment: .leading, spacing: Layout.fieldSpacing) {
+            HStack(spacing: Layout.exerciseControlSpacing) {
+                Text("Exercise \(index + 1)")
+                    .font(.caption.weight(.semibold))
+                    .foregroundStyle(AppColors.textSecondary)
+
+                Spacer()
+
+                Button {
+                    moveExerciseUp(at: index)
+                } label: {
+                    Image(systemName: "arrow.up")
+                }
+                .buttonStyle(.plain)
+                .foregroundStyle(AppColors.textSecondary.opacity(Layout.controlOpacity))
+                .disabled(index == 0)
+
+                Button {
+                    moveExerciseDown(at: index)
+                } label: {
+                    Image(systemName: "arrow.down")
+                }
+                .buttonStyle(.plain)
+                .foregroundStyle(AppColors.textSecondary.opacity(Layout.controlOpacity))
+                .disabled(index == exercises.count - 1)
+
+                Button(role: .destructive) {
+                    deleteExercise(at: index)
+                } label: {
+                    Image(systemName: "trash")
+                }
+                .buttonStyle(.plain)
+            }
+
+            TextField("Exercise", text: exerciseTextBinding(at: index, keyPath: \.name))
+                .textInputAutocapitalization(.words)
+                .foregroundStyle(AppColors.textPrimary)
+                .appInputField()
+
+            TextField(
+                "Training max (TM) / working weight (\(weightUnit.symbol))",
+                text: exerciseTextBinding(at: index, keyPath: \.trainingMaxText)
+            )
+            .keyboardType(.decimalPad)
+            .foregroundStyle(AppColors.textPrimary)
+            .appInputField()
+        }
+        .padding(Layout.exerciseRowPadding)
+        .appInsetCard()
+    }
+
+    private func exerciseTextBinding(at index: Int, keyPath: WritableKeyPath<EditableExercise, String>) -> Binding<String> {
+        Binding(
+            get: {
+                guard exercises.indices.contains(index) else { return "" }
+                return exercises[index][keyPath: keyPath]
+            },
+            set: { updatedValue in
+                guard exercises.indices.contains(index) else { return }
+                exercises[index][keyPath: keyPath] = updatedValue
+            }
+        )
+    }
+
     private func handleWeightUnitChange() {
         let newUnit = weightUnit
         let oldUnit = previousWeightUnit
@@ -212,6 +323,27 @@ struct RoutineEditorView: View {
             var updated = exercise
             updated.trainingMaxText = convertedWeight
             return updated
+        }
+    }
+
+    private func deleteExercise(at index: Int) {
+        guard exercises.indices.contains(index) else { return }
+        _ = withAnimation(Layout.listAnimation) {
+            exercises.remove(at: index)
+        }
+    }
+
+    private func moveExerciseUp(at index: Int) {
+        guard index > 0, exercises.indices.contains(index) else { return }
+        withAnimation(Layout.listAnimation) {
+            exercises.swapAt(index, index - 1)
+        }
+    }
+
+    private func moveExerciseDown(at index: Int) {
+        guard index >= 0, index < exercises.count - 1 else { return }
+        withAnimation(Layout.listAnimation) {
+            exercises.swapAt(index, index + 1)
         }
     }
 }

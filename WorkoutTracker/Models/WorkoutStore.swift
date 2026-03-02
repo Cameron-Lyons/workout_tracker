@@ -105,6 +105,13 @@ final class WorkoutStore: ObservableObject {
         liftProgressByExerciseName[exerciseName] ?? []
     }
 
+    func routine(withID id: UUID) -> Routine? {
+        guard let index = routineIndexByID[id], routines.indices.contains(index) else {
+            return nil
+        }
+        return routines[index]
+    }
+
     init() {
         decoder.dateDecodingStrategy = .iso8601
         routines = []
@@ -189,7 +196,7 @@ final class WorkoutStore: ObservableObject {
             entries: meaningfulEntries,
             programContext: WorkoutProgramEngine.contextLabel(for: routine)
         )
-        workoutHistory.insert(session, at: 0)
+        workoutHistory.append(session)
 
         let records = Self.liftRecords(from: session)
         appendLiftHistoryRecords(records)
@@ -237,14 +244,14 @@ final class WorkoutStore: ObservableObject {
 
         if let data = defaults.data(forKey: historyKey),
            let decodedHistory = try? decoder.decode([WorkoutSession].self, from: data) {
-            workoutHistory = decodedHistory
+            workoutHistory = Self.sortedSessionsByDate(decodedHistory)
         } else {
             workoutHistory = []
         }
 
         if let data = defaults.data(forKey: liftHistoryKey),
            let decodedLiftHistory = try? decoder.decode([LiftRecord].self, from: data) {
-            liftHistory = decodedLiftHistory
+            liftHistory = Self.sortedLiftRecordsByDate(decodedLiftHistory)
         } else {
             // Backfill normalized lift records from existing session history.
             liftHistory = workoutHistory.flatMap(Self.liftRecords(from:))
@@ -256,10 +263,6 @@ final class WorkoutStore: ObservableObject {
         if didMigrateStoredRoutines {
             persist(routines, forKey: routinesKey)
         }
-    }
-
-    func liftRecords(forExerciseName exerciseName: String) -> [LiftRecord] {
-        liftHistoryByExerciseName[exerciseName] ?? []
     }
 
     func weightRecommendation(
@@ -455,7 +458,7 @@ final class WorkoutStore: ObservableObject {
 
         isApplyingIncrementalLiftHistoryUpdate = true
         defer { isApplyingIncrementalLiftHistoryUpdate = false }
-        liftHistory.insert(contentsOf: records, at: 0)
+        liftHistory.append(contentsOf: records)
     }
 
     private func applyIncrementalLiftHistoryIndexUpdate(with records: [LiftRecord]) {
@@ -499,12 +502,12 @@ final class WorkoutStore: ObservableObject {
             if liftHistoryByExerciseName[exerciseName] == nil {
                 addedNewExerciseName = true
             }
-            liftHistoryByExerciseName[exerciseName, default: []].insert(contentsOf: newRecords, at: 0)
+            liftHistoryByExerciseName[exerciseName, default: []].append(contentsOf: newRecords)
         }
 
         for (exerciseSessionKey, newRecords) in recordsByExerciseSession {
             if var existingRecords = liftHistoryByExerciseAndSession[exerciseSessionKey] {
-                existingRecords.insert(contentsOf: newRecords, at: 0)
+                existingRecords.append(contentsOf: newRecords)
                 liftHistoryByExerciseAndSession[exerciseSessionKey] = existingRecords
             } else {
                 liftHistoryByExerciseAndSession[exerciseSessionKey] = newRecords
@@ -515,16 +518,7 @@ final class WorkoutStore: ObservableObject {
                 continue
             }
 
-            var snapshots = liftProgressByExerciseName[exerciseSessionKey.exerciseName] ?? []
-            if let existingIndex = snapshots.firstIndex(where: { $0.sessionID == snapshot.sessionID }) {
-                snapshots[existingIndex] = snapshot
-            } else {
-                snapshots.append(snapshot)
-            }
-            snapshots.sort { lhs, rhs in
-                lhs.performedAt < rhs.performedAt
-            }
-            liftProgressByExerciseName[exerciseSessionKey.exerciseName] = snapshots
+            upsertProgressSnapshot(snapshot, forExerciseName: exerciseSessionKey.exerciseName)
         }
 
         updateLatestSessionIDsByExerciseName(with: latestRecordByExerciseName)
@@ -535,6 +529,36 @@ final class WorkoutStore: ObservableObject {
         }
 
         recommendationCache.removeAll(keepingCapacity: true)
+    }
+
+    private func upsertProgressSnapshot(
+        _ snapshot: LiftProgressSnapshot,
+        forExerciseName exerciseName: String
+    ) {
+        var snapshots = liftProgressByExerciseName[exerciseName] ?? []
+
+        if let existingIndex = snapshots.firstIndex(where: { $0.sessionID == snapshot.sessionID }) {
+            snapshots[existingIndex] = snapshot
+
+            let hasPrevious = existingIndex > 0
+            let hasNext = existingIndex < snapshots.count - 1
+            let needsMoveBackward = hasPrevious && snapshots[existingIndex - 1].performedAt > snapshot.performedAt
+            let needsMoveForward = hasNext && snapshots[existingIndex + 1].performedAt < snapshot.performedAt
+
+            if needsMoveBackward || needsMoveForward {
+                let updatedSnapshot = snapshots.remove(at: existingIndex)
+                let insertionIndex = snapshots.firstIndex { $0.performedAt > updatedSnapshot.performedAt } ?? snapshots.endIndex
+                snapshots.insert(updatedSnapshot, at: insertionIndex)
+            }
+        } else if let latestSnapshotDate = snapshots.last?.performedAt,
+                  latestSnapshotDate <= snapshot.performedAt {
+            snapshots.append(snapshot)
+        } else {
+            let insertionIndex = snapshots.firstIndex { $0.performedAt > snapshot.performedAt } ?? snapshots.endIndex
+            snapshots.insert(snapshot, at: insertionIndex)
+        }
+
+        liftProgressByExerciseName[exerciseName] = snapshots
     }
 
     private func rebuildRoutineIndex() {
@@ -771,6 +795,27 @@ final class WorkoutStore: ObservableObject {
             exercises: ProgramTemplate.exerciseNames(for: kind).map { Exercise(name: $0) },
             program: ProgramConfig(kind: kind)
         )
+    }
+
+    private static func sortedSessionsByDate(_ sessions: [WorkoutSession]) -> [WorkoutSession] {
+        sessions.sorted { lhs, rhs in
+            if lhs.performedAt != rhs.performedAt {
+                return lhs.performedAt < rhs.performedAt
+            }
+            return lhs.id.uuidString < rhs.id.uuidString
+        }
+    }
+
+    private static func sortedLiftRecordsByDate(_ records: [LiftRecord]) -> [LiftRecord] {
+        records.sorted { lhs, rhs in
+            if lhs.performedAt != rhs.performedAt {
+                return lhs.performedAt < rhs.performedAt
+            }
+            if lhs.sessionID != rhs.sessionID {
+                return lhs.sessionID.uuidString < rhs.sessionID.uuidString
+            }
+            return lhs.setIndex < rhs.setIndex
+        }
     }
 
 #if DEBUG
