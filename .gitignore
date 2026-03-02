@@ -1,0 +1,15 @@
+# Xcode build output
+build/
+DerivedData/
+
+# User-specific Xcode data
+*.xcworkspace/xcuserdata/
+*.xcodeproj/xcuserdata/
+*.xcuserstate
+
+# Swift Package Manager
+.build/
+.swiftpm/
+
+# macOS metadata
+.DS_Store
