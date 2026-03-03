@@ -22,10 +22,6 @@
 	<string>$(CURRENT_PROJECT_VERSION)</string>
 	<key>LSRequiresIPhoneOS</key>
 	<true/>
-	<key>NSMicrophoneUsageDescription</key>
-	<string>Use your microphone to dictate weight and reps while logging sets.</string>
-	<key>NSSpeechRecognitionUsageDescription</key>
-	<string>Use speech recognition to capture workout values for each exercise.</string>
 	<key>UIApplicationSupportsIndirectInputEvents</key>
 	<true/>
 	<key>UILaunchScreen</key>

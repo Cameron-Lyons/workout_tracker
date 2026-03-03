@@ -1,5 +1,14 @@
 import Foundation
 
+enum StrengthProgressionDefaults {
+    static let gymRoundingIncrement = 2.5
+    static let upperBodyIncreaseInPounds = 2.5
+    static let lowerBodyIncreaseInPounds = 5.0
+    static let lowerBodyTrainingMaxCycleIncreaseInPounds = 10.0
+    static let recommendedMinimumIncreaseInPounds = 10.0
+    static let recommendedMinimumIncreaseInKilograms = 5.0
+}
+
 enum WeightUnit: String, CaseIterable, Codable {
     case pounds
     case kilograms
@@ -7,14 +16,14 @@ enum WeightUnit: String, CaseIterable, Codable {
     static let preferenceKey = "workout_tracker_weight_unit_v1"
 
     private static let poundsPerKilogram = 2.2046226218
-    private static let poundsDisplayIncrement = 2.5
-    private static let kilogramsDisplayIncrement = 2.5
+    private static let poundsDisplayIncrement = StrengthProgressionDefaults.gymRoundingIncrement
+    private static let kilogramsDisplayIncrement = StrengthProgressionDefaults.gymRoundingIncrement
     private static let minimumRoundingIncrement = 0.000_1
-    private static let defaultMinimumIncreaseFloor = 2.5
-    private static let defaultUpperBodyIncrease = 2.5
-    private static let defaultLowerBodyIncrease = 5.0
-    private static let recommendedMinimumIncreasePounds = 10.0
-    private static let recommendedMinimumIncreaseKilograms = 5.0
+    private static let defaultMinimumIncreaseFloor = StrengthProgressionDefaults.gymRoundingIncrement
+    private static let defaultUpperBodyIncrease = StrengthProgressionDefaults.upperBodyIncreaseInPounds
+    private static let defaultLowerBodyIncrease = StrengthProgressionDefaults.lowerBodyIncreaseInPounds
+    private static let recommendedMinimumIncreasePounds = StrengthProgressionDefaults.recommendedMinimumIncreaseInPounds
+    private static let recommendedMinimumIncreaseKilograms = StrengthProgressionDefaults.recommendedMinimumIncreaseInKilograms
 
     var symbol: String {
         switch self {
@@ -208,6 +217,24 @@ enum WeightFormatter {
 
 }
 
+enum WeightInputParser {
+    static func parseDisplayValue(_ text: String, allowsZero: Bool = false) -> Double? {
+        let sanitized = text
+            .trimmingCharacters(in: .whitespacesAndNewlines)
+            .replacingOccurrences(of: ",", with: ".")
+
+        guard !sanitized.isEmpty, let value = Double(sanitized) else {
+            return nil
+        }
+
+        if allowsZero {
+            return value >= 0 ? value : nil
+        }
+
+        return value > 0 ? value : nil
+    }
+}
+
 enum LiftClassifier {
     private static let lowerBodyKeywords = [
         "squat",
@@ -289,18 +316,15 @@ struct ExerciseSet: Identifiable, Codable, Equatable {
     var id: UUID
     var weight: Double?
     var reps: Int?
-    var transcript: String?
 
     init(
         id: UUID = UUID(),
         weight: Double? = nil,
-        reps: Int? = nil,
-        transcript: String? = nil
+        reps: Int? = nil
     ) {
         self.id = id
         self.weight = weight
         self.reps = reps
-        self.transcript = transcript
     }
 }
 
@@ -317,44 +341,6 @@ struct ExerciseEntry: Identifiable, Codable, Equatable {
         self.id = id
         self.exerciseName = exerciseName
         self.sets = sets
-    }
-
-    enum CodingKeys: String, CodingKey {
-        case id
-        case exerciseName
-        case sets
-        case weight
-        case reps
-        case transcript
-    }
-
-    init(from decoder: Decoder) throws {
-        let container = try decoder.container(keyedBy: CodingKeys.self)
-        id = try container.decodeIfPresent(UUID.self, forKey: .id) ?? UUID()
-        exerciseName = try container.decode(String.self, forKey: .exerciseName)
-
-        if let decodedSets = try container.decodeIfPresent([ExerciseSet].self, forKey: .sets) {
-            sets = decodedSets
-            return
-        }
-
-        // Backward compatibility for old single-set history payloads.
-        let legacyWeight = try container.decodeIfPresent(Double.self, forKey: .weight)
-        let legacyReps = try container.decodeIfPresent(Int.self, forKey: .reps)
-        let legacyTranscript = try container.decodeIfPresent(String.self, forKey: .transcript)
-
-        if legacyWeight != nil || legacyReps != nil || ((legacyTranscript ?? "").isEmpty == false) {
-            sets = [ExerciseSet(weight: legacyWeight, reps: legacyReps, transcript: legacyTranscript)]
-        } else {
-            sets = []
-        }
-    }
-
-    func encode(to encoder: Encoder) throws {
-        var container = encoder.container(keyedBy: CodingKeys.self)
-        try container.encode(id, forKey: .id)
-        try container.encode(exerciseName, forKey: .exerciseName)
-        try container.encode(sets, forKey: .sets)
     }
 }
 
@@ -389,7 +375,6 @@ struct LiftRecord: Identifiable, Codable, Equatable {
     var setIndex: Int
     var weight: Double?
     var reps: Int?
-    var transcript: String?
 
     init(
         id: UUID = UUID(),
@@ -399,8 +384,7 @@ struct LiftRecord: Identifiable, Codable, Equatable {
         performedAt: Date,
         setIndex: Int,
         weight: Double? = nil,
-        reps: Int? = nil,
-        transcript: String? = nil
+        reps: Int? = nil
     ) {
         self.id = id
         self.sessionID = sessionID
@@ -410,6 +394,5 @@ struct LiftRecord: Identifiable, Codable, Equatable {
         self.setIndex = setIndex
         self.weight = weight
         self.reps = reps
-        self.transcript = transcript
     }
 }

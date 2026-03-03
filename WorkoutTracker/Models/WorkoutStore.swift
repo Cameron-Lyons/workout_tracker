@@ -1,8 +1,8 @@
 import Foundation
+import SwiftData
 
 struct ExerciseWeightRecommendation: Equatable {
     var recommendedWeight: Double
-    var previousWeight: Double
     var shouldIncrease: Bool
     var guidance: String
 }
@@ -16,6 +16,11 @@ struct LiftProgressSnapshot: Equatable {
 final class WorkoutStore: ObservableObject {
     private enum Persistence {
         static let saveDebounceMilliseconds = 300
+    }
+
+    private enum LiftHistoryIndexing {
+        static let minimumRecordsForParallelIndexing = 800
+        static let maximumParallelChunkCount = 8
     }
 
     private enum Recommendation {
@@ -47,6 +52,87 @@ final class WorkoutStore: ObservableObject {
         var routineName: String
     }
 
+    private struct LiftHistoryIndexPartial {
+        var byExerciseName: [String: [LiftRecord]]
+        var byExerciseAndSession: [ExerciseSessionKey: [LiftRecord]]
+        var latestSessionByExercise: [String: (sessionID: UUID, performedAt: Date)]
+        var latestSessionByExerciseAndRoutine: [ExerciseRoutineKey: (sessionID: UUID, performedAt: Date)]
+    }
+
+    private struct UnsafeSendableBox<Value>: @unchecked Sendable {
+        var value: Value
+    }
+
+    private final class WeakStoreBox: @unchecked Sendable {
+        weak var store: WorkoutStore?
+
+        init(store: WorkoutStore?) {
+            self.store = store
+        }
+    }
+
+    private final class ParallelHydrationResults: @unchecked Sendable {
+        private let lock = NSLock()
+        private var routines: [Routine] = []
+        private var history: [WorkoutSession] = []
+        private var liftHistory: [LiftRecord] = []
+
+        func setRoutines(_ routines: [Routine]) {
+            lock.lock()
+            self.routines = routines
+            lock.unlock()
+        }
+
+        func setHistory(_ history: [WorkoutSession]) {
+            lock.lock()
+            self.history = history
+            lock.unlock()
+        }
+
+        func setLiftHistory(_ liftHistory: [LiftRecord]) {
+            lock.lock()
+            self.liftHistory = liftHistory
+            lock.unlock()
+        }
+
+        func snapshot() -> (
+            routines: [Routine],
+            history: [WorkoutSession],
+            liftHistory: [LiftRecord]
+        ) {
+            lock.lock()
+            defer { lock.unlock() }
+            return (
+                routines: routines,
+                history: history,
+                liftHistory: liftHistory
+            )
+        }
+    }
+
+    private final class IndexedPartialStore: @unchecked Sendable {
+        private let lock = NSLock()
+        private var valuesByIndex: [Int: LiftHistoryIndexPartial] = [:]
+
+        func set(_ partial: LiftHistoryIndexPartial, at index: Int) {
+            lock.lock()
+            valuesByIndex[index] = partial
+            lock.unlock()
+        }
+
+        func orderedPartials(count: Int) -> [LiftHistoryIndexPartial] {
+            lock.lock()
+            defer { lock.unlock() }
+            return (0..<count).compactMap { valuesByIndex[$0] }
+        }
+    }
+
+    private struct PersistedSnapshot {
+        var routines: [Routine]
+        var history: [WorkoutSession]
+        var liftHistory: [LiftRecord]
+    }
+
     @Published var routines: [Routine] {
         didSet {
             guard !isHydrating else { return }
@@ -74,17 +160,15 @@ final class WorkoutStore: ObservableObject {
         }
     }
 
-    private let routinesKey = "workout_tracker_routines_v1"
-    private let historyKey = "workout_tracker_history_v1"
-    private let liftHistoryKey = "workout_tracker_lift_history_v1"
-    private let legacyPushPullLegsCleanupKey = "workout_tracker_legacy_push_pull_legs_cleanup_v1"
-    private let defaults = UserDefaults.standard
-    private let decoder = JSONDecoder()
-    private let persistenceQueue = DispatchQueue(label: "workout_tracker.persistence", qos: .utility)
+    @Published private(set) var isHydrated = false
 
-    private var pendingRoutinesSave: DispatchWorkItem?
-    private var pendingHistorySave: DispatchWorkItem?
-    private var pendingLiftHistorySave: DispatchWorkItem?
+    private let modelContainer: ModelContainer
+    private let modelContext: ModelContext
+
+    private var pendingPersistenceSave: DispatchWorkItem?
+    private var hasPendingRoutinesSave = false
+    private var hasPendingHistorySave = false
+    private var hasPendingLiftHistorySave = false
 
     private var routineIndexByID: [UUID: Int] = [:]
     private var liftHistoryByExerciseName: [String: [LiftRecord]] = [:]
@@ -96,6 +180,7 @@ final class WorkoutStore: ObservableObject {
     private var recommendationCache: [RecommendationCacheKey: CachedRecommendationResult] = [:]
     private var isHydrating = false
     private var isApplyingIncrementalLiftHistoryUpdate = false
+    private var hasStartedHydration = false
 
     var exerciseNamesWithLiftHistory: [String] {
         cachedExerciseNamesWithHistory
@@ -112,12 +197,13 @@ final class WorkoutStore: ObservableObject {
         return routines[index]
     }
 
-    init() {
-        decoder.dateDecodingStrategy = .iso8601
+    init(modelContainer: ModelContainer = WorkoutModelContainerFactory.makeContainer()) {
+        self.modelContainer = modelContainer
+        modelContext = ModelContext(modelContainer)
+        modelContext.autosaveEnabled = false
         routines = []
         workoutHistory = []
         liftHistory = []
-        hydrate()
     }
 
     deinit {
@@ -208,61 +294,97 @@ final class WorkoutStore: ObservableObject {
         }
     }
 
-    private func hydrate() {
+    func startHydrationIfNeeded() {
+        guard hasStartedHydration == false else {
+            return
+        }
+
+        hasStartedHydration = true
+        let modelContainer = UnsafeSendableBox(value: self.modelContainer)
+        let weakStoreBox = WeakStoreBox(store: self)
+
+        DispatchQueue.global(qos: .userInitiated).async {
+            let snapshot = Self.loadPersistedSnapshotInParallel(modelContainer: modelContainer.value)
+            DispatchQueue.main.async {
+                weakStoreBox.store?.hydrate(using: snapshot)
+            }
+        }
+    }
+
+    private func hydrate(using snapshot: PersistedSnapshot) {
         isHydrating = true
-        defer { isHydrating = false }
+        defer {
+            isHydrating = false
+            isHydrated = true
+        }
 
-        var didMigrateStoredRoutines = false
-        let hasAppliedLegacyPushPullLegsCleanup = defaults.bool(forKey: legacyPushPullLegsCleanupKey)
+        let persistedRoutines = snapshot.routines
+        let persistedHistory = snapshot.history
+        let persistedLiftHistory = snapshot.liftHistory
 
-        if let data = defaults.data(forKey: routinesKey),
-           let decodedRoutines = try? decoder.decode([Routine].self, from: data),
-           !decodedRoutines.isEmpty {
-            var hydratedRoutines = decodedRoutines
+        let hasPersistedSwiftData = !persistedRoutines.isEmpty
+            || !persistedHistory.isEmpty
+            || !persistedLiftHistory.isEmpty
 
-            if Self.matchesLegacyStarterRoutines(hydratedRoutines) {
-                hydratedRoutines = Self.starterRoutines
-                didMigrateStoredRoutines = true
-            }
+        if hasPersistedSwiftData {
+            routines = persistedRoutines
+            workoutHistory = Self.sortedSessionsByDate(persistedHistory)
 
-            if !hasAppliedLegacyPushPullLegsCleanup {
-                let cleanedRoutines = Self.removingLegacyPushPullLegsRoutines(from: hydratedRoutines)
-                if cleanedRoutines.count != hydratedRoutines.count {
-                    hydratedRoutines = cleanedRoutines.isEmpty ? Self.starterRoutines : cleanedRoutines
-                    didMigrateStoredRoutines = true
+            if persistedLiftHistory.isEmpty {
+                liftHistory = workoutHistory.flatMap(Self.liftRecords(from:))
+                if !liftHistory.isEmpty {
+                    replaceStoredLiftHistory(with: liftHistory)
                 }
-                defaults.set(true, forKey: legacyPushPullLegsCleanupKey)
+            } else {
+                liftHistory = Self.sortedLiftRecordsByDate(persistedLiftHistory)
             }
-
-            routines = hydratedRoutines
         } else {
             routines = Self.starterRoutines
-            if !hasAppliedLegacyPushPullLegsCleanup {
-                defaults.set(true, forKey: legacyPushPullLegsCleanupKey)
-            }
-        }
-
-        if let data = defaults.data(forKey: historyKey),
-           let decodedHistory = try? decoder.decode([WorkoutSession].self, from: data) {
-            workoutHistory = Self.sortedSessionsByDate(decodedHistory)
-        } else {
             workoutHistory = []
-        }
-
-        if let data = defaults.data(forKey: liftHistoryKey),
-           let decodedLiftHistory = try? decoder.decode([LiftRecord].self, from: data) {
-            liftHistory = Self.sortedLiftRecordsByDate(decodedLiftHistory)
-        } else {
-            // Backfill normalized lift records from existing session history.
-            liftHistory = workoutHistory.flatMap(Self.liftRecords(from:))
+            liftHistory = []
+            persistAllToSwiftData()
         }
 
         rebuildRoutineIndex()
         rebuildLiftHistoryIndex()
+    }
 
-        if didMigrateStoredRoutines {
-            persist(routines, forKey: routinesKey)
+    private static func loadPersistedSnapshotInParallel(modelContainer: ModelContainer) -> PersistedSnapshot {
+        let results = ParallelHydrationResults()
+        let group = DispatchGroup()
+        let queue = DispatchQueue.global(qos: .userInitiated)
+
+        group.enter()
+        queue.async {
+            let readContext = ModelContext(modelContainer)
+            readContext.autosaveEnabled = false
+            results.setRoutines(Self.loadRoutinesFromStore(using: readContext))
+            group.leave()
         }
+
+        group.enter()
+        queue.async {
+            let readContext = ModelContext(modelContainer)
+            readContext.autosaveEnabled = false
+            results.setHistory(Self.loadWorkoutHistoryFromStore(using: readContext))
+            group.leave()
+        }
+
+        group.enter()
+        queue.async {
+            let readContext = ModelContext(modelContainer)
+            readContext.autosaveEnabled = false
+            results.setLiftHistory(Self.loadLiftHistoryFromStore(using: readContext))
+            group.leave()
+        }
+
+        group.wait()
+        let snapshot = results.snapshot()
+        return PersistedSnapshot(
+            routines: snapshot.routines,
+            history: snapshot.history,
+            liftHistory: snapshot.liftHistory
+        )
     }
 
     func weightRecommendation(
@@ -347,7 +469,6 @@ final class WorkoutStore: ObservableObject {
 
         let recommendation = ExerciseWeightRecommendation(
             recommendedWeight: recommendedWeight,
-            previousWeight: previousWeight,
             shouldIncrease: shouldIncrease,
             guidance: guidance
         )
@@ -356,31 +477,9 @@ final class WorkoutStore: ObservableObject {
     }
 
     func flushPendingSaves() {
-        pendingRoutinesSave?.cancel()
-        pendingHistorySave?.cancel()
-        pendingLiftHistorySave?.cancel()
-        pendingRoutinesSave = nil
-        pendingHistorySave = nil
-        pendingLiftHistorySave = nil
-
-        // Ensure any already-started background writes finish before this immediate flush.
-        persistenceQueue.sync { }
-
-        persist(routines, forKey: routinesKey)
-        persist(workoutHistory, forKey: historyKey)
-        persist(liftHistory, forKey: liftHistoryKey)
-    }
-
-    private static func makeEncoder() -> JSONEncoder {
-        let encoder = JSONEncoder()
-        encoder.dateEncodingStrategy = .iso8601
-        return encoder
-    }
-
-    private func persist<T: Encodable>(_ value: T, forKey key: String) {
-        let encoder = Self.makeEncoder()
-        guard let data = try? encoder.encode(value) else { return }
-        defaults.set(data, forKey: key)
+        pendingPersistenceSave?.cancel()
+        pendingPersistenceSave = nil
+        persistDirtyData()
     }
 
     private func latestSessionRecords(
@@ -561,6 +660,18 @@ final class WorkoutStore: ObservableObject {
     }
 
     private func rebuildLiftHistoryIndex() {
+        let records = liftHistory
+        let preferredChunkCount = min(
+            max(ProcessInfo.processInfo.activeProcessorCount, 1),
+            LiftHistoryIndexing.maximumParallelChunkCount
+        )
+        let shouldBuildInParallel = records.count >= LiftHistoryIndexing.minimumRecordsForParallelIndexing
+            && preferredChunkCount > 1
+
+        let partials: [LiftHistoryIndexPartial] = shouldBuildInParallel
+            ? Self.buildLiftHistoryIndexPartials(records: records, preferredChunkCount: preferredChunkCount)
+            : [Self.buildLiftHistoryIndexPartial(from: records[...])]
+
         var byExerciseName: [String: [LiftRecord]] = [:]
         byExerciseName.reserveCapacity(liftHistoryByExerciseName.count)
         var byExerciseAndSession: [ExerciseSessionKey: [LiftRecord]] = [:]
@@ -570,30 +681,30 @@ final class WorkoutStore: ObservableObject {
         var latestSessionByExerciseAndRoutine: [ExerciseRoutineKey: (sessionID: UUID, performedAt: Date)] = [:]
         latestSessionByExerciseAndRoutine.reserveCapacity(latestSessionIDByExerciseAndRoutine.count)
 
-        for record in liftHistory {
-            byExerciseName[record.exerciseName, default: []].append(record)
+        for partial in partials {
+            for (exerciseName, partialRecords) in partial.byExerciseName {
+                byExerciseName[exerciseName, default: []].append(contentsOf: partialRecords)
+            }
 
-            let exerciseSessionKey = ExerciseSessionKey(
-                exerciseName: record.exerciseName,
-                sessionID: record.sessionID
-            )
-            byExerciseAndSession[exerciseSessionKey, default: []].append(record)
+            for (exerciseSessionKey, partialRecords) in partial.byExerciseAndSession {
+                byExerciseAndSession[exerciseSessionKey, default: []].append(contentsOf: partialRecords)
+            }
 
-            Self.updateLatestSession(
-                in: &latestSessionByExercise,
-                key: record.exerciseName,
-                record: record
-            )
+            for (exerciseName, latestSession) in partial.latestSessionByExercise {
+                if let existing = latestSessionByExercise[exerciseName],
+                   existing.performedAt >= latestSession.performedAt {
+                    continue
+                }
+                latestSessionByExercise[exerciseName] = latestSession
+            }
 
-            let exerciseRoutineKey = ExerciseRoutineKey(
-                exerciseName: record.exerciseName,
-                routineName: record.routineName
-            )
-            Self.updateLatestSession(
-                in: &latestSessionByExerciseAndRoutine,
-                key: exerciseRoutineKey,
-                record: record
-            )
+            for (exerciseRoutineKey, latestSession) in partial.latestSessionByExerciseAndRoutine {
+                if let existing = latestSessionByExerciseAndRoutine[exerciseRoutineKey],
+                   existing.performedAt >= latestSession.performedAt {
+                    continue
+                }
+                latestSessionByExerciseAndRoutine[exerciseRoutineKey] = latestSession
+            }
         }
 
         var progressByExerciseName: [String: [LiftProgressSnapshot]] = [:]
@@ -621,6 +732,78 @@ final class WorkoutStore: ObservableObject {
         recommendationCache.removeAll(keepingCapacity: true)
     }
 
+    private static func buildLiftHistoryIndexPartials(
+        records: [LiftRecord],
+        preferredChunkCount: Int
+    ) -> [LiftHistoryIndexPartial] {
+        guard !records.isEmpty else {
+            return []
+        }
+
+        let safeChunkCount = max(1, min(preferredChunkCount, records.count))
+        let chunkSize = (records.count + safeChunkCount - 1) / safeChunkCount
+        let partialStore = IndexedPartialStore()
+
+        DispatchQueue.concurrentPerform(iterations: safeChunkCount) { chunkIndex in
+            let startIndex = chunkIndex * chunkSize
+            guard startIndex < records.count else {
+                return
+            }
+
+            let endIndex = min(startIndex + chunkSize, records.count)
+            let partial = buildLiftHistoryIndexPartial(from: records[startIndex..<endIndex])
+            partialStore.set(partial, at: chunkIndex)
+        }
+
+        return partialStore.orderedPartials(count: safeChunkCount)
+    }
+
+    private static func buildLiftHistoryIndexPartial(
+        from records: ArraySlice<LiftRecord>
+    ) -> LiftHistoryIndexPartial {
+        var byExerciseName: [String: [LiftRecord]] = [:]
+        byExerciseName.reserveCapacity(records.count)
+        var byExerciseAndSession: [ExerciseSessionKey: [LiftRecord]] = [:]
+        byExerciseAndSession.reserveCapacity(records.count)
+        var latestSessionByExercise: [String: (sessionID: UUID, performedAt: Date)] = [:]
+        latestSessionByExercise.reserveCapacity(records.count)
+        var latestSessionByExerciseAndRoutine: [ExerciseRoutineKey: (sessionID: UUID, performedAt: Date)] = [:]
+        latestSessionByExerciseAndRoutine.reserveCapacity(records.count)
+
+        for record in records {
+            byExerciseName[record.exerciseName, default: []].append(record)
+
+            let exerciseSessionKey = ExerciseSessionKey(
+                exerciseName: record.exerciseName,
+                sessionID: record.sessionID
+            )
+            byExerciseAndSession[exerciseSessionKey, default: []].append(record)
+
+            updateLatestSession(
+                in: &latestSessionByExercise,
+                key: record.exerciseName,
+                record: record
+            )
+
+            let exerciseRoutineKey = ExerciseRoutineKey(
+                exerciseName: record.exerciseName,
+                routineName: record.routineName
+            )
+            updateLatestSession(
+                in: &latestSessionByExerciseAndRoutine,
+                key: exerciseRoutineKey,
+                record: record
+            )
+        }
+
+        return LiftHistoryIndexPartial(
+            byExerciseName: byExerciseName,
+            byExerciseAndSession: byExerciseAndSession,
+            latestSessionByExercise: latestSessionByExercise,
+            latestSessionByExerciseAndRoutine: latestSessionByExerciseAndRoutine
+        )
+    }
+
     private func cacheRecommendation(
         _ result: CachedRecommendationResult,
         for key: RecommendationCacheKey
@@ -632,72 +815,488 @@ final class WorkoutStore: ObservableObject {
     }
 
     private func scheduleRoutinesSave() {
-        scheduleSave(pendingWorkItem: &pendingRoutinesSave) { [weak self] in
-            guard let self else { return }
-            self.persistAsync(self.routines, forKey: self.routinesKey)
-        }
+        hasPendingRoutinesSave = true
+        scheduleSave()
     }
 
     private func scheduleHistorySave() {
-        scheduleSave(pendingWorkItem: &pendingHistorySave) { [weak self] in
-            guard let self else { return }
-            self.persistAsync(self.workoutHistory, forKey: self.historyKey)
-        }
+        hasPendingHistorySave = true
+        scheduleSave()
     }
 
     private func scheduleLiftHistorySave() {
-        scheduleSave(pendingWorkItem: &pendingLiftHistorySave) { [weak self] in
-            guard let self else { return }
-            self.persistAsync(self.liftHistory, forKey: self.liftHistoryKey)
-        }
+        hasPendingLiftHistorySave = true
+        scheduleSave()
     }
 
-    private func scheduleSave(
-        pendingWorkItem: inout DispatchWorkItem?,
-        operation: @escaping () -> Void
-    ) {
-        pendingWorkItem?.cancel()
-        let work = DispatchWorkItem(block: operation)
+    private func scheduleSave() {
+        pendingPersistenceSave?.cancel()
+        let work = DispatchWorkItem { [weak self] in
+            self?.persistDirtyData()
+        }
 
-        pendingWorkItem = work
+        pendingPersistenceSave = work
         DispatchQueue.main.asyncAfter(
             deadline: .now() + .milliseconds(Persistence.saveDebounceMilliseconds),
             execute: work
         )
     }
 
-    private func persistAsync<T: Encodable>(_ value: T, forKey key: String) {
-        let defaults = self.defaults
-        persistenceQueue.async {
-            let encoder = Self.makeEncoder()
-            guard let data = try? encoder.encode(value) else { return }
-            defaults.set(data, forKey: key)
+    private func persistAllToSwiftData() {
+        pendingPersistenceSave?.cancel()
+        pendingPersistenceSave = nil
+        hasPendingRoutinesSave = false
+        hasPendingHistorySave = false
+        hasPendingLiftHistorySave = false
+
+        replaceStoredRoutines(with: routines)
+        replaceStoredWorkoutHistory(with: workoutHistory)
+        replaceStoredLiftHistory(with: liftHistory)
+    }
+
+    private func persistDirtyData() {
+        let shouldSaveRoutines = hasPendingRoutinesSave
+        let shouldSaveHistory = hasPendingHistorySave
+        let shouldSaveLiftHistory = hasPendingLiftHistorySave
+
+        pendingPersistenceSave = nil
+        hasPendingRoutinesSave = false
+        hasPendingHistorySave = false
+        hasPendingLiftHistorySave = false
+
+        if shouldSaveRoutines {
+            replaceStoredRoutines(with: routines)
+        }
+        if shouldSaveHistory {
+            replaceStoredWorkoutHistory(with: workoutHistory)
+        }
+        if shouldSaveLiftHistory {
+            replaceStoredLiftHistory(with: liftHistory)
         }
     }
 
-    private func updateLatestSessionIDsByExerciseName(with latestRecords: [String: LiftRecord]) {
-        for (exerciseName, latestRecord) in latestRecords {
-            let currentDate = latestSessionIDByExerciseName[exerciseName].map {
-                currentSessionDate(forExerciseName: exerciseName, sessionID: $0)
-            } ?? .distantPast
+    private func loadRoutinesFromStore() -> [Routine] {
+        Self.loadRoutinesFromStore(using: modelContext)
+    }
 
-            if latestRecord.performedAt >= currentDate {
-                latestSessionIDByExerciseName[exerciseName] = latestRecord.sessionID
+    private static func loadRoutinesFromStore(using context: ModelContext) -> [Routine] {
+        do {
+            let descriptor = FetchDescriptor<StoredRoutine>(
+                sortBy: [SortDescriptor(\.orderIndex)]
+            )
+            let storedRoutines = try context.fetch(descriptor)
+
+            return storedRoutines.map { storedRoutine in
+                let exercises = storedRoutine.exercises
+                    .sorted {
+                        Self.orderedByIndexAndID(
+                            $0,
+                            $1,
+                            index: \.orderIndex,
+                            id: \.id
+                        )
+                    }
+                    .map { exercise in
+                        Exercise(
+                            id: exercise.id,
+                            name: exercise.name,
+                            trainingMax: exercise.trainingMax
+                        )
+                    }
+
+                return Routine(
+                    id: storedRoutine.id,
+                    name: storedRoutine.name,
+                    exercises: exercises,
+                    program: Self.programConfig(
+                        kindRaw: storedRoutine.programKindRaw,
+                        step: storedRoutine.programStep,
+                        cycle: storedRoutine.programCycle
+                    )
+                )
             }
+        } catch {
+            print("WorkoutStore: failed to load routines from SwiftData: \(error)")
+            return []
+        }
+    }
+
+    private func loadWorkoutHistoryFromStore() -> [WorkoutSession] {
+        Self.loadWorkoutHistoryFromStore(using: modelContext)
+    }
+
+    private static func loadWorkoutHistoryFromStore(using context: ModelContext) -> [WorkoutSession] {
+        do {
+            let descriptor = FetchDescriptor<StoredWorkoutSession>()
+            let storedSessions = try context.fetch(descriptor)
+
+            let sessions = storedSessions.map { storedSession in
+                let entries = storedSession.entries
+                    .sorted {
+                        Self.orderedByIndexAndID(
+                            $0,
+                            $1,
+                            index: \.orderIndex,
+                            id: \.id
+                        )
+                    }
+                    .map { storedEntry in
+                        let sets = storedEntry.sets
+                            .sorted {
+                                Self.orderedByIndexAndID(
+                                    $0,
+                                    $1,
+                                    index: \.orderIndex,
+                                    id: \.id
+                                )
+                            }
+                            .map { storedSet in
+                                ExerciseSet(
+                                    id: storedSet.id,
+                                    weight: storedSet.weight,
+                                    reps: storedSet.reps
+                                )
+                            }
+
+                        return ExerciseEntry(
+                            id: storedEntry.id,
+                            exerciseName: storedEntry.exerciseName,
+                            sets: sets
+                        )
+                    }
+
+                return WorkoutSession(
+                    id: storedSession.id,
+                    routineName: storedSession.routineName,
+                    performedAt: storedSession.performedAt,
+                    entries: entries,
+                    programContext: storedSession.programContext
+                )
+            }
+
+            return Self.sortedSessionsByDate(sessions)
+        } catch {
+            print("WorkoutStore: failed to load workout history from SwiftData: \(error)")
+            return []
+        }
+    }
+
+    private func loadLiftHistoryFromStore() -> [LiftRecord] {
+        Self.loadLiftHistoryFromStore(using: modelContext)
+    }
+
+    private static func loadLiftHistoryFromStore(using context: ModelContext) -> [LiftRecord] {
+        do {
+            let descriptor = FetchDescriptor<StoredLiftRecord>()
+            let storedRecords = try context.fetch(descriptor)
+
+            let records = storedRecords.map { record in
+                LiftRecord(
+                    id: record.id,
+                    sessionID: record.sessionID,
+                    routineName: record.routineName,
+                    exerciseName: record.exerciseName,
+                    performedAt: record.performedAt,
+                    setIndex: record.setIndex,
+                    weight: record.weight,
+                    reps: record.reps
+                )
+            }
+
+            return Self.sortedLiftRecordsByDate(records)
+        } catch {
+            print("WorkoutStore: failed to load lift history from SwiftData: \(error)")
+            return []
+        }
+    }
+
+    private func replaceStoredRoutines(with routines: [Routine]) {
+        do {
+            let storedRoutines = try modelContext.fetch(FetchDescriptor<StoredRoutine>())
+            var storedRoutineByID: [UUID: StoredRoutine] = [:]
+            storedRoutineByID.reserveCapacity(storedRoutines.count)
+            for storedRoutine in storedRoutines {
+                storedRoutineByID[storedRoutine.id] = storedRoutine
+            }
+
+            var seenRoutineIDs: Set<UUID> = []
+            seenRoutineIDs.reserveCapacity(routines.count)
+            for (routineIndex, routine) in routines.enumerated() {
+                seenRoutineIDs.insert(routine.id)
+
+                let storedRoutine = storedRoutineByID[routine.id] ?? {
+                    let inserted = StoredRoutine(
+                        id: routine.id,
+                        name: routine.name,
+                        orderIndex: routineIndex,
+                        programKindRaw: routine.program?.kind.rawValue,
+                        programStep: routine.program?.state.step,
+                        programCycle: routine.program?.state.cycle
+                    )
+                    modelContext.insert(inserted)
+                    storedRoutineByID[routine.id] = inserted
+                    return inserted
+                }()
+
+                storedRoutine.name = routine.name
+                storedRoutine.orderIndex = routineIndex
+                storedRoutine.programKindRaw = routine.program?.kind.rawValue
+                storedRoutine.programStep = routine.program?.state.step
+                storedRoutine.programCycle = routine.program?.state.cycle
+
+                syncStoredExercises(for: storedRoutine, with: routine.exercises)
+            }
+
+            for storedRoutine in storedRoutines where !seenRoutineIDs.contains(storedRoutine.id) {
+                modelContext.delete(storedRoutine)
+            }
+
+            try saveContextChanges()
+        } catch {
+            print("WorkoutStore: failed to persist routines to SwiftData: \(error)")
+        }
+    }
+
+    private func replaceStoredWorkoutHistory(with sessions: [WorkoutSession]) {
+        do {
+            let storedSessions = try modelContext.fetch(FetchDescriptor<StoredWorkoutSession>())
+            var storedSessionByID: [UUID: StoredWorkoutSession] = [:]
+            storedSessionByID.reserveCapacity(storedSessions.count)
+            for storedSession in storedSessions {
+                storedSessionByID[storedSession.id] = storedSession
+            }
+
+            var seenSessionIDs: Set<UUID> = []
+            seenSessionIDs.reserveCapacity(sessions.count)
+            for session in sessions {
+                seenSessionIDs.insert(session.id)
+
+                let storedSession = storedSessionByID[session.id] ?? {
+                    let inserted = StoredWorkoutSession(
+                        id: session.id,
+                        routineName: session.routineName,
+                        performedAt: session.performedAt,
+                        programContext: session.programContext
+                    )
+                    modelContext.insert(inserted)
+                    storedSessionByID[session.id] = inserted
+                    return inserted
+                }()
+
+                storedSession.routineName = session.routineName
+                storedSession.performedAt = session.performedAt
+                storedSession.programContext = session.programContext
+
+                syncStoredEntries(for: storedSession, with: session.entries)
+            }
+
+            for storedSession in storedSessions where !seenSessionIDs.contains(storedSession.id) {
+                modelContext.delete(storedSession)
+            }
+
+            try saveContextChanges()
+        } catch {
+            print("WorkoutStore: failed to persist workout history to SwiftData: \(error)")
+        }
+    }
+
+    private func replaceStoredLiftHistory(with records: [LiftRecord]) {
+        do {
+            let storedRecords = try modelContext.fetch(FetchDescriptor<StoredLiftRecord>())
+            var storedRecordByID: [UUID: StoredLiftRecord] = [:]
+            storedRecordByID.reserveCapacity(storedRecords.count)
+            for storedRecord in storedRecords {
+                storedRecordByID[storedRecord.id] = storedRecord
+            }
+
+            var seenRecordIDs: Set<UUID> = []
+            seenRecordIDs.reserveCapacity(records.count)
+            for record in records {
+                seenRecordIDs.insert(record.id)
+
+                let storedRecord = storedRecordByID[record.id] ?? {
+                    let inserted = StoredLiftRecord(
+                        id: record.id,
+                        sessionID: record.sessionID,
+                        routineName: record.routineName,
+                        exerciseName: record.exerciseName,
+                        performedAt: record.performedAt,
+                        setIndex: record.setIndex,
+                        weight: record.weight,
+                        reps: record.reps
+                    )
+                    modelContext.insert(inserted)
+                    storedRecordByID[record.id] = inserted
+                    return inserted
+                }()
+
+                storedRecord.sessionID = record.sessionID
+                storedRecord.routineName = record.routineName
+                storedRecord.exerciseName = record.exerciseName
+                storedRecord.performedAt = record.performedAt
+                storedRecord.setIndex = record.setIndex
+                storedRecord.weight = record.weight
+                storedRecord.reps = record.reps
+            }
+
+            for storedRecord in storedRecords where !seenRecordIDs.contains(storedRecord.id) {
+                modelContext.delete(storedRecord)
+            }
+
+            try saveContextChanges()
+        } catch {
+            print("WorkoutStore: failed to persist lift history to SwiftData: \(error)")
+        }
+    }
+
+    private func syncStoredExercises(
+        for storedRoutine: StoredRoutine,
+        with exercises: [Exercise]
+    ) {
+        let existingExercises = storedRoutine.exercises
+        var storedExerciseByID: [UUID: StoredExercise] = [:]
+        storedExerciseByID.reserveCapacity(existingExercises.count)
+        for storedExercise in existingExercises {
+            storedExerciseByID[storedExercise.id] = storedExercise
+        }
+
+        var seenExerciseIDs: Set<UUID> = []
+        seenExerciseIDs.reserveCapacity(exercises.count)
+        for (exerciseIndex, exercise) in exercises.enumerated() {
+            seenExerciseIDs.insert(exercise.id)
+
+            let storedExercise = storedExerciseByID[exercise.id] ?? {
+                let inserted = StoredExercise(
+                    id: exercise.id,
+                    name: exercise.name,
+                    trainingMax: exercise.trainingMax,
+                    orderIndex: exerciseIndex
+                )
+                inserted.routine = storedRoutine
+                modelContext.insert(inserted)
+                storedExerciseByID[exercise.id] = inserted
+                return inserted
+            }()
+
+            storedExercise.name = exercise.name
+            storedExercise.trainingMax = exercise.trainingMax
+            storedExercise.orderIndex = exerciseIndex
+            if storedExercise.routine?.id != storedRoutine.id {
+                storedExercise.routine = storedRoutine
+            }
+        }
+
+        for storedExercise in existingExercises where !seenExerciseIDs.contains(storedExercise.id) {
+            modelContext.delete(storedExercise)
+        }
+    }
+
+    private func syncStoredEntries(
+        for storedSession: StoredWorkoutSession,
+        with entries: [ExerciseEntry]
+    ) {
+        let existingEntries = storedSession.entries
+        var storedEntryByID: [UUID: StoredWorkoutEntry] = [:]
+        storedEntryByID.reserveCapacity(existingEntries.count)
+        for storedEntry in existingEntries {
+            storedEntryByID[storedEntry.id] = storedEntry
+        }
+
+        var seenEntryIDs: Set<UUID> = []
+        seenEntryIDs.reserveCapacity(entries.count)
+        for (entryIndex, entry) in entries.enumerated() {
+            seenEntryIDs.insert(entry.id)
+
+            let storedEntry = storedEntryByID[entry.id] ?? {
+                let inserted = StoredWorkoutEntry(
+                    id: entry.id,
+                    exerciseName: entry.exerciseName,
+                    orderIndex: entryIndex
+                )
+                inserted.session = storedSession
+                modelContext.insert(inserted)
+                storedEntryByID[entry.id] = inserted
+                return inserted
+            }()
+
+            storedEntry.exerciseName = entry.exerciseName
+            storedEntry.orderIndex = entryIndex
+            if storedEntry.session?.id != storedSession.id {
+                storedEntry.session = storedSession
+            }
+
+            syncStoredSets(for: storedEntry, with: entry.sets)
+        }
+
+        for storedEntry in existingEntries where !seenEntryIDs.contains(storedEntry.id) {
+            modelContext.delete(storedEntry)
+        }
+    }
+
+    private func syncStoredSets(
+        for storedEntry: StoredWorkoutEntry,
+        with sets: [ExerciseSet]
+    ) {
+        let existingSets = storedEntry.sets
+        var storedSetByID: [UUID: StoredWorkoutSet] = [:]
+        storedSetByID.reserveCapacity(existingSets.count)
+        for storedSet in existingSets {
+            storedSetByID[storedSet.id] = storedSet
+        }
+
+        var seenSetIDs: Set<UUID> = []
+        seenSetIDs.reserveCapacity(sets.count)
+        for (setIndex, set) in sets.enumerated() {
+            seenSetIDs.insert(set.id)
+
+            let storedSet = storedSetByID[set.id] ?? {
+                let inserted = StoredWorkoutSet(
+                    id: set.id,
+                    weight: set.weight,
+                    reps: set.reps,
+                    orderIndex: setIndex
+                )
+                inserted.entry = storedEntry
+                modelContext.insert(inserted)
+                storedSetByID[set.id] = inserted
+                return inserted
+            }()
+
+            storedSet.weight = set.weight
+            storedSet.reps = set.reps
+            storedSet.orderIndex = setIndex
+            if storedSet.entry?.id != storedEntry.id {
+                storedSet.entry = storedEntry
+            }
+        }
+
+        for storedSet in existingSets where !seenSetIDs.contains(storedSet.id) {
+            modelContext.delete(storedSet)
+        }
+    }
+
+    private func saveContextChanges() throws {
+        guard modelContext.hasChanges else { return }
+        try modelContext.save()
+    }
+
+    private func updateLatestSessionIDsByExerciseName(with latestRecords: [String: LiftRecord]) {
+        updateLatestSessionIDs(
+            with: latestRecords,
+            target: &latestSessionIDByExerciseName
+        ) { exerciseName in
+            exerciseName
         }
     }
 
     private func updateLatestSessionIDsByExerciseAndRoutine(
         with latestRecords: [ExerciseRoutineKey: LiftRecord]
     ) {
-        for (exerciseRoutineKey, latestRecord) in latestRecords {
-            let currentDate = latestSessionIDByExerciseAndRoutine[exerciseRoutineKey].map {
-                currentSessionDate(forExerciseName: exerciseRoutineKey.exerciseName, sessionID: $0)
-            } ?? .distantPast
-
-            if latestRecord.performedAt >= currentDate {
-                latestSessionIDByExerciseAndRoutine[exerciseRoutineKey] = latestRecord.sessionID
-            }
+        updateLatestSessionIDs(
+            with: latestRecords,
+            target: &latestSessionIDByExerciseAndRoutine
+        ) { exerciseRoutineKey in
+            exerciseRoutineKey.exerciseName
         }
     }
 
@@ -705,6 +1304,25 @@ final class WorkoutStore: ObservableObject {
         liftHistoryByExerciseAndSession[
             ExerciseSessionKey(exerciseName: exerciseName, sessionID: sessionID)
         ]?.first?.performedAt ?? .distantPast
+    }
+
+    private func updateLatestSessionIDs<Key: Hashable>(
+        with latestRecords: [Key: LiftRecord],
+        target latestSessionIDsByKey: inout [Key: UUID],
+        exerciseNameForKey: (Key) -> String
+    ) {
+        for (key, latestRecord) in latestRecords {
+            let currentDate = latestSessionIDsByKey[key].map {
+                currentSessionDate(
+                    forExerciseName: exerciseNameForKey(key),
+                    sessionID: $0
+                )
+            } ?? .distantPast
+
+            if latestRecord.performedAt >= currentDate {
+                latestSessionIDsByKey[key] = latestRecord.sessionID
+            }
+        }
     }
 
     private static func updateLatestRecord<Key: Hashable>(
@@ -729,11 +1347,35 @@ final class WorkoutStore: ObservableObject {
         sessionsByKey[key] = (sessionID: record.sessionID, performedAt: record.performedAt)
     }
 
+    private static func orderedByIndexAndID<T>(
+        _ lhs: T,
+        _ rhs: T,
+        index: KeyPath<T, Int>,
+        id: KeyPath<T, UUID>
+    ) -> Bool {
+        let lhsIndex = lhs[keyPath: index]
+        let rhsIndex = rhs[keyPath: index]
+        if lhsIndex != rhsIndex {
+            return lhsIndex < rhsIndex
+        }
+        return lhs[keyPath: id].uuidString < rhs[keyPath: id].uuidString
+    }
+
+    private static func programConfig(kindRaw: String?, step: Int?, cycle: Int?) -> ProgramConfig? {
+        guard let kindRaw, let kind = ProgramKind(rawValue: kindRaw) else {
+            return nil
+        }
+
+        return ProgramConfig(
+            kind: kind,
+            state: ProgramState(step: max(step ?? 0, 0), cycle: max(cycle ?? 1, 1))
+        )
+    }
+
     private static func liftRecords(from session: WorkoutSession) -> [LiftRecord] {
         session.entries.flatMap { entry in
             entry.sets.enumerated().compactMap { index, set in
-                let transcript = set.transcript?.trimmingCharacters(in: .whitespacesAndNewlines)
-                guard set.weight != nil || set.reps != nil || ((transcript ?? "").isEmpty == false) else {
+                guard set.weight != nil || set.reps != nil else {
                     return nil
                 }
 
@@ -744,8 +1386,7 @@ final class WorkoutStore: ObservableObject {
                     performedAt: session.performedAt,
                     setIndex: index + 1,
                     weight: set.weight,
-                    reps: set.reps,
-                    transcript: transcript?.isEmpty == true ? nil : transcript
+                    reps: set.reps
                 )
             }
         }
@@ -933,24 +1574,6 @@ final class WorkoutStore: ObservableObject {
 }
 
 private extension WorkoutStore {
-    static let legacyPushPullLegsExerciseNamesByRoutineName: [String: [String]] = [
-        "Push": [
-            "Bench Press",
-            "Incline Dumbbell Press",
-            "Overhead Press"
-        ],
-        "Pull": [
-            "Deadlift",
-            "Pull Up",
-            "Barbell Row"
-        ],
-        "Legs": [
-            "Back Squat",
-            "Romanian Deadlift",
-            "Leg Press"
-        ]
-    ]
-
     enum ProgramTemplate {
         static let bigFourExerciseNames = [
             "Back Squat",
@@ -1143,28 +1766,5 @@ private extension WorkoutStore {
             .fiveThreeOne,
             .boringButBig
         ].map(makeProgramRoutine)
-    }
-
-    static func matchesLegacyStarterRoutines(_ routines: [Routine]) -> Bool {
-        let expectedRoutineCount = legacyPushPullLegsExerciseNamesByRoutineName.count
-        guard routines.count == expectedRoutineCount else { return false }
-
-        let migratedRoutineNames = Set(routines.map(\.name))
-        guard migratedRoutineNames.count == expectedRoutineCount else { return false }
-
-        return routines.allSatisfy(isLegacyPushPullLegsRoutine)
-    }
-
-    static func removingLegacyPushPullLegsRoutines(from routines: [Routine]) -> [Routine] {
-        routines.filter { !isLegacyPushPullLegsRoutine($0) }
-    }
-
-    static func isLegacyPushPullLegsRoutine(_ routine: Routine) -> Bool {
-        guard routine.program == nil else { return false }
-        guard let expectedExerciseNames = legacyPushPullLegsExerciseNamesByRoutineName[routine.name] else {
-            return false
-        }
-
-        return routine.exercises.map(\.name) == expectedExerciseNames
     }
 }

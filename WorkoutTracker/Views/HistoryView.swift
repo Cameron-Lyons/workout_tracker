@@ -9,6 +9,14 @@ private struct LiftProgressPoint: Identifiable {
     var id: UUID { sessionID }
 }
 
+private struct HistoryCachePayload {
+    var workoutDays: Set<Date>
+    var workoutCountByMonthStart: [Date: Int]
+    var sessionsByWorkoutDay: [Date: [WorkoutSession]]
+    var allSessionsNewestFirst: [WorkoutSession]
+    var filteredSessions: [WorkoutSession]
+}
+
 struct HistoryView: View {
     private enum Constants {
         static let filterAnimation = Animation.easeInOut(duration: 0.22)
@@ -69,10 +77,13 @@ struct HistoryView: View {
     @State private var cachedWorkoutDays: Set<Date> = []
     @State private var cachedWorkoutCountByMonthStart: [Date: Int] = [:]
     @State private var cachedSessionsByWorkoutDay: [Date: [WorkoutSession]] = [:]
+    @State private var cachedAllSessionsNewestFirst: [WorkoutSession] = []
     @State private var cachedFilteredSessions: [WorkoutSession] = []
     @State private var cachedProgressPointsByExerciseName: [String: [LiftProgressPoint]] = [:]
     @State private var cachedOrderedWeekdaySymbols: [String] = []
     @State private var cachedMonthGridDates: [Date?] = []
+    @State private var historyCacheVersion = 0
+    @State private var progressCacheVersion = 0
 #if DEBUG
     @State private var showBenchmarkAlert = false
     @State private var benchmarkSummary = ""
@@ -157,8 +168,6 @@ struct HistoryView: View {
                 rebuildHistoryCaches()
                 syncExerciseSelection()
                 rebuildProgressPointsCache()
-                syncCalendarState()
-                rebuildCalendarGridCache()
             }
             .onChange(of: store.liftHistory) { _, _ in
                 syncExerciseSelection()
@@ -166,8 +175,6 @@ struct HistoryView: View {
             }
             .onChange(of: store.workoutHistory) { _, _ in
                 rebuildHistoryCaches()
-                syncCalendarState()
-                rebuildCalendarGridCache()
             }
             .onChange(of: selectedCalendarDay) { _, _ in
                 updateFilteredSessions()
@@ -528,18 +535,6 @@ struct HistoryView: View {
         displayedMonth = calendar.startOfMonth(for: nextMonth)
     }
 
-    private func progressPoints(for exerciseName: String, unit: WeightUnit) -> [LiftProgressPoint] {
-        guard !exerciseName.isEmpty else { return [] }
-
-        return store.liftProgress(forExerciseName: exerciseName).map { progress in
-            LiftProgressPoint(
-                sessionID: progress.sessionID,
-                date: progress.performedAt,
-                topWeight: unit.displayValue(fromStoredPounds: progress.topWeightInStoredPounds)
-            )
-        }
-    }
-
     private var selectedProgressPoints: [LiftProgressPoint] {
         cachedProgressPointsByExerciseName[selectedExerciseName] ?? []
     }
@@ -689,33 +684,42 @@ struct HistoryView: View {
     }
 
     private func rebuildHistoryCaches() {
-        let history = store.workoutHistory
-        var workoutDays: Set<Date> = []
-        workoutDays.reserveCapacity(history.count)
-        var workoutCountByMonthStart: [Date: Int] = [:]
-        workoutCountByMonthStart.reserveCapacity(history.count)
-        var sessionsByWorkoutDay: [Date: [WorkoutSession]] = [:]
-        sessionsByWorkoutDay.reserveCapacity(history.count)
+        historyCacheVersion += 1
+        let expectedVersion = historyCacheVersion
+        let historySnapshot = store.workoutHistory
+        let selectedDaySnapshot = selectedCalendarDay
+        let calendarSnapshot = calendar
 
-        for session in history {
-            let workoutDay = calendar.startOfDay(for: session.performedAt)
-            workoutDays.insert(workoutDay)
-            sessionsByWorkoutDay[workoutDay, default: []].append(session)
+        DispatchQueue.global(qos: .userInitiated).async {
+            let payload = Self.buildHistoryCaches(
+                history: historySnapshot,
+                selectedCalendarDay: selectedDaySnapshot,
+                calendar: calendarSnapshot
+            )
 
-            let monthStart = calendar.startOfMonth(for: session.performedAt)
-            workoutCountByMonthStart[monthStart, default: 0] += 1
+            DispatchQueue.main.async {
+                guard self.historyCacheVersion == expectedVersion else {
+                    return
+                }
+
+                self.cachedWorkoutDays = payload.workoutDays
+                self.cachedWorkoutCountByMonthStart = payload.workoutCountByMonthStart
+                self.cachedSessionsByWorkoutDay = payload.sessionsByWorkoutDay
+                self.cachedAllSessionsNewestFirst = payload.allSessionsNewestFirst
+                self.cachedFilteredSessions = payload.filteredSessions
+                self.syncCalendarState()
+                self.rebuildCalendarGridCache()
+            }
         }
-
-        cachedWorkoutDays = workoutDays
-        cachedWorkoutCountByMonthStart = workoutCountByMonthStart
-        cachedSessionsByWorkoutDay = sessionsByWorkoutDay
-        updateFilteredSessions(using: history)
     }
 
     private func updateFilteredSessions(using history: [WorkoutSession]? = nil) {
-        let sessions = history ?? store.workoutHistory
         guard let selectedCalendarDay else {
-            cachedFilteredSessions = Array(sessions.reversed())
+            if let history {
+                cachedFilteredSessions = Array(history.reversed())
+            } else {
+                cachedFilteredSessions = cachedAllSessionsNewestFirst
+            }
             return
         }
 
@@ -724,16 +728,31 @@ struct HistoryView: View {
     }
 
     private func rebuildProgressPointsCache() {
+        progressCacheVersion += 1
+        let expectedVersion = progressCacheVersion
         let exercises = trackedExercises
         let unit = weightUnit
-        var refreshed: [String: [LiftProgressPoint]] = [:]
-        refreshed.reserveCapacity(exercises.count)
-
+        var progressByExerciseNameSnapshot: [String: [LiftProgressSnapshot]] = [:]
+        progressByExerciseNameSnapshot.reserveCapacity(exercises.count)
         for exerciseName in exercises {
-            refreshed[exerciseName] = progressPoints(for: exerciseName, unit: unit)
+            progressByExerciseNameSnapshot[exerciseName] = store.liftProgress(forExerciseName: exerciseName)
         }
+        let progressByExerciseName = progressByExerciseNameSnapshot
 
-        cachedProgressPointsByExerciseName = refreshed
+        DispatchQueue.global(qos: .userInitiated).async {
+            let refreshed = Self.buildProgressPointsCache(
+                progressByExerciseName: progressByExerciseName,
+                unit: unit
+            )
+
+            DispatchQueue.main.async {
+                guard self.progressCacheVersion == expectedVersion else {
+                    return
+                }
+
+                self.cachedProgressPointsByExerciseName = refreshed
+            }
+        }
     }
 
     private func syncCalendarState() {
@@ -798,6 +817,69 @@ struct HistoryView: View {
         }
 
         return gridDates
+    }
+
+    nonisolated private static func buildHistoryCaches(
+        history: [WorkoutSession],
+        selectedCalendarDay: Date?,
+        calendar: Calendar
+    ) -> HistoryCachePayload {
+        var workoutDays: Set<Date> = []
+        workoutDays.reserveCapacity(history.count)
+        var workoutCountByMonthStart: [Date: Int] = [:]
+        workoutCountByMonthStart.reserveCapacity(history.count)
+        var sessionsByWorkoutDay: [Date: [WorkoutSession]] = [:]
+        sessionsByWorkoutDay.reserveCapacity(history.count)
+
+        for session in history {
+            let workoutDay = calendar.startOfDay(for: session.performedAt)
+            workoutDays.insert(workoutDay)
+            sessionsByWorkoutDay[workoutDay, default: []].append(session)
+
+            let monthStart = calendar.startOfMonth(for: session.performedAt)
+            workoutCountByMonthStart[monthStart, default: 0] += 1
+        }
+
+        let allSessionsNewestFirst = Array(history.reversed())
+        let filteredSessions: [WorkoutSession]
+        if let selectedCalendarDay {
+            let normalizedDay = calendar.startOfDay(for: selectedCalendarDay)
+            filteredSessions = Array((sessionsByWorkoutDay[normalizedDay] ?? []).reversed())
+        } else {
+            filteredSessions = allSessionsNewestFirst
+        }
+
+        return HistoryCachePayload(
+            workoutDays: workoutDays,
+            workoutCountByMonthStart: workoutCountByMonthStart,
+            sessionsByWorkoutDay: sessionsByWorkoutDay,
+            allSessionsNewestFirst: allSessionsNewestFirst,
+            filteredSessions: filteredSessions
+        )
+    }
+
+    nonisolated private static func buildProgressPointsCache(
+        progressByExerciseName: [String: [LiftProgressSnapshot]],
+        unit: WeightUnit
+    ) -> [String: [LiftProgressPoint]] {
+        guard !progressByExerciseName.isEmpty else {
+            return [:]
+        }
+
+        var refreshed: [String: [LiftProgressPoint]] = [:]
+        refreshed.reserveCapacity(progressByExerciseName.count)
+
+        for (exerciseName, snapshots) in progressByExerciseName {
+            refreshed[exerciseName] = snapshots.map { progress in
+                LiftProgressPoint(
+                    sessionID: progress.sessionID,
+                    date: progress.performedAt,
+                    topWeight: unit.displayValue(fromStoredPounds: progress.topWeightInStoredPounds)
+                )
+            }
+        }
+
+        return refreshed
     }
 }
 

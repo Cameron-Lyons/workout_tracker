@@ -138,24 +138,20 @@ struct RoutineEditorView: View {
     }
 
     private var exercisesSection: some View {
-        VStack(alignment: .leading, spacing: Layout.exerciseRowSpacing) {
-            if exercises.isEmpty {
-                Text("Add at least one exercise")
-                    .font(.subheadline)
-                    .foregroundStyle(AppColors.textSecondary)
-            } else {
-                ForEach(Array(exercises.indices), id: \.self) { index in
-                    editableExerciseRow(at: index)
-                }
-
-                Text("Use arrows to reorder exercises.")
-                    .font(.caption2)
-                    .foregroundStyle(AppColors.textSecondary)
+        ExerciseEditingList(
+            isEmpty: exercises.isEmpty,
+            rowSpacing: Layout.exerciseRowSpacing,
+            emptyTopPadding: 0,
+            listTopPadding: 0,
+            animation: Layout.listAnimation,
+            animationValue: exercises.count
+        ) {
+            ForEach(Array(exercises.indices), id: \.self) { index in
+                editableExerciseRow(at: index)
             }
         }
         .padding(Layout.cardPadding)
         .appSurface(cornerRadius: Layout.cardCornerRadius, shadow: false)
-        .animation(Layout.listAnimation, value: exercises.count)
         .appReveal(delay: 0.11)
     }
 
@@ -216,12 +212,9 @@ struct RoutineEditorView: View {
     }
 
     private func parseTrainingMax(_ text: String) -> Double? {
-        let sanitized = text
-            .trimmingCharacters(in: .whitespacesAndNewlines)
-            .replacingOccurrences(of: ",", with: ".")
-
-        guard !sanitized.isEmpty else { return nil }
-        guard let displayValue = Double(sanitized) else { return nil }
+        guard let displayValue = WeightInputParser.parseDisplayValue(text) else {
+            return nil
+        }
         return weightUnit.storedPounds(fromDisplayValue: displayValue)
     }
 
@@ -245,8 +238,8 @@ struct RoutineEditorView: View {
                     isFirst: index == 0,
                     isLast: index == exercises.count - 1,
                     controlOpacity: Layout.controlOpacity,
-                    onMoveUp: { moveExerciseUp(at: index) },
-                    onMoveDown: { moveExerciseDown(at: index) },
+                    onMoveUp: { moveExercise(from: index, to: index - 1) },
+                    onMoveDown: { moveExercise(from: index, to: index + 1) },
                     onDelete: { deleteExercise(at: index) }
                 )
             }
@@ -307,17 +300,9 @@ struct RoutineEditorView: View {
         }
     }
 
-    private func moveExerciseUp(at index: Int) {
-        guard index > 0, exercises.indices.contains(index) else { return }
+    private func moveExercise(from sourceIndex: Int, to destinationIndex: Int) {
         withAnimation(Layout.listAnimation) {
-            exercises.swapAt(index, index - 1)
-        }
-    }
-
-    private func moveExerciseDown(at index: Int) {
-        guard index >= 0 else { return }
-        withAnimation(Layout.listAnimation) {
-            _ = exercises.swapIfPresent(from: index, to: index + 1)
+            _ = exercises.swapIfPresent(from: sourceIndex, to: destinationIndex)
         }
     }
 }

@@ -46,8 +46,8 @@ enum WorkoutProgramEngine {
         static let startingStrengthPowerCleanReps = 3
         static let startingStrengthDefaultSetCount = 3
         static let startingStrengthDefaultReps = 5
-        static let startingStrengthSmallLiftIncrement = 2.5
-        static let standardIncrement = 5.0
+        static let startingStrengthSmallLiftIncrement = StrengthProgressionDefaults.upperBodyIncreaseInPounds
+        static let standardIncrement = StrengthProgressionDefaults.lowerBodyIncreaseInPounds
 
         static let fiveThreeOneWeekCount = 4
         static let fiveThreeOneLastWeekIndex = fiveThreeOneWeekCount - 1
@@ -56,8 +56,8 @@ enum WorkoutProgramEngine {
         static let bbbSupplementalReps = 10
         static let bbbNote = "BBB (5x10)"
         static let noTrainingMaxNote = "Set training max (TM) in Edit Routine"
-        static let lowerBodyTrainingMaxIncrement = 10.0
-        static let roundingIncrement = 2.5
+        static let lowerBodyTrainingMaxIncrement = StrengthProgressionDefaults.lowerBodyTrainingMaxCycleIncreaseInPounds
+        static let roundingIncrement = StrengthProgressionDefaults.gymRoundingIncrement
 
         static let fiveThreeOneWeekSpecs: [WeekPlanSpec] = [
             WeekPlanSpec(

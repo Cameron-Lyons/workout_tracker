@@ -17,6 +17,7 @@ enum AppColors {
     static let input = Color(red: 0.03, green: 0.05, blue: 0.10)
 }
 
+@MainActor
 enum AppAppearance {
     private enum Metrics {
         static let tabBarShadowOpacity = 0.38

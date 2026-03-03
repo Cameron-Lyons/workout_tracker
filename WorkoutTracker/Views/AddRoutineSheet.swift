@@ -73,6 +73,35 @@ struct ExerciseRowControls: View {
     }
 }
 
+struct ExerciseEditingList<Rows: View>: View {
+    let isEmpty: Bool
+    let rowSpacing: CGFloat
+    let emptyTopPadding: CGFloat
+    let listTopPadding: CGFloat
+    let animation: Animation
+    let animationValue: Int
+    @ViewBuilder var rows: () -> Rows
+
+    var body: some View {
+        if isEmpty {
+            Text("Add at least one exercise")
+                .font(.subheadline)
+                .foregroundStyle(AppColors.textSecondary)
+                .padding(.top, emptyTopPadding)
+        } else {
+            VStack(spacing: rowSpacing) {
+                rows()
+            }
+            .padding(.top, listTopPadding)
+            .animation(animation, value: animationValue)
+
+            Text("Use arrows to reorder exercises.")
+                .font(.caption2)
+                .foregroundStyle(AppColors.textSecondary)
+        }
+    }
+}
+
 extension Array {
     @discardableResult
     mutating func removeIfPresent(at index: Int) -> Bool {
@@ -142,41 +171,34 @@ struct AddRoutineSheet: View {
                             revealDelay: 0.08
                         ) {
                             ExerciseNameInputRow(exerciseName: $pendingExercise, addAction: addExercise)
+                            ExerciseEditingList(
+                                isEmpty: exercises.isEmpty,
+                                rowSpacing: Layout.exerciseRowSpacing,
+                                emptyTopPadding: Layout.emptyStateTopPadding,
+                                listTopPadding: Layout.exerciseListTopPadding,
+                                animation: Layout.listAnimation,
+                                animationValue: exercises.count
+                            ) {
+                                ForEach(Array(exercises.enumerated()), id: \.element.id) { index, exercise in
+                                    HStack(spacing: 10) {
+                                        Text(exercise.name)
+                                            .font(.body.weight(.medium))
+                                            .foregroundStyle(AppColors.textPrimary)
+                                            .frame(maxWidth: .infinity, alignment: .leading)
 
-                            if exercises.isEmpty {
-                                Text("Add at least one exercise")
-                                    .font(.subheadline)
-                                    .foregroundStyle(AppColors.textSecondary)
-                                    .padding(.top, Layout.emptyStateTopPadding)
-                            } else {
-                                VStack(spacing: Layout.exerciseRowSpacing) {
-                                    ForEach(Array(exercises.enumerated()), id: \.element.id) { index, exercise in
-                                        HStack(spacing: 10) {
-                                            Text(exercise.name)
-                                                .font(.body.weight(.medium))
-                                                .foregroundStyle(AppColors.textPrimary)
-                                                .frame(maxWidth: .infinity, alignment: .leading)
-
-                                            ExerciseRowControls(
-                                                isFirst: index == 0,
-                                                isLast: index == exercises.count - 1,
-                                                controlOpacity: Layout.controlOpacity,
-                                                onMoveUp: { moveExercise(from: index, to: index - 1) },
-                                                onMoveDown: { moveExercise(from: index, to: index + 1) },
-                                                onDelete: { deleteExercise(at: index) }
-                                            )
-                                        }
-                                        .padding(Layout.exerciseRowPadding)
-                                        .appInsetCard()
-                                        .transition(.move(edge: .bottom).combined(with: .opacity))
+                                        ExerciseRowControls(
+                                            isFirst: index == 0,
+                                            isLast: index == exercises.count - 1,
+                                            controlOpacity: Layout.controlOpacity,
+                                            onMoveUp: { moveExercise(from: index, to: index - 1) },
+                                            onMoveDown: { moveExercise(from: index, to: index + 1) },
+                                            onDelete: { deleteExercise(at: index) }
+                                        )
                                     }
+                                    .padding(Layout.exerciseRowPadding)
+                                    .appInsetCard()
+                                    .transition(.move(edge: .bottom).combined(with: .opacity))
                                 }
-                                .padding(.top, Layout.exerciseListTopPadding)
-                                .animation(Layout.listAnimation, value: exercises)
-
-                                Text("Use arrows to reorder exercises.")
-                                    .font(.caption2)
-                                    .foregroundStyle(AppColors.textSecondary)
                             }
                         }
                     }

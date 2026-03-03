@@ -5,13 +5,7 @@ private struct SetDraft: Identifiable, Equatable {
     var id = UUID()
     var weight = ""
     var reps = ""
-    var transcript = ""
     var prescriptionNote: String?
-}
-
-private struct ActiveVoiceTarget: Equatable {
-    var exerciseID: UUID
-    var setID: UUID
 }
 
 private struct RestTimerCardView: View {
@@ -209,11 +203,9 @@ struct WorkoutLoggerView: View {
     private enum Constants {
         static let weightInputCharacters = "0123456789."
         static let savedToastDuration = 1.4
-        static let defaultMinimumWeightIncreaseInPounds = 10.0
         static let scrollFadeOpacity = 0.84
         static let scrollScale = 0.985
         static let destructiveControlOpacity = 0.9
-        static let voiceToolsAnimationDuration = 0.18
         static let animationDuration = 0.2
         static let setAnimation = Animation.spring(response: 0.40, dampingFraction: 0.84)
     }
@@ -243,29 +235,20 @@ struct WorkoutLoggerView: View {
         static let toastVerticalPadding: CGFloat = 10
         static let toastBottomPadding: CGFloat = 24
         static let heroHorizontalPadding: CGFloat = 14
-        static let hintHorizontalPadding: CGFloat = 12
-        static let hintVerticalPadding: CGFloat = 9
-        static let hintCornerRadius: CGFloat = 11
     }
 
     @EnvironmentObject private var store: WorkoutStore
-    @StateObject private var speechInput = SpeechInputManager()
     @AppStorage("workout_tracker_rest_timer_auto_start_v1") private var autoStartRestTimer = false
     @AppStorage(WeightUnit.preferenceKey) private var weightUnitRawValue = WeightUnit.pounds.rawValue
     @AppStorage("workout_tracker_min_weight_increase_v1")
-    private var minimumWeightIncreaseInPounds = Constants.defaultMinimumWeightIncreaseInPounds
+    private var minimumWeightIncreaseInPounds = StrengthProgressionDefaults.recommendedMinimumIncreaseInPounds
 
     @State private var selectedRoutineID: UUID?
     @State private var drafts: [UUID: [SetDraft]] = [:]
-    @State private var activeVoiceTarget: ActiveVoiceTarget?
     @State private var minimumWeightIncreaseInput = ""
     @State private var previousWeightUnit: WeightUnit = .pounds
 
-    @State private var showErrorAlert = false
-    @State private var errorMessage = ""
-
     @State private var showSavedToast = false
-    @State private var showVoiceTools = false
 
     @State private var restTimerAutoStartTrigger = 0
 
@@ -295,7 +278,22 @@ struct WorkoutLoggerView: View {
                     let selectedRoutineWithPlan = selectedRoutine.map { routine in
                         let plan = WorkoutProgramEngine.plan(for: routine)
                         let visibleExercises = activeExercises(in: routine, plan: plan)
-                        return (routine: routine, plan: plan, visibleExercises: visibleExercises)
+                        let setDraftsByExerciseID = buildSetDraftCache(
+                            for: visibleExercises,
+                            plan: plan
+                        )
+                        let recommendationsByExerciseID = buildRecommendationCache(
+                            routineName: routine.name,
+                            exercises: visibleExercises,
+                            setDraftsByExerciseID: setDraftsByExerciseID
+                        )
+                        return (
+                            routine: routine,
+                            plan: plan,
+                            visibleExercises: visibleExercises,
+                            setDraftsByExerciseID: setDraftsByExerciseID,
+                            recommendationsByExerciseID: recommendationsByExerciseID
+                        )
                     }
 
                     loggerHeroCard(
@@ -317,15 +315,6 @@ struct WorkoutLoggerView: View {
                             .frame(maxWidth: .infinity, alignment: .leading)
                     }
 
-                    Label("Manual entry is default. Enable voice tools for quick set capture.", systemImage: "info.circle")
-                        .font(.footnote)
-                        .foregroundStyle(AppColors.textSecondary)
-                        .padding(.horizontal, Layout.hintHorizontalPadding)
-                        .padding(.vertical, Layout.hintVerticalPadding)
-                        .appInsetCard(cornerRadius: Layout.hintCornerRadius, fillOpacity: 0.70, borderOpacity: 0.65)
-                        .padding(.horizontal)
-                        .frame(maxWidth: .infinity, alignment: .leading)
-
                     RestTimerCardView(
                         autoStartRestTimer: $autoStartRestTimer,
                         autoStartTrigger: restTimerAutoStartTrigger
@@ -335,13 +324,18 @@ struct WorkoutLoggerView: View {
 
                     if let selectedRoutineWithPlan {
                         let routine = selectedRoutineWithPlan.routine
-                        let plan = selectedRoutineWithPlan.plan
                         let visibleExercises = selectedRoutineWithPlan.visibleExercises
+                        let setDraftsByExerciseID = selectedRoutineWithPlan.setDraftsByExerciseID
+                        let recommendationsByExerciseID = selectedRoutineWithPlan.recommendationsByExerciseID
 
                         ScrollView {
                             LazyVStack(spacing: Layout.sectionSpacing) {
                                 ForEach(visibleExercises) { exercise in
-                                    exerciseCard(exercise, plan: plan)
+                                    exerciseCard(
+                                        exercise,
+                                        sets: setDraftsByExerciseID[exercise.id] ?? [],
+                                        recommendation: recommendationsByExerciseID[exercise.id]
+                                    )
                                         .scrollTransition(axis: .vertical) { content, phase in
                                             content
                                                 .opacity(phase.isIdentity ? 1 : Constants.scrollFadeOpacity)
@@ -409,26 +403,6 @@ struct WorkoutLoggerView: View {
             .onChange(of: selectedRoutineID) { _, _ in
                 rebuildDrafts()
             }
-            .onChange(of: showVoiceTools) { _, isEnabled in
-                if !isEnabled {
-                    speechInput.stopRecording()
-                    activeVoiceTarget = nil
-                }
-            }
-            .alert("Voice Input", isPresented: $showErrorAlert) {
-                Button("OK", role: .cancel) { }
-            } message: {
-                Text(errorMessage)
-            }
-            .toolbar {
-                ToolbarItem(placement: .topBarTrailing) {
-                    Button {
-                        showVoiceTools.toggle()
-                    } label: {
-                        Label(showVoiceTools ? "Voice tools on" : "Voice tools off", systemImage: showVoiceTools ? "mic.fill" : "mic.slash")
-                    }
-                }
-            }
             .tint(AppColors.accent)
             .overlay(alignment: .bottom) {
                 if showSavedToast {
@@ -477,12 +451,6 @@ struct WorkoutLoggerView: View {
                     label: "Unit",
                     value: weightUnit.symbol.uppercased(),
                     systemImage: "scalemass"
-                ),
-                AppHeroMetric(
-                    id: "logger-voice",
-                    label: "Voice",
-                    value: showVoiceTools ? "On" : "Off",
-                    systemImage: showVoiceTools ? "mic.fill" : "mic.slash"
                 ),
                 AppHeroMetric(
                     id: "logger-rest",
@@ -567,11 +535,9 @@ struct WorkoutLoggerView: View {
 
     private func exerciseCard(
         _ exercise: Exercise,
-        plan: ProgramWorkoutPlan
+        sets: [SetDraft],
+        recommendation: ExerciseWeightRecommendation?
     ) -> some View {
-        let sets = setDrafts(for: exercise, plan: plan)
-        let recommendation = weightRecommendation(for: exercise, targetSets: sets)
-
         return VStack(alignment: .leading, spacing: Layout.rowSpacing) {
             Text(exercise.name)
                 .font(.system(size: 20, weight: .bold, design: .rounded))
@@ -617,35 +583,11 @@ struct WorkoutLoggerView: View {
                             .font(.caption)
                             .foregroundStyle(AppColors.textSecondary)
                     }
-
-                    if showVoiceTools {
-                        HStack(spacing: Layout.rowSpacing) {
-                            Button {
-                                toggleVoiceInput(for: exercise.id, setID: set.id)
-                            } label: {
-                                Label(
-                                    isVoiceActive(for: exercise.id, setID: set.id) && speechInput.isRecording ? "Stop" : "Speak",
-                                    systemImage: isVoiceActive(for: exercise.id, setID: set.id) && speechInput.isRecording ? "stop.circle.fill" : "mic.fill"
-                                )
-                            }
-                            .buttonStyle(.bordered)
-                            .tint(isVoiceActive(for: exercise.id, setID: set.id) && speechInput.isRecording ? .red : AppColors.accent)
-
-                            if !set.transcript.isEmpty {
-                                Text("Heard: \(set.transcript)")
-                                    .font(.caption)
-                                    .foregroundStyle(AppColors.textSecondary)
-                                    .lineLimit(2)
-                            }
-                        }
-                        .transition(.move(edge: .top).combined(with: .opacity))
-                    }
                 }
                 .padding(Layout.setCardPadding)
                 .appSurface(cornerRadius: Layout.setCardCornerRadius, shadow: false)
             }
             .animation(Constants.setAnimation, value: sets.count)
-            .animation(.easeInOut(duration: Constants.voiceToolsAnimationDuration), value: showVoiceTools)
 
             Button {
                 addSet(to: exercise.id)
@@ -688,6 +630,46 @@ struct WorkoutLoggerView: View {
         return routine.exercises
     }
 
+    private func buildSetDraftCache(
+        for exercises: [Exercise],
+        plan: ProgramWorkoutPlan
+    ) -> [UUID: [SetDraft]] {
+        var setDraftsByExerciseID: [UUID: [SetDraft]] = [:]
+        setDraftsByExerciseID.reserveCapacity(exercises.count)
+
+        for exercise in exercises {
+            setDraftsByExerciseID[exercise.id] = setDrafts(for: exercise, plan: plan)
+        }
+
+        return setDraftsByExerciseID
+    }
+
+    private func buildRecommendationCache(
+        routineName: String,
+        exercises: [Exercise],
+        setDraftsByExerciseID: [UUID: [SetDraft]]
+    ) -> [UUID: ExerciseWeightRecommendation] {
+        let minimumIncrease = minimumWeightIncreaseDisplayValue()
+        var recommendationsByExerciseID: [UUID: ExerciseWeightRecommendation] = [:]
+        recommendationsByExerciseID.reserveCapacity(exercises.count)
+
+        for exercise in exercises {
+            let setDrafts = setDraftsByExerciseID[exercise.id] ?? []
+            let targetReps = setDrafts.compactMap { Int($0.reps) }
+            if let recommendation = store.weightRecommendation(
+                routineName: routineName,
+                exerciseName: exercise.name,
+                targetReps: targetReps,
+                minimumIncrease: minimumIncrease,
+                unit: weightUnit
+            ) {
+                recommendationsByExerciseID[exercise.id] = recommendation
+            }
+        }
+
+        return recommendationsByExerciseID
+    }
+
     private var minimumWeightIncreaseBinding: Binding<String> {
         Binding(
             get: {
@@ -697,7 +679,7 @@ struct WorkoutLoggerView: View {
                 let sanitized = value.filter { Constants.weightInputCharacters.contains($0) }
                 minimumWeightIncreaseInput = sanitized
 
-                guard let parsed = Double(sanitized), parsed > 0 else {
+                guard let parsed = WeightInputParser.parseDisplayValue(sanitized) else {
                     return
                 }
 
@@ -762,7 +744,7 @@ struct WorkoutLoggerView: View {
     }
 
     private func parseStoredWeight(from text: String) -> Double? {
-        guard let displayWeight = Double(text), displayWeight >= 0 else {
+        guard let displayWeight = WeightInputParser.parseDisplayValue(text, allowsZero: true) else {
             return nil
         }
 
@@ -791,7 +773,6 @@ struct WorkoutLoggerView: View {
                     WeightFormatter.displayString($0, unit: weightUnit)
                 } ?? "",
                 reps: String(template.reps),
-                transcript: "",
                 prescriptionNote: template.note
             )
         }
@@ -828,12 +809,6 @@ struct WorkoutLoggerView: View {
         }
 
         drafts = refreshed
-
-        if let activeVoiceTarget,
-           refreshed[activeVoiceTarget.exerciseID]?.contains(where: { $0.id == activeVoiceTarget.setID }) != true {
-            speechInput.stopRecording()
-            self.activeVoiceTarget = nil
-        }
     }
 
     private func setDrafts(
@@ -842,14 +817,6 @@ struct WorkoutLoggerView: View {
     ) -> [SetDraft] {
         let sets = drafts[exercise.id] ?? []
         return sets.isEmpty ? defaultDrafts(for: exercise, plan: plan) : sets
-    }
-
-    private func weightRecommendation(
-        for exercise: Exercise,
-        targetSets: [SetDraft]
-    ) -> ExerciseWeightRecommendation? {
-        let targetReps = targetSets.compactMap { Int($0.reps) }
-        return weightRecommendation(for: exercise, targetReps: targetReps)
     }
 
     private func weightRecommendation(
@@ -883,27 +850,10 @@ struct WorkoutLoggerView: View {
             return
         }
 
-        if isVoiceActive(for: exerciseID, setID: setID) {
-            speechInput.stopRecording()
-            activeVoiceTarget = nil
-        }
-
         drafts[exerciseID]!.remove(at: index)
         if drafts[exerciseID]?.isEmpty == true {
             drafts[exerciseID] = [SetDraft()]
         }
-    }
-
-    private func updateSet(
-        for exerciseID: UUID,
-        setID: UUID,
-        update: (inout SetDraft) -> Void
-    ) {
-        guard let index = drafts[exerciseID]?.firstIndex(where: { $0.id == setID }) else {
-            return
-        }
-
-        updateSet(for: exerciseID, setIndex: index, update: update)
     }
 
     private func updateSet(
@@ -966,61 +916,11 @@ struct WorkoutLoggerView: View {
         )
     }
 
-    private func isVoiceActive(for exerciseID: UUID, setID: UUID) -> Bool {
-        activeVoiceTarget == ActiveVoiceTarget(exerciseID: exerciseID, setID: setID)
-    }
-
-    private func toggleVoiceInput(for exerciseID: UUID, setID: UUID) {
-        let target = ActiveVoiceTarget(exerciseID: exerciseID, setID: setID)
-
-        if activeVoiceTarget == target && speechInput.isRecording {
-            speechInput.stopRecording()
-            activeVoiceTarget = nil
-            return
-        }
-
-        speechInput.requestPermissions { granted in
-            guard granted else {
-                errorMessage = SpeechInputError.permissionsDenied.localizedDescription
-                showErrorAlert = true
-                return
-            }
-
-            do {
-                activeVoiceTarget = target
-
-                try speechInput.startRecording { transcript, isFinal in
-                    updateSet(for: exerciseID, setID: setID) { set in
-                        set.transcript = transcript
-
-                        let parsed = VoiceParser.parseWeightAndReps(from: transcript)
-                        if let weight = parsed.weight {
-                            let spokenUnit = weight.unit ?? weightUnit
-                            let storedWeight = spokenUnit.storedPounds(fromDisplayValue: weight.value)
-                            set.weight = WeightFormatter.displayString(storedWeight, unit: weightUnit)
-                        }
-                        if let reps = parsed.reps {
-                            set.reps = String(reps)
-                        }
-                    }
-
-                    if isFinal {
-                        activeVoiceTarget = nil
-                    }
-                }
-            } catch {
-                errorMessage = (error as? LocalizedError)?.errorDescription ?? "Unable to start voice input."
-                showErrorAlert = true
-                activeVoiceTarget = nil
-            }
-        }
-    }
-
     private func hasAnyLoggedValues(in exercises: [Exercise]) -> Bool {
         exercises.contains { exercise in
             let sets = drafts[exercise.id] ?? []
             return sets.contains { set in
-                !set.weight.isEmpty || !set.reps.isEmpty || !set.transcript.isEmpty
+                !set.weight.isEmpty || !set.reps.isEmpty
             }
         }
     }
@@ -1028,18 +928,16 @@ struct WorkoutLoggerView: View {
     private func saveWorkout(routine: Routine, activeExercises: [Exercise]) {
         let entries: [ExerciseEntry] = activeExercises.map { exercise in
             let sets = (drafts[exercise.id] ?? []).compactMap { set -> ExerciseSet? in
-                let transcript = set.transcript.trimmingCharacters(in: .whitespacesAndNewlines)
                 let weight = parseStoredWeight(from: set.weight)
                 let reps = Int(set.reps)
 
-                if weight == nil, reps == nil, transcript.isEmpty {
+                if weight == nil, reps == nil {
                     return nil
                 }
 
                 return ExerciseSet(
                     weight: weight,
-                    reps: reps,
-                    transcript: transcript.isEmpty ? nil : transcript
+                    reps: reps
                 )
             }
 
@@ -1051,9 +949,6 @@ struct WorkoutLoggerView: View {
         if autoStartRestTimer {
             restTimerAutoStartTrigger += 1
         }
-
-        speechInput.stopRecording()
-        activeVoiceTarget = nil
 
         drafts = [:]
         syncSelection()
