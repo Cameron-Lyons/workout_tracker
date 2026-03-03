@@ -713,13 +713,9 @@ struct HistoryView: View {
         }
     }
 
-    private func updateFilteredSessions(using history: [WorkoutSession]? = nil) {
+    private func updateFilteredSessions() {
         guard let selectedCalendarDay else {
-            if let history {
-                cachedFilteredSessions = Array(history.reversed())
-            } else {
-                cachedFilteredSessions = cachedAllSessionsNewestFirst
-            }
+            cachedFilteredSessions = cachedAllSessionsNewestFirst
             return
         }
 

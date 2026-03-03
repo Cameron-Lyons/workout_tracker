@@ -102,6 +102,29 @@ struct ExerciseEditingList<Rows: View>: View {
     }
 }
 
+enum ExerciseEditingMutations {
+    static func delete<Element>(
+        from items: inout [Element],
+        at index: Int,
+        animation: Animation
+    ) {
+        _ = withAnimation(animation) {
+            items.removeIfPresent(at: index)
+        }
+    }
+
+    static func move<Element>(
+        in items: inout [Element],
+        from sourceIndex: Int,
+        to destinationIndex: Int,
+        animation: Animation
+    ) {
+        withAnimation(animation) {
+            _ = items.swapIfPresent(from: sourceIndex, to: destinationIndex)
+        }
+    }
+}
+
 extension Array {
     @discardableResult
     mutating func removeIfPresent(at index: Int) -> Bool {
@@ -190,9 +213,29 @@ struct AddRoutineSheet: View {
                                             isFirst: index == 0,
                                             isLast: index == exercises.count - 1,
                                             controlOpacity: Layout.controlOpacity,
-                                            onMoveUp: { moveExercise(from: index, to: index - 1) },
-                                            onMoveDown: { moveExercise(from: index, to: index + 1) },
-                                            onDelete: { deleteExercise(at: index) }
+                                            onMoveUp: {
+                                                ExerciseEditingMutations.move(
+                                                    in: &exercises,
+                                                    from: index,
+                                                    to: index - 1,
+                                                    animation: Layout.listAnimation
+                                                )
+                                            },
+                                            onMoveDown: {
+                                                ExerciseEditingMutations.move(
+                                                    in: &exercises,
+                                                    from: index,
+                                                    to: index + 1,
+                                                    animation: Layout.listAnimation
+                                                )
+                                            },
+                                            onDelete: {
+                                                ExerciseEditingMutations.delete(
+                                                    from: &exercises,
+                                                    at: index,
+                                                    animation: Layout.listAnimation
+                                                )
+                                            }
                                         )
                                     }
                                     .padding(Layout.exerciseRowPadding)
@@ -241,17 +284,5 @@ struct AddRoutineSheet: View {
             exercises.append(DraftExercise(name: trimmed))
         }
         pendingExercise = ""
-    }
-
-    private func deleteExercise(at index: Int) {
-        _ = withAnimation(Layout.listAnimation) {
-            exercises.removeIfPresent(at: index)
-        }
-    }
-
-    private func moveExercise(from sourceIndex: Int, to destinationIndex: Int) {
-        withAnimation(Layout.listAnimation) {
-            _ = exercises.swapIfPresent(from: sourceIndex, to: destinationIndex)
-        }
     }
 }

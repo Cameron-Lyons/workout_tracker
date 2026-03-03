@@ -875,10 +875,6 @@ final class WorkoutStore: ObservableObject {
         }
     }
 
-    private func loadRoutinesFromStore() -> [Routine] {
-        Self.loadRoutinesFromStore(using: modelContext)
-    }
-
     private static func loadRoutinesFromStore(using context: ModelContext) -> [Routine] {
         do {
             let descriptor = FetchDescriptor<StoredRoutine>(
@@ -919,10 +915,6 @@ final class WorkoutStore: ObservableObject {
             print("WorkoutStore: failed to load routines from SwiftData: \(error)")
             return []
         }
-    }
-
-    private func loadWorkoutHistoryFromStore() -> [WorkoutSession] {
-        Self.loadWorkoutHistoryFromStore(using: modelContext)
     }
 
     private static func loadWorkoutHistoryFromStore(using context: ModelContext) -> [WorkoutSession] {
@@ -979,10 +971,6 @@ final class WorkoutStore: ObservableObject {
             print("WorkoutStore: failed to load workout history from SwiftData: \(error)")
             return []
         }
-    }
-
-    private func loadLiftHistoryFromStore() -> [LiftRecord] {
-        Self.loadLiftHistoryFromStore(using: modelContext)
     }
 
     private static func loadLiftHistoryFromStore(using context: ModelContext) -> [LiftRecord] {

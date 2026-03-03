@@ -238,9 +238,29 @@ struct RoutineEditorView: View {
                     isFirst: index == 0,
                     isLast: index == exercises.count - 1,
                     controlOpacity: Layout.controlOpacity,
-                    onMoveUp: { moveExercise(from: index, to: index - 1) },
-                    onMoveDown: { moveExercise(from: index, to: index + 1) },
-                    onDelete: { deleteExercise(at: index) }
+                    onMoveUp: {
+                        ExerciseEditingMutations.move(
+                            in: &exercises,
+                            from: index,
+                            to: index - 1,
+                            animation: Layout.listAnimation
+                        )
+                    },
+                    onMoveDown: {
+                        ExerciseEditingMutations.move(
+                            in: &exercises,
+                            from: index,
+                            to: index + 1,
+                            animation: Layout.listAnimation
+                        )
+                    },
+                    onDelete: {
+                        ExerciseEditingMutations.delete(
+                            from: &exercises,
+                            at: index,
+                            animation: Layout.listAnimation
+                        )
+                    }
                 )
             }
 
@@ -291,18 +311,6 @@ struct RoutineEditorView: View {
             var updated = exercise
             updated.trainingMaxText = convertedWeight
             return updated
-        }
-    }
-
-    private func deleteExercise(at index: Int) {
-        _ = withAnimation(Layout.listAnimation) {
-            exercises.removeIfPresent(at: index)
-        }
-    }
-
-    private func moveExercise(from sourceIndex: Int, to destinationIndex: Int) {
-        withAnimation(Layout.listAnimation) {
-            _ = exercises.swapIfPresent(from: sourceIndex, to: destinationIndex)
         }
     }
 }
