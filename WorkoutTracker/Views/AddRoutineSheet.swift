@@ -5,21 +5,108 @@ private struct DraftExercise: Identifiable, Equatable {
     var name: String
 }
 
+struct AppFormSectionCard<Content: View>: View {
+    private let sectionTitleSpacing: CGFloat = 8
+    private let sectionTitleTracking: CGFloat = 0.6
+
+    let title: String
+    let cardPadding: CGFloat
+    let cornerRadius: CGFloat
+    let revealDelay: Double
+    @ViewBuilder var content: () -> Content
+
+    var body: some View {
+        VStack(alignment: .leading, spacing: sectionTitleSpacing) {
+            Text(title)
+                .font(.caption.weight(.semibold))
+                .tracking(sectionTitleTracking)
+                .textCase(.uppercase)
+                .foregroundStyle(AppColors.textSecondary)
+
+            content()
+        }
+        .padding(cardPadding)
+        .appSurface(cornerRadius: cornerRadius, shadow: false)
+        .appReveal(delay: revealDelay)
+    }
+}
+
+struct ExerciseRowControls: View {
+    private enum Layout {
+        static let spacing: CGFloat = 10
+    }
+
+    let isFirst: Bool
+    let isLast: Bool
+    let controlOpacity: Double
+    let onMoveUp: () -> Void
+    let onMoveDown: () -> Void
+    let onDelete: () -> Void
+
+    var body: some View {
+        HStack(spacing: Layout.spacing) {
+            Button {
+                onMoveUp()
+            } label: {
+                Image(systemName: "arrow.up")
+            }
+            .buttonStyle(.plain)
+            .foregroundStyle(AppColors.textSecondary.opacity(controlOpacity))
+            .disabled(isFirst)
+
+            Button {
+                onMoveDown()
+            } label: {
+                Image(systemName: "arrow.down")
+            }
+            .buttonStyle(.plain)
+            .foregroundStyle(AppColors.textSecondary.opacity(controlOpacity))
+            .disabled(isLast)
+
+            Button(role: .destructive) {
+                onDelete()
+            } label: {
+                Image(systemName: "trash")
+            }
+            .buttonStyle(.plain)
+        }
+    }
+}
+
+extension Array {
+    @discardableResult
+    mutating func removeIfPresent(at index: Int) -> Bool {
+        guard indices.contains(index) else {
+            return false
+        }
+
+        remove(at: index)
+        return true
+    }
+
+    @discardableResult
+    mutating func swapIfPresent(from sourceIndex: Int, to destinationIndex: Int) -> Bool {
+        guard indices.contains(sourceIndex), indices.contains(destinationIndex) else {
+            return false
+        }
+
+        swapAt(sourceIndex, destinationIndex)
+        return true
+    }
+}
+
 struct AddRoutineSheet: View {
     private enum Layout {
         static let listAnimation = Animation.spring(response: 0.40, dampingFraction: 0.84)
         static let sectionSpacing: CGFloat = 14
-        static let sectionTitleSpacing: CGFloat = 8
-        static let sectionTitleTracking: CGFloat = 0.6
         static let cardPadding: CGFloat = 14
         static let exerciseRowSpacing: CGFloat = 8
-        static let exerciseControlSpacing: CGFloat = 10
         static let exerciseRowPadding: CGFloat = 10
         static let emptyStateTopPadding: CGFloat = 4
         static let exerciseListTopPadding: CGFloat = 2
         static let contentVerticalPadding: CGFloat = 14
         static let cornerRadius: CGFloat = 14
-        static let moveButtonOpacity = 0.82
+        static let controlOpacity = 0.82
     }
 
     @Environment(\.dismiss) private var dismiss
@@ -36,29 +123,24 @@ struct AddRoutineSheet: View {
                 AppBackground()
                 ScrollView {
                     VStack(spacing: Layout.sectionSpacing) {
-                        VStack(alignment: .leading, spacing: Layout.sectionTitleSpacing) {
-                            Text("Routine")
-                                .font(.caption.weight(.semibold))
-                                .tracking(Layout.sectionTitleTracking)
-                                .textCase(.uppercase)
-                                .foregroundStyle(AppColors.textSecondary)
-
+                        AppFormSectionCard(
+                            title: "Routine",
+                            cardPadding: Layout.cardPadding,
+                            cornerRadius: Layout.cornerRadius,
+                            revealDelay: 0.02
+                        ) {
                             TextField("Routine name", text: $routineName)
                                 .textInputAutocapitalization(.words)
                                 .foregroundStyle(AppColors.textPrimary)
                                 .appInputField()
                         }
-                        .padding(Layout.cardPadding)
-                        .appSurface(cornerRadius: Layout.cornerRadius, shadow: false)
-                        .appReveal(delay: 0.02)
 
-                        VStack(alignment: .leading, spacing: Layout.sectionTitleSpacing) {
-                            Text("Exercises")
-                                .font(.caption.weight(.semibold))
-                                .tracking(Layout.sectionTitleTracking)
-                                .textCase(.uppercase)
-                                .foregroundStyle(AppColors.textSecondary)
-
+                        AppFormSectionCard(
+                            title: "Exercises",
+                            cardPadding: Layout.cardPadding,
+                            cornerRadius: Layout.cornerRadius,
+                            revealDelay: 0.08
+                        ) {
                             ExerciseNameInputRow(exerciseName: $pendingExercise, addAction: addExercise)
 
                             if exercises.isEmpty {
@@ -69,36 +151,20 @@ struct AddRoutineSheet: View {
                             } else {
                                 VStack(spacing: Layout.exerciseRowSpacing) {
                                     ForEach(Array(exercises.enumerated()), id: \.element.id) { index, exercise in
-                                        HStack(spacing: Layout.exerciseControlSpacing) {
+                                        HStack(spacing: 10) {
                                             Text(exercise.name)
                                                 .font(.body.weight(.medium))
                                                 .foregroundStyle(AppColors.textPrimary)
                                                 .frame(maxWidth: .infinity, alignment: .leading)
 
-                                            Button {
-                                                moveExercise(from: index, to: index - 1)
-                                            } label: {
-                                                Image(systemName: "arrow.up")
-                                            }
-                                            .buttonStyle(.plain)
-                                            .foregroundStyle(AppColors.textSecondary.opacity(Layout.moveButtonOpacity))
-                                            .disabled(index == 0)
-
-                                            Button {
-                                                moveExercise(from: index, to: index + 1)
-                                            } label: {
-                                                Image(systemName: "arrow.down")
-                                            }
-                                            .buttonStyle(.plain)
-                                            .foregroundStyle(AppColors.textSecondary.opacity(Layout.moveButtonOpacity))
-                                            .disabled(index == exercises.count - 1)
-
-                                            Button(role: .destructive) {
-                                                deleteExercise(at: index)
-                                            } label: {
-                                                Image(systemName: "trash")
-                                            }
-                                            .buttonStyle(.plain)
+                                            ExerciseRowControls(
+                                                isFirst: index == 0,
+                                                isLast: index == exercises.count - 1,
+                                                controlOpacity: Layout.controlOpacity,
+                                                onMoveUp: { moveExercise(from: index, to: index - 1) },
+                                                onMoveDown: { moveExercise(from: index, to: index + 1) },
+                                                onDelete: { deleteExercise(at: index) }
+                                            )
                                         }
                                         .padding(Layout.exerciseRowPadding)
                                         .appInsetCard()
@@ -113,9 +179,6 @@ struct AddRoutineSheet: View {
                                     .foregroundStyle(AppColors.textSecondary)
                             }
                         }
-                        .padding(Layout.cardPadding)
-                        .appSurface(cornerRadius: Layout.cornerRadius, shadow: false)
-                        .appReveal(delay: 0.08)
                     }
                     .padding(.horizontal)
                     .padding(.vertical, Layout.contentVerticalPadding)
@@ -133,7 +196,10 @@ struct AddRoutineSheet: View {
                 }
                 ToolbarItem(placement: .topBarTrailing) {
                     Button("Save") {
-                        onSave(routineName.nonEmptyTrimmed ?? routineName, exercises.map(\.name))
+                        guard let trimmedRoutineName = routineName.nonEmptyTrimmed else {
+                            return
+                        }
+                        onSave(trimmedRoutineName, exercises.map(\.name))
                         dismiss()
                     }
                     .disabled(!canSave)
@@ -156,18 +222,14 @@ struct AddRoutineSheet: View {
     }
 
     private func deleteExercise(at index: Int) {
-        guard exercises.indices.contains(index) else { return }
         _ = withAnimation(Layout.listAnimation) {
-            exercises.remove(at: index)
+            exercises.removeIfPresent(at: index)
         }
     }
 
     private func moveExercise(from sourceIndex: Int, to destinationIndex: Int) {
-        guard exercises.indices.contains(sourceIndex), exercises.indices.contains(destinationIndex) else {
-            return
-        }
         withAnimation(Layout.listAnimation) {
-            exercises.swapAt(sourceIndex, destinationIndex)
+            _ = exercises.swapIfPresent(from: sourceIndex, to: destinationIndex)
         }
     }
 }

@@ -57,6 +57,7 @@ struct HistoryView: View {
         static let progressAreaStartOpacity = 0.35
         static let progressAreaEndOpacity = 0.02
         static let cellSelectionAnimationDuration = 0.18
+        static let overviewSectionInset: CGFloat = 8
     }
 
     @EnvironmentObject private var store: WorkoutStore
@@ -66,6 +67,8 @@ struct HistoryView: View {
     @State private var displayedMonth = Date()
     @State private var hasInitializedCalendarMonth = false
     @State private var cachedWorkoutDays: Set<Date> = []
+    @State private var cachedWorkoutCountByMonthStart: [Date: Int] = [:]
+    @State private var cachedSessionsByWorkoutDay: [Date: [WorkoutSession]] = [:]
     @State private var cachedFilteredSessions: [WorkoutSession] = []
     @State private var cachedProgressPointsByExerciseName: [String: [LiftProgressPoint]] = [:]
     @State private var cachedOrderedWeekdaySymbols: [String] = []
@@ -90,6 +93,7 @@ struct HistoryView: View {
                         let sessions = cachedFilteredSessions
 
                         List {
+                            historyOverviewSection(filteredSessionCount: sessions.count)
                             calendarSection(filteredSessionCount: sessions.count)
                             progressSection
 
@@ -210,6 +214,63 @@ struct HistoryView: View {
         )
     }
 
+    private func historyOverviewSection(filteredSessionCount: Int) -> some View {
+        let selectedDayText = selectedCalendarDay?.formatted(date: .abbreviated, time: .omitted)
+        let subtitle: String
+
+        if let selectedDayText {
+            subtitle = "Filtered to \(selectedDayText). Showing \(filteredSessionCount) workout\(filteredSessionCount == 1 ? "" : "s")."
+        } else {
+            subtitle = "Browse every logged session, calendar streaks, and top-set trends in one place."
+        }
+
+        return Section {
+            AppHeroCard(
+                eyebrow: "Session Archive",
+                title: "\(store.workoutHistory.count) workouts logged",
+                subtitle: subtitle,
+                systemImage: "calendar.badge.clock",
+                metrics: [
+                    AppHeroMetric(
+                        id: "history-sessions",
+                        label: "Sessions",
+                        value: "\(store.workoutHistory.count)",
+                        systemImage: "clock.arrow.circlepath"
+                    ),
+                    AppHeroMetric(
+                        id: "history-days",
+                        label: "Active Days",
+                        value: "\(workoutDays.count)",
+                        systemImage: "calendar"
+                    ),
+                    AppHeroMetric(
+                        id: "history-month",
+                        label: monthTitle,
+                        value: "\(workoutsInDisplayedMonth)",
+                        systemImage: "calendar.badge.plus"
+                    ),
+                    AppHeroMetric(
+                        id: "history-lifts",
+                        label: "Tracked Lifts",
+                        value: "\(trackedExercises.count)",
+                        systemImage: "chart.line.uptrend.xyaxis"
+                    )
+                ]
+            )
+            .appReveal(delay: 0.02)
+            .listRowBackground(Color.clear)
+            .listRowSeparator(.hidden)
+            .listRowInsets(
+                EdgeInsets(
+                    top: Constants.overviewSectionInset,
+                    leading: Constants.standardHorizontalInset,
+                    bottom: Constants.overviewSectionInset,
+                    trailing: Constants.standardHorizontalInset
+                )
+            )
+        }
+    }
+
     private func sessionEntryCard(_ entry: ExerciseEntry) -> some View {
         VStack(alignment: .leading, spacing: Constants.sessionEntrySpacing) {
             Text(entry.exerciseName)
@@ -238,18 +299,29 @@ struct HistoryView: View {
     }
 
     private func sessionHeader(_ session: WorkoutSession) -> some View {
-        VStack(alignment: .leading, spacing: Constants.sessionHeaderSpacing) {
-            Text(session.routineName)
-                .font(.system(size: Constants.sessionTitleFontSize, weight: .bold, design: .rounded))
-                .foregroundStyle(AppColors.textPrimary)
-            if let context = session.programContext, !context.isEmpty {
-                Text(context)
+        HStack(alignment: .top, spacing: 12) {
+            VStack(alignment: .leading, spacing: Constants.sessionHeaderSpacing) {
+                Text(session.routineName)
+                    .font(.system(size: Constants.sessionTitleFontSize, weight: .bold, design: .rounded))
+                    .foregroundStyle(AppColors.textPrimary)
+                if let context = session.programContext, !context.isEmpty {
+                    Text(context)
+                        .font(.caption)
+                        .foregroundStyle(AppColors.textSecondary)
+                }
+                Text(session.performedAt.formatted(date: .abbreviated, time: .shortened))
                     .font(.caption)
                     .foregroundStyle(AppColors.textSecondary)
             }
-            Text(session.performedAt.formatted(date: .abbreviated, time: .shortened))
-                .font(.caption)
+
+            Spacer()
+
+            Label("\(session.entries.count)", systemImage: "dumbbell.fill")
+                .font(.caption.weight(.semibold))
                 .foregroundStyle(AppColors.textSecondary)
+                .padding(.horizontal, 8)
+                .padding(.vertical, 5)
+                .appInsetCard(cornerRadius: 9, fillOpacity: 0.74, borderOpacity: 0.66)
         }
         .textCase(nil)
         .padding(.top, Constants.sessionHeaderTopPadding)
@@ -310,6 +382,10 @@ struct HistoryView: View {
 
     private var monthTitle: String {
         displayedMonthStart.formatted(.dateTime.month(.wide).year())
+    }
+
+    private var workoutsInDisplayedMonth: Int {
+        cachedWorkoutCountByMonthStart[displayedMonthStart] ?? 0
     }
 
     private func calendarSection(filteredSessionCount: Int) -> some View {
@@ -614,7 +690,25 @@ struct HistoryView: View {
 
     private func rebuildHistoryCaches() {
         let history = store.workoutHistory
-        cachedWorkoutDays = Set(history.map { calendar.startOfDay(for: $0.performedAt) })
+        var workoutDays: Set<Date> = []
+        workoutDays.reserveCapacity(history.count)
+        var workoutCountByMonthStart: [Date: Int] = [:]
+        workoutCountByMonthStart.reserveCapacity(history.count)
+        var sessionsByWorkoutDay: [Date: [WorkoutSession]] = [:]
+        sessionsByWorkoutDay.reserveCapacity(history.count)
+
+        for session in history {
+            let workoutDay = calendar.startOfDay(for: session.performedAt)
+            workoutDays.insert(workoutDay)
+            sessionsByWorkoutDay[workoutDay, default: []].append(session)
+
+            let monthStart = calendar.startOfMonth(for: session.performedAt)
+            workoutCountByMonthStart[monthStart, default: 0] += 1
+        }
+
+        cachedWorkoutDays = workoutDays
+        cachedWorkoutCountByMonthStart = workoutCountByMonthStart
+        cachedSessionsByWorkoutDay = sessionsByWorkoutDay
         updateFilteredSessions(using: history)
     }
 
@@ -625,9 +719,8 @@ struct HistoryView: View {
             return
         }
 
-        cachedFilteredSessions = sessions.reversed().filter {
-            calendar.isDate($0.performedAt, inSameDayAs: selectedCalendarDay)
-        }
+        let normalizedDay = calendar.startOfDay(for: selectedCalendarDay)
+        cachedFilteredSessions = Array((cachedSessionsByWorkoutDay[normalizedDay] ?? []).reversed())
     }
 
     private func rebuildProgressPointsCache() {

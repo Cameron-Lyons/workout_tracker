@@ -16,7 +16,6 @@ struct RoutineEditorView: View {
         static let contentVerticalPadding: CGFloat = 14
         static let fieldSpacing: CGFloat = 10
         static let exerciseRowSpacing: CGFloat = 10
-        static let exerciseControlSpacing: CGFloat = 10
         static let exerciseRowPadding: CGFloat = 12
         static let cardCornerRadius: CGFloat = 14
         static let controlOpacity = 0.82
@@ -110,40 +109,32 @@ struct RoutineEditorView: View {
     }
 
     private var routineSection: some View {
-        VStack(alignment: .leading, spacing: Layout.sectionTitleSpacing) {
-            Text("Routine")
-                .font(.caption.weight(.semibold))
-                .tracking(Layout.sectionTitleTracking)
-                .textCase(.uppercase)
-                .foregroundStyle(AppColors.textSecondary)
-
+        AppFormSectionCard(
+            title: "Routine",
+            cardPadding: Layout.cardPadding,
+            cornerRadius: Layout.cardCornerRadius,
+            revealDelay: 0.05
+        ) {
             TextField("Routine name", text: $routineName)
                 .textInputAutocapitalization(.words)
                 .foregroundStyle(AppColors.textPrimary)
                 .appInputField()
         }
-        .padding(Layout.cardPadding)
-        .appSurface(cornerRadius: Layout.cardCornerRadius, shadow: false)
-        .appReveal(delay: 0.05)
     }
 
     private var exerciseSetupSection: some View {
-        VStack(alignment: .leading, spacing: Layout.sectionTitleSpacing) {
-            Text("Exercises")
-                .font(.caption.weight(.semibold))
-                .tracking(Layout.sectionTitleTracking)
-                .textCase(.uppercase)
-                .foregroundStyle(AppColors.textSecondary)
-
+        AppFormSectionCard(
+            title: "Exercises",
+            cardPadding: Layout.cardPadding,
+            cornerRadius: Layout.cardCornerRadius,
+            revealDelay: 0.08
+        ) {
             ExerciseNameInputRow(exerciseName: $pendingExerciseName, addAction: addExercise)
 
             Text("Set a training max (TM) or working weight to auto-calculate sets.")
                 .font(.caption2)
                 .foregroundStyle(AppColors.textSecondary)
         }
-        .padding(Layout.cardPadding)
-        .appSurface(cornerRadius: Layout.cardCornerRadius, shadow: false)
-        .appReveal(delay: 0.08)
     }
 
     private var exercisesSection: some View {
@@ -243,37 +234,21 @@ struct RoutineEditorView: View {
 
     private func editableExerciseRow(at index: Int) -> some View {
         VStack(alignment: .leading, spacing: Layout.fieldSpacing) {
-            HStack(spacing: Layout.exerciseControlSpacing) {
+            HStack(spacing: 10) {
                 Text("Exercise \(index + 1)")
                     .font(.caption.weight(.semibold))
                     .foregroundStyle(AppColors.textSecondary)
 
                 Spacer()
 
-                Button {
-                    moveExerciseUp(at: index)
-                } label: {
-                    Image(systemName: "arrow.up")
-                }
-                .buttonStyle(.plain)
-                .foregroundStyle(AppColors.textSecondary.opacity(Layout.controlOpacity))
-                .disabled(index == 0)
-
-                Button {
-                    moveExerciseDown(at: index)
-                } label: {
-                    Image(systemName: "arrow.down")
-                }
-                .buttonStyle(.plain)
-                .foregroundStyle(AppColors.textSecondary.opacity(Layout.controlOpacity))
-                .disabled(index == exercises.count - 1)
-
-                Button(role: .destructive) {
-                    deleteExercise(at: index)
-                } label: {
-                    Image(systemName: "trash")
-                }
-                .buttonStyle(.plain)
+                ExerciseRowControls(
+                    isFirst: index == 0,
+                    isLast: index == exercises.count - 1,
+                    controlOpacity: Layout.controlOpacity,
+                    onMoveUp: { moveExerciseUp(at: index) },
+                    onMoveDown: { moveExerciseDown(at: index) },
+                    onDelete: { deleteExercise(at: index) }
+                )
             }
 
             TextField("Exercise", text: exerciseTextBinding(at: index, keyPath: \.name))
@@ -327,9 +302,8 @@ struct RoutineEditorView: View {
     }
 
     private func deleteExercise(at index: Int) {
-        guard exercises.indices.contains(index) else { return }
         _ = withAnimation(Layout.listAnimation) {
-            exercises.remove(at: index)
+            exercises.removeIfPresent(at: index)
         }
     }
 
@@ -341,9 +315,9 @@ struct RoutineEditorView: View {
     }
 
     private func moveExerciseDown(at index: Int) {
-        guard index >= 0, index < exercises.count - 1 else { return }
+        guard index >= 0 else { return }
         withAnimation(Layout.listAnimation) {
-            exercises.swapAt(index, index + 1)
+            _ = exercises.swapIfPresent(from: index, to: index + 1)
         }
     }
 }

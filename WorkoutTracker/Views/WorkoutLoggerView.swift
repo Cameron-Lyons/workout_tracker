@@ -242,6 +242,10 @@ struct WorkoutLoggerView: View {
         static let toastHorizontalPadding: CGFloat = 14
         static let toastVerticalPadding: CGFloat = 10
         static let toastBottomPadding: CGFloat = 24
+        static let heroHorizontalPadding: CGFloat = 14
+        static let hintHorizontalPadding: CGFloat = 12
+        static let hintVerticalPadding: CGFloat = 9
+        static let hintCornerRadius: CGFloat = 11
     }
 
     @EnvironmentObject private var store: WorkoutStore
@@ -294,6 +298,13 @@ struct WorkoutLoggerView: View {
                         return (routine: routine, plan: plan, visibleExercises: visibleExercises)
                     }
 
+                    loggerHeroCard(
+                        selectedRoutineName: selectedRoutineWithPlan?.routine.name,
+                        visibleExerciseCount: selectedRoutineWithPlan?.visibleExercises.count ?? 0
+                    )
+                    .padding(.horizontal, Layout.heroHorizontalPadding)
+                    .appReveal(delay: 0.01)
+
                     routineSelector
                         .appReveal(delay: 0.02)
 
@@ -306,9 +317,12 @@ struct WorkoutLoggerView: View {
                             .frame(maxWidth: .infinity, alignment: .leading)
                     }
 
-                    Text("Use manual entry by default. Voice input is optional for quick logging.")
+                    Label("Manual entry is default. Enable voice tools for quick set capture.", systemImage: "info.circle")
                         .font(.footnote)
                         .foregroundStyle(AppColors.textSecondary)
+                        .padding(.horizontal, Layout.hintHorizontalPadding)
+                        .padding(.vertical, Layout.hintVerticalPadding)
+                        .appInsetCard(cornerRadius: Layout.hintCornerRadius, fillOpacity: 0.70, borderOpacity: 0.65)
                         .padding(.horizontal)
                         .frame(maxWidth: .infinity, alignment: .leading)
 
@@ -438,13 +452,55 @@ struct WorkoutLoggerView: View {
         }
     }
 
+    private func loggerHeroCard(
+        selectedRoutineName: String?,
+        visibleExerciseCount: Int
+    ) -> some View {
+        let hasSelection = selectedRoutineName != nil
+
+        return AppHeroCard(
+            eyebrow: "Current Session",
+            title: selectedRoutineName ?? "Choose a routine",
+            subtitle: hasSelection
+                ? "Log \(visibleExerciseCount) exercise\(visibleExerciseCount == 1 ? "" : "s"), then save to update your progress history."
+                : "Pick a routine to unlock set logging, recommendations, and auto rest timing.",
+            systemImage: "figure.strengthtraining.traditional",
+            metrics: [
+                AppHeroMetric(
+                    id: "logger-exercises",
+                    label: "Exercises",
+                    value: "\(visibleExerciseCount)",
+                    systemImage: "dumbbell"
+                ),
+                AppHeroMetric(
+                    id: "logger-unit",
+                    label: "Unit",
+                    value: weightUnit.symbol.uppercased(),
+                    systemImage: "scalemass"
+                ),
+                AppHeroMetric(
+                    id: "logger-voice",
+                    label: "Voice",
+                    value: showVoiceTools ? "On" : "Off",
+                    systemImage: showVoiceTools ? "mic.fill" : "mic.slash"
+                ),
+                AppHeroMetric(
+                    id: "logger-rest",
+                    label: "Auto Rest",
+                    value: autoStartRestTimer ? "On" : "Off",
+                    systemImage: "timer"
+                )
+            ]
+        )
+    }
+
     private var routineSelector: some View {
         VStack(alignment: .leading, spacing: Layout.selectorSectionSpacing) {
-            Text("Routine")
-                .font(.caption.weight(.semibold))
-                .foregroundStyle(AppColors.textSecondary)
-                .textCase(.uppercase)
-                .tracking(0.6)
+            Label("Session setup", systemImage: "slider.horizontal.3")
+                .font(.subheadline.weight(.semibold))
+                .foregroundStyle(AppColors.textPrimary)
+
+            selectorRowLabel("Routine", systemImage: "list.bullet")
 
             Picker("Routine", selection: $selectedRoutineID) {
                 Text("Choose a routine").tag(Optional<UUID>.none)
@@ -456,9 +512,7 @@ struct WorkoutLoggerView: View {
             .tint(AppColors.textPrimary)
 
             HStack(spacing: Layout.compactSpacing) {
-                Text("Units")
-                    .font(.caption.weight(.semibold))
-                    .foregroundStyle(AppColors.textSecondary)
+                selectorRowLabel("Units", systemImage: "scalemass")
 
                 Spacer()
 
@@ -472,9 +526,7 @@ struct WorkoutLoggerView: View {
             }
 
             HStack(spacing: Layout.compactSpacing) {
-                Text("Min Weight Increase")
-                    .font(.caption.weight(.semibold))
-                    .foregroundStyle(AppColors.textSecondary)
+                selectorRowLabel("Min Weight Increase", systemImage: "arrow.up.right")
 
                 Spacer()
 
@@ -486,10 +538,10 @@ struct WorkoutLoggerView: View {
                         ),
                         text: minimumWeightIncreaseBinding
                     )
-                        .keyboardType(.decimalPad)
-                        .multilineTextAlignment(.trailing)
-                        .frame(width: Layout.minimumIncreaseInputWidth)
-                        .appInputField()
+                    .keyboardType(.decimalPad)
+                    .multilineTextAlignment(.trailing)
+                    .frame(width: Layout.minimumIncreaseInputWidth)
+                    .appInputField()
 
                     Text(weightUnit.symbol)
                         .font(.caption.weight(.semibold))
@@ -504,6 +556,13 @@ struct WorkoutLoggerView: View {
         .padding(Layout.routineSelectorPadding)
         .appSurface(cornerRadius: Layout.cardCornerRadius, shadow: false)
         .padding(.horizontal)
+    }
+
+    private func selectorRowLabel(_ label: String, systemImage: String) -> some View {
+        Label(label, systemImage: systemImage)
+            .font(.caption.weight(.semibold))
+            .foregroundStyle(AppColors.textSecondary)
+            .tracking(0.4)
     }
 
     private func exerciseCard(
@@ -811,18 +870,16 @@ struct WorkoutLoggerView: View {
     }
 
     private func addSet(to exerciseID: UUID) {
-        var sets = drafts[exerciseID] ?? []
-        if sets.isEmpty {
-            sets = [SetDraft()]
+        if drafts[exerciseID]?.isEmpty != false {
+            drafts[exerciseID] = [SetDraft(), SetDraft()]
+            return
         }
 
-        sets.append(SetDraft())
-        drafts[exerciseID] = sets
+        drafts[exerciseID, default: []].append(SetDraft())
     }
 
     private func removeSet(from exerciseID: UUID, setID: UUID) {
-        guard var sets = drafts[exerciseID],
-              let index = sets.firstIndex(where: { $0.id == setID }) else {
+        guard let index = drafts[exerciseID]?.firstIndex(where: { $0.id == setID }) else {
             return
         }
 
@@ -831,8 +888,10 @@ struct WorkoutLoggerView: View {
             activeVoiceTarget = nil
         }
 
-        sets.remove(at: index)
-        drafts[exerciseID] = sets.isEmpty ? [SetDraft()] : sets
+        drafts[exerciseID]!.remove(at: index)
+        if drafts[exerciseID]?.isEmpty == true {
+            drafts[exerciseID] = [SetDraft()]
+        }
     }
 
     private func updateSet(
@@ -840,13 +899,11 @@ struct WorkoutLoggerView: View {
         setID: UUID,
         update: (inout SetDraft) -> Void
     ) {
-        guard var sets = drafts[exerciseID],
-              let index = sets.firstIndex(where: { $0.id == setID }) else {
+        guard let index = drafts[exerciseID]?.firstIndex(where: { $0.id == setID }) else {
             return
         }
 
-        update(&sets[index])
-        drafts[exerciseID] = sets
+        updateSet(for: exerciseID, setIndex: index, update: update)
     }
 
     private func updateSet(
@@ -854,45 +911,57 @@ struct WorkoutLoggerView: View {
         setIndex: Int,
         update: (inout SetDraft) -> Void
     ) {
-        guard var sets = drafts[exerciseID],
-              sets.indices.contains(setIndex) else {
+        guard let setCount = drafts[exerciseID]?.count,
+              setIndex >= 0,
+              setIndex < setCount else {
             return
         }
 
-        update(&sets[setIndex])
-        drafts[exerciseID] = sets
+        var updatedSet = drafts[exerciseID]![setIndex]
+        update(&updatedSet)
+        drafts[exerciseID]![setIndex] = updatedSet
     }
 
-    private func weightBinding(for exerciseID: UUID, setIndex: Int) -> Binding<String> {
+    private func setFieldBinding(
+        for exerciseID: UUID,
+        setIndex: Int,
+        value: @escaping (SetDraft) -> String,
+        assign: @escaping (inout SetDraft, String) -> Void
+    ) -> Binding<String> {
         Binding(
             get: {
                 guard let sets = drafts[exerciseID],
                       sets.indices.contains(setIndex) else {
                     return ""
                 }
-                return sets[setIndex].weight
+                return value(sets[setIndex])
             },
-            set: { value in
+            set: { input in
                 updateSet(for: exerciseID, setIndex: setIndex) { set in
-                    set.weight = value.filter { Constants.weightInputCharacters.contains($0) }
+                    assign(&set, input)
                 }
             }
         )
     }
 
+    private func weightBinding(for exerciseID: UUID, setIndex: Int) -> Binding<String> {
+        setFieldBinding(
+            for: exerciseID,
+            setIndex: setIndex,
+            value: { $0.weight },
+            assign: { set, input in
+                set.weight = input.filter { Constants.weightInputCharacters.contains($0) }
+            }
+        )
+    }
+
     private func repsBinding(for exerciseID: UUID, setIndex: Int) -> Binding<String> {
-        Binding(
-            get: {
-                guard let sets = drafts[exerciseID],
-                      sets.indices.contains(setIndex) else {
-                    return ""
-                }
-                return sets[setIndex].reps
-            },
-            set: { value in
-                updateSet(for: exerciseID, setIndex: setIndex) { set in
-                    set.reps = value.filter(\.isNumber)
-                }
+        setFieldBinding(
+            for: exerciseID,
+            setIndex: setIndex,
+            value: { $0.reps },
+            assign: { set, input in
+                set.reps = input.filter(\.isNumber)
             }
         )
     }

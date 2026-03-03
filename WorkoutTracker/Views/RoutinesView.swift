@@ -5,6 +5,8 @@ struct RoutinesView: View {
         static let listAnimation = Animation.spring(response: 0.42, dampingFraction: 0.86)
         static let scrollFadeOpacity = 0.82
         static let scrollScale = 0.985
+        static let standardHorizontalInset: CGFloat = 14
+        static let sectionInset: CGFloat = 8
         static let rowInsetTop: CGFloat = 7
         static let rowInsetLeadingTrailing: CGFloat = 14
         static let rowInsetBottom: CGFloat = 7
@@ -26,11 +28,23 @@ struct RoutinesView: View {
         static let rowDotGradientEndOpacity = 0.4
         static let rowTextLineLimit = 2
         static let rowSpacing: CGFloat = 12
+        static let rowMetaSpacing: CGFloat = 8
+        static let rowMetaHorizontalPadding: CGFloat = 9
+        static let rowMetaVerticalPadding: CGFloat = 6
+        static let emptyStateSpacing: CGFloat = 14
     }
 
     @EnvironmentObject private var store: WorkoutStore
     @State private var showingAddRoutine = false
     @State private var exerciseSummaryByRoutineID: [UUID: String] = [:]
+
+    private var totalExerciseCount: Int {
+        store.routines.reduce(0) { $0 + $1.exercises.count }
+    }
+
+    private var templateRoutineCount: Int {
+        store.routines.filter { $0.program != nil }.count
+    }
 
     var body: some View {
         NavigationStack {
@@ -103,6 +117,52 @@ struct RoutinesView: View {
     private var routinesList: some View {
         List {
             Section {
+                AppHeroCard(
+                    eyebrow: "Training Library",
+                    title: "\(store.routines.count) routines ready",
+                    subtitle: "Mix custom plans with progression templates and jump into logging faster.",
+                    systemImage: "list.bullet.clipboard",
+                    metrics: [
+                        AppHeroMetric(
+                            id: "routines",
+                            label: "Routines",
+                            value: "\(store.routines.count)",
+                            systemImage: "list.bullet"
+                        ),
+                        AppHeroMetric(
+                            id: "exercises",
+                            label: "Exercises",
+                            value: "\(totalExerciseCount)",
+                            systemImage: "dumbbell"
+                        ),
+                        AppHeroMetric(
+                            id: "templates",
+                            label: "Templates",
+                            value: "\(templateRoutineCount)",
+                            systemImage: "sparkles"
+                        ),
+                        AppHeroMetric(
+                            id: "custom",
+                            label: "Custom",
+                            value: "\(max(0, store.routines.count - templateRoutineCount))",
+                            systemImage: "square.and.pencil"
+                        )
+                    ]
+                )
+                .appReveal(delay: 0.01)
+                .listRowBackground(Color.clear)
+                .listRowSeparator(.hidden)
+                .listRowInsets(
+                    EdgeInsets(
+                        top: Constants.sectionInset,
+                        leading: Constants.standardHorizontalInset,
+                        bottom: Constants.sectionInset,
+                        trailing: Constants.standardHorizontalInset
+                    )
+                )
+            }
+
+            Section {
                 ForEach(store.routines) { routine in
                     NavigationLink {
                         RoutineEditorView(routineID: routine.id)
@@ -127,6 +187,8 @@ struct RoutinesView: View {
                 }
                 .onDelete(perform: store.deleteRoutines)
                 .onMove(perform: store.moveRoutines)
+            } header: {
+                Text("Saved routines")
             } footer: {
                 Text("Use Edit to reorder or remove routines.")
                     .font(.caption)
@@ -140,11 +202,25 @@ struct RoutinesView: View {
     }
 
     private var emptyState: some View {
-        AppEmptyStateCard(
-            systemImage: "list.bullet.rectangle",
-            title: "Build your first routine",
-            message: "Create a custom plan or start from a proven strength template."
-        )
+        VStack(spacing: Constants.emptyStateSpacing) {
+            AppEmptyStateCard(
+                systemImage: "list.bullet.rectangle",
+                title: "Build your first routine",
+                message: "Create a custom plan or start from a proven strength template."
+            )
+
+            Button {
+                showingAddRoutine = true
+            } label: {
+                Label("Create Routine", systemImage: "plus")
+                    .font(.headline)
+                    .frame(maxWidth: .infinity)
+            }
+            .buttonStyle(.borderedProminent)
+            .tint(AppColors.accent)
+            .controlSize(.large)
+            .padding(.horizontal, 20)
+        }
     }
 
     private func routineRow(_ routine: Routine) -> some View {
@@ -203,10 +279,31 @@ struct RoutinesView: View {
                     .font(.subheadline)
                     .foregroundStyle(AppColors.textSecondary)
                     .lineLimit(Constants.rowTextLineLimit)
+
+                HStack(spacing: Constants.rowMetaSpacing) {
+                    rowMetadataChip(
+                        label: "\(routine.exercises.count) exercise\(routine.exercises.count == 1 ? "" : "s")",
+                        systemImage: "figure.strengthtraining.traditional"
+                    )
+
+                    rowMetadataChip(
+                        label: routine.program == nil ? "Custom" : "Template",
+                        systemImage: routine.program == nil ? "square.and.pencil" : "sparkles"
+                    )
+                }
             }
         }
         .padding(Constants.rowOuterPadding)
         .appSurface(cornerRadius: Constants.rowCornerRadius, shadow: false)
+    }
+
+    private func rowMetadataChip(label: String, systemImage: String) -> some View {
+        Label(label, systemImage: systemImage)
+            .font(.caption2.weight(.medium))
+            .foregroundStyle(AppColors.textSecondary)
+            .padding(.horizontal, Constants.rowMetaHorizontalPadding)
+            .padding(.vertical, Constants.rowMetaVerticalPadding)
+            .appInsetCard(cornerRadius: 9, fillOpacity: 0.78, borderOpacity: 0.68)
     }
 
     private func rebuildExerciseSummaryCache() {

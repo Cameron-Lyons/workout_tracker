@@ -462,23 +462,26 @@ final class WorkoutStore: ObservableObject {
     }
 
     private func applyIncrementalLiftHistoryIndexUpdate(with records: [LiftRecord]) {
-        var recordsByExerciseName: [String: [LiftRecord]] = [:]
-        recordsByExerciseName.reserveCapacity(records.count)
-        var recordsByExerciseSession: [ExerciseSessionKey: [LiftRecord]] = [:]
-        recordsByExerciseSession.reserveCapacity(records.count)
+        var touchedExerciseSessionKeys: Set<ExerciseSessionKey> = []
+        touchedExerciseSessionKeys.reserveCapacity(records.count)
         var latestRecordByExerciseName: [String: LiftRecord] = [:]
         latestRecordByExerciseName.reserveCapacity(records.count)
         var latestRecordByExerciseAndRoutine: [ExerciseRoutineKey: LiftRecord] = [:]
         latestRecordByExerciseAndRoutine.reserveCapacity(records.count)
+        var addedNewExerciseName = false
 
         for record in records {
-            recordsByExerciseName[record.exerciseName, default: []].append(record)
+            if liftHistoryByExerciseName[record.exerciseName] == nil {
+                addedNewExerciseName = true
+            }
+            liftHistoryByExerciseName[record.exerciseName, default: []].append(record)
 
             let exerciseSessionKey = ExerciseSessionKey(
                 exerciseName: record.exerciseName,
                 sessionID: record.sessionID
             )
-            recordsByExerciseSession[exerciseSessionKey, default: []].append(record)
+            touchedExerciseSessionKeys.insert(exerciseSessionKey)
+            liftHistoryByExerciseAndSession[exerciseSessionKey, default: []].append(record)
 
             Self.updateLatestRecord(
                 in: &latestRecordByExerciseName,
@@ -497,22 +500,7 @@ final class WorkoutStore: ObservableObject {
             )
         }
 
-        var addedNewExerciseName = false
-        for (exerciseName, newRecords) in recordsByExerciseName {
-            if liftHistoryByExerciseName[exerciseName] == nil {
-                addedNewExerciseName = true
-            }
-            liftHistoryByExerciseName[exerciseName, default: []].append(contentsOf: newRecords)
-        }
-
-        for (exerciseSessionKey, newRecords) in recordsByExerciseSession {
-            if var existingRecords = liftHistoryByExerciseAndSession[exerciseSessionKey] {
-                existingRecords.append(contentsOf: newRecords)
-                liftHistoryByExerciseAndSession[exerciseSessionKey] = existingRecords
-            } else {
-                liftHistoryByExerciseAndSession[exerciseSessionKey] = newRecords
-            }
-
+        for exerciseSessionKey in touchedExerciseSessionKeys {
             guard let combinedRecords = liftHistoryByExerciseAndSession[exerciseSessionKey],
                   let snapshot = Self.makeProgressSnapshot(from: combinedRecords) else {
                 continue
@@ -644,36 +632,47 @@ final class WorkoutStore: ObservableObject {
     }
 
     private func scheduleRoutinesSave() {
-        scheduleSave(snapshot: routines, key: routinesKey, pendingWorkItem: &pendingRoutinesSave)
+        scheduleSave(pendingWorkItem: &pendingRoutinesSave) { [weak self] in
+            guard let self else { return }
+            self.persistAsync(self.routines, forKey: self.routinesKey)
+        }
     }
 
     private func scheduleHistorySave() {
-        scheduleSave(snapshot: workoutHistory, key: historyKey, pendingWorkItem: &pendingHistorySave)
+        scheduleSave(pendingWorkItem: &pendingHistorySave) { [weak self] in
+            guard let self else { return }
+            self.persistAsync(self.workoutHistory, forKey: self.historyKey)
+        }
     }
 
     private func scheduleLiftHistorySave() {
-        scheduleSave(snapshot: liftHistory, key: liftHistoryKey, pendingWorkItem: &pendingLiftHistorySave)
+        scheduleSave(pendingWorkItem: &pendingLiftHistorySave) { [weak self] in
+            guard let self else { return }
+            self.persistAsync(self.liftHistory, forKey: self.liftHistoryKey)
+        }
     }
 
-    private func scheduleSave<T: Encodable>(
-        snapshot: T,
-        key: String,
-        pendingWorkItem: inout DispatchWorkItem?
+    private func scheduleSave(
+        pendingWorkItem: inout DispatchWorkItem?,
+        operation: @escaping () -> Void
     ) {
         pendingWorkItem?.cancel()
-
-        let defaults = self.defaults
-        let work = DispatchWorkItem {
-            let encoder = Self.makeEncoder()
-            guard let data = try? encoder.encode(snapshot) else { return }
-            defaults.set(data, forKey: key)
-        }
+        let work = DispatchWorkItem(block: operation)
 
         pendingWorkItem = work
-        persistenceQueue.asyncAfter(
+        DispatchQueue.main.asyncAfter(
             deadline: .now() + .milliseconds(Persistence.saveDebounceMilliseconds),
             execute: work
         )
+    }
+
+    private func persistAsync<T: Encodable>(_ value: T, forKey key: String) {
+        let defaults = self.defaults
+        persistenceQueue.async {
+            let encoder = Self.makeEncoder()
+            guard let data = try? encoder.encode(value) else { return }
+            defaults.set(data, forKey: key)
+        }
     }
 
     private func updateLatestSessionIDsByExerciseName(with latestRecords: [String: LiftRecord]) {

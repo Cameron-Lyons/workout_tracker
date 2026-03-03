@@ -291,6 +291,7 @@ struct AppEmptyStateCard: View {
     private enum Layout {
         static let spacing: CGFloat = 12
         static let iconSize: CGFloat = 36
+        static let iconContainerSize: CGFloat = 68
         static let titleSize: CGFloat = 28
         static let outerPadding: CGFloat = 24
         static let horizontalPadding: CGFloat = 20
@@ -302,9 +303,24 @@ struct AppEmptyStateCard: View {
 
     var body: some View {
         VStack(spacing: Layout.spacing) {
-            Image(systemName: systemImage)
-                .font(.system(size: Layout.iconSize, weight: .semibold))
-                .foregroundStyle(AppColors.accent)
+            ZStack {
+                Circle()
+                    .fill(
+                        LinearGradient(
+                            colors: [
+                                AppColors.accent.opacity(0.28),
+                                AppColors.accent.opacity(0.10)
+                            ],
+                            startPoint: .topLeading,
+                            endPoint: .bottomTrailing
+                        )
+                    )
+
+                Image(systemName: systemImage)
+                    .font(.system(size: Layout.iconSize, weight: .semibold))
+                    .foregroundStyle(AppColors.accent)
+            }
+            .frame(width: Layout.iconContainerSize, height: Layout.iconContainerSize)
 
             Text(title)
                 .font(.system(size: Layout.titleSize, weight: .bold, design: .rounded))
@@ -318,6 +334,116 @@ struct AppEmptyStateCard: View {
         .padding(Layout.outerPadding)
         .appSurface()
         .padding(.horizontal, Layout.horizontalPadding)
+    }
+}
+
+struct AppHeroMetric: Identifiable {
+    let id: String
+    let label: String
+    let value: String
+    let systemImage: String
+}
+
+struct AppHeroCard: View {
+    private enum Layout {
+        static let cardSpacing: CGFloat = 14
+        static let iconSize: CGFloat = 18
+        static let iconContainerSize: CGFloat = 42
+        static let eyebrowTracking: CGFloat = 0.6
+        static let titleSize: CGFloat = 25
+        static let subtitleLineSpacing: CGFloat = 3
+        static let metricsSpacing: CGFloat = 10
+        static let metricLabelTracking: CGFloat = 0.4
+        static let metricValueSize: CGFloat = 17
+        static let horizontalPadding: CGFloat = 16
+        static let verticalPadding: CGFloat = 16
+        static let cornerRadius: CGFloat = 18
+    }
+
+    let eyebrow: String?
+    let title: String
+    let subtitle: String
+    let systemImage: String
+    let metrics: [AppHeroMetric]
+
+    private var metricColumns: [GridItem] {
+        [
+            GridItem(.flexible(minimum: 110), spacing: Layout.metricsSpacing),
+            GridItem(.flexible(minimum: 110), spacing: Layout.metricsSpacing)
+        ]
+    }
+
+    var body: some View {
+        VStack(alignment: .leading, spacing: Layout.cardSpacing) {
+            HStack(alignment: .top, spacing: 12) {
+                ZStack {
+                    Circle()
+                        .fill(
+                            LinearGradient(
+                                colors: [
+                                    AppColors.accent.opacity(0.30),
+                                    AppColors.accentAlt.opacity(0.20)
+                                ],
+                                startPoint: .topLeading,
+                                endPoint: .bottomTrailing
+                            )
+                        )
+
+                    Image(systemName: systemImage)
+                        .font(.system(size: Layout.iconSize, weight: .semibold))
+                        .foregroundStyle(AppColors.accent)
+                }
+                .frame(width: Layout.iconContainerSize, height: Layout.iconContainerSize)
+
+                VStack(alignment: .leading, spacing: 5) {
+                    if let eyebrow, !eyebrow.isEmpty {
+                        Text(eyebrow.uppercased())
+                            .font(.caption2.weight(.semibold))
+                            .tracking(Layout.eyebrowTracking)
+                            .foregroundStyle(AppColors.textSecondary)
+                    }
+
+                    Text(title)
+                        .font(.system(size: Layout.titleSize, weight: .bold, design: .rounded))
+                        .foregroundStyle(AppColors.textPrimary)
+
+                    Text(subtitle)
+                        .font(.subheadline)
+                        .foregroundStyle(AppColors.textSecondary)
+                        .lineSpacing(Layout.subtitleLineSpacing)
+                }
+            }
+
+            if !metrics.isEmpty {
+                LazyVGrid(columns: metricColumns, alignment: .leading, spacing: Layout.metricsSpacing) {
+                    ForEach(metrics) { metric in
+                        VStack(alignment: .leading, spacing: 4) {
+                            Label(metric.label, systemImage: metric.systemImage)
+                                .font(.caption2.weight(.medium))
+                                .tracking(Layout.metricLabelTracking)
+                                .foregroundStyle(AppColors.textSecondary)
+
+                            Text(metric.value)
+                                .font(
+                                    .system(
+                                        size: Layout.metricValueSize,
+                                        weight: .semibold,
+                                        design: .rounded
+                                    )
+                                )
+                                .foregroundStyle(AppColors.textPrimary)
+                        }
+                        .frame(maxWidth: .infinity, alignment: .leading)
+                        .padding(.horizontal, 11)
+                        .padding(.vertical, 9)
+                        .appInsetCard(cornerRadius: 11, fillOpacity: 0.78, borderOpacity: 0.65)
+                    }
+                }
+            }
+        }
+        .padding(.horizontal, Layout.horizontalPadding)
+        .padding(.vertical, Layout.verticalPadding)
+        .appSurface(cornerRadius: Layout.cornerRadius, shadow: false)
     }
 }
 
