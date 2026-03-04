@@ -17,7 +17,7 @@ Native SwiftUI iPhone app for logging workouts with routines.
 - Historical lift record storage (per set) for trend analysis
 - Progress-over-time chart by exercise (top set per workout)
 - Rest timer in the workout logger (presets + pause/resume/reset + optional auto-start)
-- Local persistence via `UserDefaults`
+- Local persistence via SwiftData (v2 fast storage path)
 
 ## Project Structure
 - `WorkoutTracker.xcodeproj` (generated)

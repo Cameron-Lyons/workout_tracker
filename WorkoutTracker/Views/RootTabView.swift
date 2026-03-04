@@ -12,7 +12,7 @@ enum AppColors {
     static let stroke = Color(red: 0.57, green: 0.64, blue: 0.77).opacity(0.36)
     static let textPrimary = Color(red: 0.96, green: 0.97, blue: 0.99)
     static let textSecondary = Color(red: 0.76, green: 0.81, blue: 0.90)
-    static let accent = Color("AccentColor")
+    static let accent = Color(red: 0.48, green: 0.60, blue: 0.95)
     static let accentAlt = Color(red: 0.55, green: 0.64, blue: 0.89)
     static let input = Color(red: 0.03, green: 0.05, blue: 0.10)
 }
