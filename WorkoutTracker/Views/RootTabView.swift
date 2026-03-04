@@ -451,6 +451,8 @@ struct AppHeroCard: View {
 struct ExerciseNameInputRow: View {
     @Binding var exerciseName: String
     var placeholder: String = "Add exercise name"
+    var textFieldAccessibilityIdentifier: String?
+    var addButtonAccessibilityIdentifier: String?
     let addAction: () -> Void
 
     var body: some View {
@@ -459,6 +461,7 @@ struct ExerciseNameInputRow: View {
                 .textInputAutocapitalization(.words)
                 .foregroundStyle(AppColors.textPrimary)
                 .appInputField()
+                .accessibilityIdentifierIfPresent(textFieldAccessibilityIdentifier)
 
             Button {
                 addAction()
@@ -469,6 +472,7 @@ struct ExerciseNameInputRow: View {
             .buttonStyle(.borderedProminent)
             .disabled(exerciseName.nonEmptyTrimmed == nil)
             .tint(AppColors.accent)
+            .accessibilityIdentifierIfPresent(addButtonAccessibilityIdentifier)
         }
     }
 }
@@ -498,6 +502,15 @@ extension View {
 
     func appReveal(delay: Double = 0) -> some View {
         modifier(AppRevealModifier(delay: delay))
+    }
+
+    @ViewBuilder
+    func accessibilityIdentifierIfPresent(_ identifier: String?) -> some View {
+        if let identifier {
+            self.accessibilityIdentifier(identifier)
+        } else {
+            self
+        }
     }
 }
 

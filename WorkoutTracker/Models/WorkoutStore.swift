@@ -164,6 +164,7 @@ final class WorkoutStore: ObservableObject {
     private var isHydrating = false
     private var isApplyingIncrementalLiftHistoryUpdate = false
     private var hasStartedHydration = false
+    private let useStarterDataWhenEmpty: Bool
 
     var exerciseNamesWithLiftHistory: [String] {
         cachedExerciseNamesWithHistory
@@ -180,8 +181,12 @@ final class WorkoutStore: ObservableObject {
         return routines[index]
     }
 
-    init(modelContainer: ModelContainer = WorkoutModelContainerFactory.makeContainer()) {
+    init(
+        modelContainer: ModelContainer = WorkoutModelContainerFactory.makeContainer(),
+        useStarterDataWhenEmpty: Bool = true
+    ) {
         self.modelContainer = modelContainer
+        self.useStarterDataWhenEmpty = useStarterDataWhenEmpty
         modelContext = ModelContext(modelContainer)
         modelContext.autosaveEnabled = false
         routines = []
@@ -314,7 +319,7 @@ final class WorkoutStore: ObservableObject {
             workoutHistory = Self.sortedSessionsByDate(persistedHistory)
             liftHistory = workoutHistory.flatMap(Self.liftRecords(from:))
         } else {
-            routines = Self.starterRoutines
+            routines = useStarterDataWhenEmpty ? Self.starterRoutines : []
             workoutHistory = []
             liftHistory = []
             persistAllToSwiftData()
@@ -366,7 +371,6 @@ final class WorkoutStore: ObservableObject {
         do {
             try deleteAll(StoredWorkoutSession.self, in: resetContext)
             try deleteAll(StoredRoutine.self, in: resetContext)
-            try deleteAll(StoredLiftRecord.self, in: resetContext)
             try saveContextChanges(for: resetContext)
             defaults.set(Compatibility.storageVersion, forKey: Compatibility.storageVersionDefaultsKey)
         } catch {
@@ -1245,18 +1249,6 @@ final class WorkoutStore: ObservableObject {
                 return lhs.performedAt < rhs.performedAt
             }
             return lhs.id.uuidString < rhs.id.uuidString
-        }
-    }
-
-    private static func sortedLiftRecordsByDate(_ records: [LiftRecord]) -> [LiftRecord] {
-        records.sorted { lhs, rhs in
-            if lhs.performedAt != rhs.performedAt {
-                return lhs.performedAt < rhs.performedAt
-            }
-            if lhs.sessionID != rhs.sessionID {
-                return lhs.sessionID.uuidString < rhs.sessionID.uuidString
-            }
-            return lhs.setIndex < rhs.setIndex
         }
     }
 

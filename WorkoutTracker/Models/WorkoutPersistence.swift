@@ -113,38 +113,6 @@ final class StoredWorkoutSet {
     }
 }
 
-@Model
-final class StoredLiftRecord {
-    @Attribute(.unique) var id: UUID
-    var sessionID: UUID
-    var routineName: String
-    var exerciseName: String
-    var performedAt: Date
-    var setIndex: Int
-    var weight: Double?
-    var reps: Int?
-
-    init(
-        id: UUID,
-        sessionID: UUID,
-        routineName: String,
-        exerciseName: String,
-        performedAt: Date,
-        setIndex: Int,
-        weight: Double?,
-        reps: Int?
-    ) {
-        self.id = id
-        self.sessionID = sessionID
-        self.routineName = routineName
-        self.exerciseName = exerciseName
-        self.performedAt = performedAt
-        self.setIndex = setIndex
-        self.weight = weight
-        self.reps = reps
-    }
-}
-
 enum WorkoutModelContainerFactory {
     static func makeContainer(isStoredInMemoryOnly: Bool = false) -> ModelContainer {
         let configuration = ModelConfiguration(isStoredInMemoryOnly: isStoredInMemoryOnly)
@@ -156,7 +124,6 @@ enum WorkoutModelContainerFactory {
                 StoredWorkoutSession.self,
                 StoredWorkoutEntry.self,
                 StoredWorkoutSet.self,
-                StoredLiftRecord.self,
                 configurations: configuration
             )
         } catch {

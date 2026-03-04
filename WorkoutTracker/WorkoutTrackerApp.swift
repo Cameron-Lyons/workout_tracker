@@ -31,9 +31,20 @@ struct WorkoutTrackerApp: App {
     @StateObject private var store: WorkoutStore
 
     init() {
-        let container = WorkoutModelContainerFactory.makeContainer()
+        let launchArguments = Set(ProcessInfo.processInfo.arguments)
+        let useInMemoryStore = launchArguments.contains("--uitesting-in-memory")
+        let useStarterDataWhenEmpty = !launchArguments.contains("--uitesting-empty-store")
+
+        let container = WorkoutModelContainerFactory.makeContainer(
+            isStoredInMemoryOnly: useInMemoryStore
+        )
         modelContainer = container
-        _store = StateObject(wrappedValue: WorkoutStore(modelContainer: container))
+        _store = StateObject(
+            wrappedValue: WorkoutStore(
+                modelContainer: container,
+                useStarterDataWhenEmpty: useStarterDataWhenEmpty
+            )
+        )
     }
 
     var body: some Scene {

@@ -361,6 +361,7 @@ struct WorkoutLoggerView: View {
                         .padding(.horizontal)
                         .padding(.bottom)
                         .disabled(!hasAnyLoggedValues(in: visibleExercises))
+                        .accessibilityIdentifier("logger.saveWorkoutButton")
                         .appReveal(delay: 0.12)
                     } else {
                         Spacer()
@@ -420,6 +421,7 @@ struct WorkoutLoggerView: View {
                         )
                         .padding(.bottom, Layout.toastBottomPadding)
                         .transition(.move(edge: .bottom).combined(with: .opacity))
+                        .accessibilityIdentifier("logger.savedToast")
                 }
             }
             .animation(.easeInOut(duration: Constants.animationDuration), value: showSavedToast)
@@ -478,6 +480,7 @@ struct WorkoutLoggerView: View {
             }
             .pickerStyle(.menu)
             .tint(AppColors.textPrimary)
+            .accessibilityIdentifier("logger.routinePicker")
 
             HStack(spacing: Layout.compactSpacing) {
                 selectorRowLabel("Units", systemImage: "scalemass")
@@ -572,10 +575,12 @@ struct WorkoutLoggerView: View {
                         TextField("Weight (\(weightUnit.symbol))", text: weightBinding(for: exercise.id, setIndex: index))
                             .keyboardType(.decimalPad)
                             .appInputField()
+                            .accessibilityIdentifier("logger.weightField.\(exercise.id.uuidString).\(index)")
 
                         TextField("Reps", text: repsBinding(for: exercise.id, setIndex: index))
                             .keyboardType(.numberPad)
                             .appInputField()
+                            .accessibilityIdentifier("logger.repsField.\(exercise.id.uuidString).\(index)")
                     }
 
                     if let note = set.prescriptionNote, !note.isEmpty {
@@ -715,16 +720,15 @@ struct WorkoutLoggerView: View {
     }
 
     private func handleWeightUnitChange() {
-        let newUnit = weightUnit
-        let oldUnit = previousWeightUnit
-        previousWeightUnit = newUnit
-
-        guard newUnit != oldUnit else {
+        guard let transition = WeightUnitTransition.changedUnits(
+            previous: &previousWeightUnit,
+            next: weightUnit
+        ) else {
             syncMinimumWeightIncreaseInput()
             return
         }
 
-        convertDraftWeights(from: oldUnit, to: newUnit)
+        convertDraftWeights(from: transition.old, to: transition.new)
         normalizeStoredMinimumIncrease()
         syncMinimumWeightIncreaseInput()
     }
@@ -732,7 +736,11 @@ struct WorkoutLoggerView: View {
     private func convertDraftWeights(from oldUnit: WeightUnit, to newUnit: WeightUnit) {
         drafts = drafts.mapValues { sets in
             sets.map { set in
-                guard let convertedWeight = newUnit.convertedDisplayString(from: oldUnit, text: set.weight) else {
+                guard let convertedWeight = WeightInputConversion.convertedDisplayString(
+                    from: set.weight,
+                    oldUnit: oldUnit,
+                    newUnit: newUnit
+                ) else {
                     return set
                 }
 
@@ -744,11 +752,7 @@ struct WorkoutLoggerView: View {
     }
 
     private func parseStoredWeight(from text: String) -> Double? {
-        guard let displayWeight = WeightInputParser.parseDisplayValue(text, allowsZero: true) else {
-            return nil
-        }
-
-        return weightUnit.storedPounds(fromDisplayValue: displayWeight)
+        WeightInputConversion.parseStoredPounds(from: text, unit: weightUnit, allowsZero: true)
     }
 
     private func defaultDrafts(

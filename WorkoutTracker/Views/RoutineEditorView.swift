@@ -212,10 +212,7 @@ struct RoutineEditorView: View {
     }
 
     private func parseTrainingMax(_ text: String) -> Double? {
-        guard let displayValue = WeightInputParser.parseDisplayValue(text) else {
-            return nil
-        }
-        return weightUnit.storedPounds(fromDisplayValue: displayValue)
+        WeightInputConversion.parseStoredPounds(from: text, unit: weightUnit)
     }
 
     private func formatTrainingMax(_ trainingMax: Double?) -> String {
@@ -234,33 +231,11 @@ struct RoutineEditorView: View {
 
                 Spacer()
 
-                ExerciseRowControls(
-                    isFirst: index == 0,
-                    isLast: index == exercises.count - 1,
+                ExerciseEditingRowControls(
+                    items: $exercises,
+                    index: index,
                     controlOpacity: Layout.controlOpacity,
-                    onMoveUp: {
-                        ExerciseEditingMutations.move(
-                            in: &exercises,
-                            from: index,
-                            to: index - 1,
-                            animation: Layout.listAnimation
-                        )
-                    },
-                    onMoveDown: {
-                        ExerciseEditingMutations.move(
-                            in: &exercises,
-                            from: index,
-                            to: index + 1,
-                            animation: Layout.listAnimation
-                        )
-                    },
-                    onDelete: {
-                        ExerciseEditingMutations.delete(
-                            from: &exercises,
-                            at: index,
-                            animation: Layout.listAnimation
-                        )
-                    }
+                    animation: Layout.listAnimation
                 )
             }
 
@@ -295,16 +270,19 @@ struct RoutineEditorView: View {
     }
 
     private func handleWeightUnitChange() {
-        let newUnit = weightUnit
-        let oldUnit = previousWeightUnit
-        previousWeightUnit = newUnit
-
-        guard newUnit != oldUnit else {
+        guard let transition = WeightUnitTransition.changedUnits(
+            previous: &previousWeightUnit,
+            next: weightUnit
+        ) else {
             return
         }
 
         exercises = exercises.map { exercise in
-            guard let convertedWeight = newUnit.convertedDisplayString(from: oldUnit, text: exercise.trainingMaxText) else {
+            guard let convertedWeight = WeightInputConversion.convertedDisplayString(
+                from: exercise.trainingMaxText,
+                oldUnit: transition.old,
+                newUnit: transition.new
+            ) else {
                 return exercise
             }
 

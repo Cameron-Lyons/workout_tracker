@@ -235,6 +235,44 @@ enum WeightInputParser {
     }
 }
 
+enum WeightUnitTransition {
+    static func changedUnits(
+        previous: inout WeightUnit,
+        next: WeightUnit
+    ) -> (old: WeightUnit, new: WeightUnit)? {
+        let oldUnit = previous
+        previous = next
+
+        guard oldUnit != next else {
+            return nil
+        }
+
+        return (old: oldUnit, new: next)
+    }
+}
+
+enum WeightInputConversion {
+    static func parseStoredPounds(
+        from text: String,
+        unit: WeightUnit,
+        allowsZero: Bool = false
+    ) -> Double? {
+        guard let displayValue = WeightInputParser.parseDisplayValue(text, allowsZero: allowsZero) else {
+            return nil
+        }
+
+        return unit.storedPounds(fromDisplayValue: displayValue)
+    }
+
+    static func convertedDisplayString(
+        from text: String,
+        oldUnit: WeightUnit,
+        newUnit: WeightUnit
+    ) -> String? {
+        newUnit.convertedDisplayString(from: oldUnit, text: text)
+    }
+}
+
 enum LiftClassifier {
     private static let lowerBodyKeywords = [
         "squat",

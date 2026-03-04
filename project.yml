@@ -35,6 +35,35 @@ targets:
         ASSETCATALOG_COMPILER_APPICON_NAME: AppIcon
         ASSETCATALOG_COMPILER_GLOBAL_ACCENT_COLOR_NAME: AccentColor
 
+  WorkoutTrackerTests:
+    type: bundle.unit-test
+    platform: iOS
+    deploymentTarget: "26.2"
+    sources:
+      - path: WorkoutTrackerTests
+    dependencies:
+      - target: WorkoutTracker
+    settings:
+      base:
+        PRODUCT_NAME: WorkoutTrackerTests
+        GENERATE_INFOPLIST_FILE: YES
+        TEST_HOST: "$(BUILT_PRODUCTS_DIR)/WorkoutTracker.app/WorkoutTracker"
+        BUNDLE_LOADER: "$(TEST_HOST)"
+
+  WorkoutTrackerUITests:
+    type: bundle.ui-testing
+    platform: iOS
+    deploymentTarget: "26.2"
+    sources:
+      - path: WorkoutTrackerUITests
+    dependencies:
+      - target: WorkoutTracker
+    settings:
+      base:
+        PRODUCT_NAME: WorkoutTrackerUITests
+        GENERATE_INFOPLIST_FILE: YES
+        TEST_TARGET_NAME: WorkoutTracker
+
 schemes:
   WorkoutTracker:
     build:
@@ -42,5 +71,11 @@ schemes:
         WorkoutTracker: all
     run:
       config: Debug
+    test:
+      config: Debug
+      gatherCoverageData: true
+      targets:
+        - name: WorkoutTrackerTests
+        - name: WorkoutTrackerUITests
     archive:
       config: Release

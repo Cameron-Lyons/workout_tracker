@@ -97,6 +97,7 @@ struct RoutinesView: View {
                     } label: {
                         Image(systemName: "plus")
                     }
+                    .accessibilityIdentifier("routines.addMenuButton")
                 }
             }
             .tint(AppColors.accent)

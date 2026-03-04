@@ -73,6 +73,44 @@ struct ExerciseRowControls: View {
     }
 }
 
+struct ExerciseEditingRowControls<Element>: View {
+    @Binding var items: [Element]
+    let index: Int
+    let controlOpacity: Double
+    let animation: Animation
+
+    var body: some View {
+        ExerciseRowControls(
+            isFirst: index == 0,
+            isLast: index == items.count - 1,
+            controlOpacity: controlOpacity,
+            onMoveUp: {
+                ExerciseEditingMutations.move(
+                    in: $items,
+                    from: index,
+                    to: index - 1,
+                    animation: animation
+                )
+            },
+            onMoveDown: {
+                ExerciseEditingMutations.move(
+                    in: $items,
+                    from: index,
+                    to: index + 1,
+                    animation: animation
+                )
+            },
+            onDelete: {
+                ExerciseEditingMutations.delete(
+                    from: $items,
+                    at: index,
+                    animation: animation
+                )
+            }
+        )
+    }
+}
+
 struct ExerciseEditingList<Rows: View>: View {
     let isEmpty: Bool
     let rowSpacing: CGFloat
@@ -104,24 +142,28 @@ struct ExerciseEditingList<Rows: View>: View {
 
 enum ExerciseEditingMutations {
     static func delete<Element>(
-        from items: inout [Element],
+        from items: Binding<[Element]>,
         at index: Int,
         animation: Animation
     ) {
+        var updatedItems = items.wrappedValue
         _ = withAnimation(animation) {
-            items.removeIfPresent(at: index)
+            updatedItems.removeIfPresent(at: index)
         }
+        items.wrappedValue = updatedItems
     }
 
     static func move<Element>(
-        in items: inout [Element],
+        in items: Binding<[Element]>,
         from sourceIndex: Int,
         to destinationIndex: Int,
         animation: Animation
     ) {
+        var updatedItems = items.wrappedValue
         withAnimation(animation) {
-            _ = items.swapIfPresent(from: sourceIndex, to: destinationIndex)
+            _ = updatedItems.swapIfPresent(from: sourceIndex, to: destinationIndex)
         }
+        items.wrappedValue = updatedItems
     }
 }
 
@@ -185,6 +227,7 @@ struct AddRoutineSheet: View {
                                 .textInputAutocapitalization(.words)
                                 .foregroundStyle(AppColors.textPrimary)
                                 .appInputField()
+                                .accessibilityIdentifier("addRoutine.routineNameField")
                         }
 
                         AppFormSectionCard(
@@ -193,7 +236,12 @@ struct AddRoutineSheet: View {
                             cornerRadius: Layout.cornerRadius,
                             revealDelay: 0.08
                         ) {
-                            ExerciseNameInputRow(exerciseName: $pendingExercise, addAction: addExercise)
+                            ExerciseNameInputRow(
+                                exerciseName: $pendingExercise,
+                                textFieldAccessibilityIdentifier: "addRoutine.exerciseNameField",
+                                addButtonAccessibilityIdentifier: "addRoutine.addExerciseButton",
+                                addAction: addExercise
+                            )
                             ExerciseEditingList(
                                 isEmpty: exercises.isEmpty,
                                 rowSpacing: Layout.exerciseRowSpacing,
@@ -209,33 +257,11 @@ struct AddRoutineSheet: View {
                                             .foregroundStyle(AppColors.textPrimary)
                                             .frame(maxWidth: .infinity, alignment: .leading)
 
-                                        ExerciseRowControls(
-                                            isFirst: index == 0,
-                                            isLast: index == exercises.count - 1,
+                                        ExerciseEditingRowControls(
+                                            items: $exercises,
+                                            index: index,
                                             controlOpacity: Layout.controlOpacity,
-                                            onMoveUp: {
-                                                ExerciseEditingMutations.move(
-                                                    in: &exercises,
-                                                    from: index,
-                                                    to: index - 1,
-                                                    animation: Layout.listAnimation
-                                                )
-                                            },
-                                            onMoveDown: {
-                                                ExerciseEditingMutations.move(
-                                                    in: &exercises,
-                                                    from: index,
-                                                    to: index + 1,
-                                                    animation: Layout.listAnimation
-                                                )
-                                            },
-                                            onDelete: {
-                                                ExerciseEditingMutations.delete(
-                                                    from: &exercises,
-                                                    at: index,
-                                                    animation: Layout.listAnimation
-                                                )
-                                            }
+                                            animation: Layout.listAnimation
                                         )
                                     }
                                     .padding(Layout.exerciseRowPadding)
@@ -258,6 +284,7 @@ struct AddRoutineSheet: View {
                     Button("Cancel") {
                         dismiss()
                     }
+                    .accessibilityIdentifier("addRoutine.cancelButton")
                 }
                 ToolbarItem(placement: .topBarTrailing) {
                     Button("Save") {
@@ -268,6 +295,7 @@ struct AddRoutineSheet: View {
                         dismiss()
                     }
                     .disabled(!canSave)
+                    .accessibilityIdentifier("addRoutine.saveButton")
                 }
             }
             .tint(AppColors.accent)
