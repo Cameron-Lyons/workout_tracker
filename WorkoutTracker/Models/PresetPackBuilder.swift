@@ -348,9 +348,12 @@ enum PresetPackBuilder {
         ExerciseBlock(
             exerciseID: id,
             exerciseNameSnapshot: name,
-            restSeconds: 90,
+            restSeconds: ExerciseBlockDefaults.restSeconds,
             progressionRule: .manual,
-            targets: repeatedTargets(count: 3, repRange: RepRange(8, 12))
+            targets: repeatedTargets(
+                count: ExerciseBlockDefaults.setCount,
+                repRange: ExerciseBlockDefaults.repRange
+            )
         )
     }
 
@@ -369,9 +372,7 @@ enum PresetPackBuilder {
                     restSeconds: 180,
                     progressionRule: ProgressionRule(
                         kind: .percentageWave,
-                        percentageWave: PercentageWaveRule(
-                            trainingMax: nil,
-                            weeks: fiveThreeOneWeeks(),
+                        percentageWave: PercentageWaveRule.fiveThreeOne(
                             cycleIncrement: ExerciseClassification.isLowerBody(mainExerciseName) ? 10 : 5
                         )
                     ),
@@ -397,9 +398,7 @@ enum PresetPackBuilder {
                     restSeconds: 180,
                     progressionRule: ProgressionRule(
                         kind: .percentageWave,
-                        percentageWave: PercentageWaveRule(
-                            trainingMax: nil,
-                            weeks: fiveThreeOneWeeks(),
+                        percentageWave: PercentageWaveRule.fiveThreeOne(
                             cycleIncrement: ExerciseClassification.isLowerBody(mainExerciseName) ? 10 : 5
                         )
                     ),
@@ -423,40 +422,4 @@ enum PresetPackBuilder {
         )
     }
 
-    private static func fiveThreeOneWeeks() -> [PercentageWaveWeek] {
-        [
-            PercentageWaveWeek(
-                name: "Week 1",
-                sets: [
-                    PercentageWaveSet(percentage: 0.65, repRange: RepRange(5, 5)),
-                    PercentageWaveSet(percentage: 0.75, repRange: RepRange(5, 5)),
-                    PercentageWaveSet(percentage: 0.85, repRange: RepRange(5, 5), note: "AMRAP")
-                ]
-            ),
-            PercentageWaveWeek(
-                name: "Week 2",
-                sets: [
-                    PercentageWaveSet(percentage: 0.70, repRange: RepRange(3, 3)),
-                    PercentageWaveSet(percentage: 0.80, repRange: RepRange(3, 3)),
-                    PercentageWaveSet(percentage: 0.90, repRange: RepRange(3, 3), note: "AMRAP")
-                ]
-            ),
-            PercentageWaveWeek(
-                name: "Week 3",
-                sets: [
-                    PercentageWaveSet(percentage: 0.75, repRange: RepRange(5, 5)),
-                    PercentageWaveSet(percentage: 0.85, repRange: RepRange(3, 3)),
-                    PercentageWaveSet(percentage: 0.95, repRange: RepRange(1, 1), note: "AMRAP")
-                ]
-            ),
-            PercentageWaveWeek(
-                name: "Deload",
-                sets: [
-                    PercentageWaveSet(percentage: 0.40, repRange: RepRange(5, 5)),
-                    PercentageWaveSet(percentage: 0.50, repRange: RepRange(5, 5)),
-                    PercentageWaveSet(percentage: 0.60, repRange: RepRange(5, 5))
-                ]
-            )
-        ]
-    }
 }

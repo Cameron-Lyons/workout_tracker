@@ -52,12 +52,12 @@ struct AnalyticsRepository: Sendable {
         let calendar = Calendar.autoupdatingCurrent
         let startOfToday = calendar.startOfDay(for: .now)
         let startOfWeek = calendar.dateInterval(of: .weekOfYear, for: startOfToday)?.start ?? startOfToday
-        let last30Days = calendar.date(byAdding: .day, value: -30, to: startOfToday) ?? startOfToday
+        let last30Days = AnalyticsDefaults.rollingWindowStart(from: startOfToday, calendar: calendar)
         let totalVolume = sessions.reduce(0) { $0 + volume(for: $1) }
         let sessionsThisWeek = sessions.filter { $0.completedAt >= startOfWeek }.count
         let sessionsLast30Days = sessions.filter { $0.completedAt >= last30Days }.count
         let firstSessionDate = sessions.first?.completedAt ?? startOfToday
-        let weeksSpan = max(1.0, startOfToday.timeIntervalSince(firstSessionDate) / (60 * 60 * 24 * 7))
+        let weeksSpan = AnalyticsDefaults.weeksSpan(from: firstSessionDate, to: startOfToday)
 
         return ProgressOverview(
             totalSessions: sessions.count,
@@ -111,7 +111,7 @@ struct AnalyticsRepository: Sendable {
     func recentPersonalRecords(
         from sessions: [CompletedSession],
         catalogByID: [UUID: ExerciseCatalogItem],
-        limit: Int = 5
+        limit: Int = AnalyticsDefaults.recentActivityLimit
     ) -> [PersonalRecord] {
         Array(personalRecords(from: sessions, catalogByID: catalogByID).suffix(limit).reversed())
     }
@@ -217,7 +217,7 @@ struct AnalyticsRepository: Sendable {
         let calendar = Calendar.autoupdatingCurrent
         let startOfToday = calendar.startOfDay(for: now)
         let startOfWeek = calendar.dateInterval(of: .weekOfYear, for: startOfToday)?.start ?? startOfToday
-        let last30Days = calendar.date(byAdding: .day, value: -30, to: startOfToday) ?? startOfToday
+        let last30Days = AnalyticsDefaults.rollingWindowStart(from: startOfToday, calendar: calendar)
         let firstSessionDate = sessions.first?.completedAt ?? startOfToday
 
         var totalVolume = 0.0
@@ -317,7 +317,7 @@ struct AnalyticsRepository: Sendable {
             totalVolume += sessionVolume
         }
 
-        let weeksSpan = max(1.0, startOfToday.timeIntervalSince(firstSessionDate) / (60 * 60 * 24 * 7))
+        let weeksSpan = AnalyticsDefaults.weeksSpan(from: firstSessionDate, to: startOfToday)
         let exerciseSummaries = exerciseAccumulatorsByID.values
             .map { accumulator in
                 ExerciseAnalyticsSummary(
@@ -341,8 +341,8 @@ struct AnalyticsRepository: Sendable {
             ),
             personalRecords: personalRecords,
             exerciseSummaries: exerciseSummaries,
-            recentPersonalRecords: Array(personalRecords.suffix(5).reversed()),
-            recentSessions: Array(sessions.suffix(5).reversed())
+            recentPersonalRecords: Array(personalRecords.suffix(AnalyticsDefaults.recentActivityLimit).reversed()),
+            recentSessions: Array(sessions.suffix(AnalyticsDefaults.recentActivityLimit).reversed())
         )
     }
 
@@ -401,8 +401,15 @@ struct AnalyticsRepository: Sendable {
         now: Date = .now
     ) -> TodaySnapshot {
         TodaySnapshot(
-            pinnedTemplate: resolvePinnedTemplate(from: plans, references: references, now: now),
-            quickStartTemplates: resolveQuickStarts(references: references, sessions: sessions),
+            pinnedTemplate: TemplateReferenceSelection.pinnedTemplate(
+                from: plans,
+                references: references,
+                now: now
+            ),
+            quickStartTemplates: TemplateReferenceSelection.quickStarts(
+                references: references,
+                sessions: sessions
+            ),
             recentPersonalRecords: sessionAnalytics.recentPersonalRecords,
             recentSessions: sessionAnalytics.recentSessions
         )
@@ -416,7 +423,7 @@ struct AnalyticsRepository: Sendable {
             overview: sessionAnalytics.overview,
             personalRecords: Array(sessionAnalytics.personalRecords.reversed()),
             exerciseSummaries: sessionAnalytics.exerciseSummaries,
-            selectedExerciseID: resolvedSelectedExerciseID(
+            selectedExerciseID: ExerciseAnalyticsSelection.selectedExerciseID(
                 selectedExerciseID,
                 summaries: sessionAnalytics.exerciseSummaries
             )
@@ -511,77 +518,6 @@ struct AnalyticsRepository: Sendable {
         }
     }
 
-    private func resolvePinnedTemplate(
-        from plans: [Plan],
-        references: [TemplateReference],
-        now: Date
-    ) -> TemplateReference? {
-        let referencesByTemplateID = Dictionary(uniqueKeysWithValues: references.map { ($0.templateID, $0) })
-        let weekday = Weekday(rawValue: Calendar.autoupdatingCurrent.component(.weekday, from: now))
-
-        if let weekday,
-           let scheduledToday = references.first(where: { $0.scheduledWeekdays.contains(weekday) }) {
-            return scheduledToday
-        }
-
-        for plan in plans {
-            if let pinnedTemplateID = plan.pinnedTemplateID,
-               let pinned = referencesByTemplateID[pinnedTemplateID] {
-                return pinned
-            }
-        }
-
-        return references.max(by: {
-            ($0.lastStartedAt ?? .distantPast) < ($1.lastStartedAt ?? .distantPast)
-        }) ?? references.first
-    }
-
-    private func resolveQuickStarts(
-        references: [TemplateReference],
-        sessions: [CompletedSession]
-    ) -> [TemplateReference] {
-        let referencesByTemplateID = Dictionary(uniqueKeysWithValues: references.map { ($0.templateID, $0) })
-        let recentTemplateIDs = sessions.reversed().map(\.templateID)
-        var resolved: [TemplateReference] = []
-        var seenTemplateIDs: Set<UUID> = []
-
-        for templateID in recentTemplateIDs {
-            guard let match = referencesByTemplateID[templateID],
-                  seenTemplateIDs.insert(match.templateID).inserted else {
-                continue
-            }
-
-            resolved.append(match)
-            if resolved.count == 4 {
-                return resolved
-            }
-        }
-
-        for reference in references where seenTemplateIDs.insert(reference.templateID).inserted {
-            resolved.append(reference)
-            if resolved.count == 4 {
-                break
-            }
-        }
-
-        return resolved
-    }
-
-    private func resolvedSelectedExerciseID(
-        _ selectedExerciseID: UUID?,
-        summaries: [ExerciseAnalyticsSummary]
-    ) -> UUID? {
-        guard !summaries.isEmpty else {
-            return nil
-        }
-
-        if let selectedExerciseID,
-           summaries.contains(where: { $0.exerciseID == selectedExerciseID }) {
-            return selectedExerciseID
-        }
-
-        return summaries.first?.exerciseID
-    }
 }
 
 struct SessionExercisePayload: Sendable {

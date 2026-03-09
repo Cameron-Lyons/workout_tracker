@@ -6,6 +6,27 @@ enum StrengthProgressionDefaults {
     static let lowerBodyIncreaseInPounds = 5.0
 }
 
+enum ExerciseBlockDefaults {
+    static let restSeconds = 90
+    static let setCount = 3
+    static let repRange = RepRange(8, 12)
+}
+
+enum AnalyticsDefaults {
+    static let rollingWindowDays = 30
+    static let recentActivityLimit = 5
+    static let quickStartLimit = 4
+    static let secondsPerWeek: TimeInterval = 60 * 60 * 24 * 7
+
+    static func rollingWindowStart(from startOfToday: Date, calendar: Calendar) -> Date {
+        calendar.date(byAdding: .day, value: -rollingWindowDays, to: startOfToday) ?? startOfToday
+    }
+
+    static func weeksSpan(from firstSessionDate: Date, to startOfToday: Date) -> Double {
+        max(1.0, startOfToday.timeIntervalSince(firstSessionDate) / secondsPerWeek)
+    }
+}
+
 enum WeightUnit: String, CaseIterable, Codable, Sendable {
     case pounds
     case kilograms
@@ -21,15 +42,6 @@ enum WeightUnit: String, CaseIterable, Codable, Sendable {
             return "lb"
         case .kilograms:
             return "kg"
-        }
-    }
-
-    var shortLabel: String {
-        switch self {
-        case .pounds:
-            return "US (lb)"
-        case .kilograms:
-            return "Metric (kg)"
         }
     }
 
@@ -191,17 +203,6 @@ enum Weekday: Int, CaseIterable, Codable, Identifiable, Sendable {
         }
     }
 
-    var fullLabel: String {
-        switch self {
-        case .sunday: return "Sunday"
-        case .monday: return "Monday"
-        case .tuesday: return "Tuesday"
-        case .wednesday: return "Wednesday"
-        case .thursday: return "Thursday"
-        case .friday: return "Friday"
-        case .saturday: return "Saturday"
-        }
-    }
 }
 
 enum SetKind: String, CaseIterable, Codable, Sendable {
@@ -383,6 +384,60 @@ struct PercentageWaveRule: Codable, Equatable, Sendable {
     }
 }
 
+extension PercentageWaveRule {
+    static func fiveThreeOne(
+        trainingMax: Double? = nil,
+        currentWeekIndex: Int = 0,
+        cycle: Int = 1,
+        cycleIncrement: Double
+    ) -> PercentageWaveRule {
+        PercentageWaveRule(
+            trainingMax: trainingMax,
+            weeks: makeFiveThreeOneWeeks(),
+            currentWeekIndex: currentWeekIndex,
+            cycle: cycle,
+            cycleIncrement: cycleIncrement
+        )
+    }
+
+    private static func makeFiveThreeOneWeeks() -> [PercentageWaveWeek] {
+        [
+            PercentageWaveWeek(
+                name: "Week 1",
+                sets: [
+                    PercentageWaveSet(percentage: 0.65, repRange: RepRange(5, 5)),
+                    PercentageWaveSet(percentage: 0.75, repRange: RepRange(5, 5)),
+                    PercentageWaveSet(percentage: 0.85, repRange: RepRange(5, 5), note: "AMRAP")
+                ]
+            ),
+            PercentageWaveWeek(
+                name: "Week 2",
+                sets: [
+                    PercentageWaveSet(percentage: 0.70, repRange: RepRange(3, 3)),
+                    PercentageWaveSet(percentage: 0.80, repRange: RepRange(3, 3)),
+                    PercentageWaveSet(percentage: 0.90, repRange: RepRange(3, 3), note: "AMRAP")
+                ]
+            ),
+            PercentageWaveWeek(
+                name: "Week 3",
+                sets: [
+                    PercentageWaveSet(percentage: 0.75, repRange: RepRange(5, 5)),
+                    PercentageWaveSet(percentage: 0.85, repRange: RepRange(3, 3)),
+                    PercentageWaveSet(percentage: 0.95, repRange: RepRange(1, 1), note: "AMRAP")
+                ]
+            ),
+            PercentageWaveWeek(
+                name: "Deload",
+                sets: [
+                    PercentageWaveSet(percentage: 0.40, repRange: RepRange(5, 5)),
+                    PercentageWaveSet(percentage: 0.50, repRange: RepRange(5, 5)),
+                    PercentageWaveSet(percentage: 0.60, repRange: RepRange(5, 5))
+                ]
+            )
+        ]
+    }
+}
+
 struct ProgressionRule: Identifiable, Codable, Equatable, Sendable {
     var id: UUID
     var kind: ProgressionRuleKind
@@ -489,7 +544,7 @@ struct ExerciseBlock: Identifiable, Codable, Equatable, Sendable {
         exerciseID: UUID,
         exerciseNameSnapshot: String,
         blockNote: String = "",
-        restSeconds: Int = 90,
+        restSeconds: Int = ExerciseBlockDefaults.restSeconds,
         supersetGroup: String? = nil,
         progressionRule: ProgressionRule = .manual,
         targets: [SetTarget],
@@ -804,6 +859,104 @@ struct SessionFinishSummary: Identifiable, Equatable, Sendable {
     }
 }
 
+enum TemplateReferenceSelection {
+    static func pinnedTemplate(
+        from plans: [Plan],
+        references: [TemplateReference],
+        now: Date,
+        calendar: Calendar = .autoupdatingCurrent
+    ) -> TemplateReference? {
+        let referencesByTemplateID = Dictionary(uniqueKeysWithValues: references.map { ($0.templateID, $0) })
+        let weekday = Weekday(rawValue: calendar.component(.weekday, from: now))
+
+        if let weekday,
+           let scheduledToday = references.first(where: { $0.scheduledWeekdays.contains(weekday) }) {
+            return scheduledToday
+        }
+
+        for plan in plans {
+            if let pinnedTemplateID = plan.pinnedTemplateID,
+               let pinned = referencesByTemplateID[pinnedTemplateID] {
+                return pinned
+            }
+        }
+
+        return references.max(by: {
+            ($0.lastStartedAt ?? .distantPast) < ($1.lastStartedAt ?? .distantPast)
+        }) ?? references.first
+    }
+
+    static func quickStarts(
+        references: [TemplateReference],
+        sessions: [CompletedSession],
+        limit: Int = AnalyticsDefaults.quickStartLimit
+    ) -> [TemplateReference] {
+        let referencesByTemplateID = Dictionary(uniqueKeysWithValues: references.map { ($0.templateID, $0) })
+        let recentTemplateIDs = sessions.reversed().map(\.templateID)
+        var resolved: [TemplateReference] = []
+        var seenTemplateIDs: Set<UUID> = []
+
+        for templateID in recentTemplateIDs {
+            guard let match = referencesByTemplateID[templateID],
+                  seenTemplateIDs.insert(match.templateID).inserted else {
+                continue
+            }
+
+            resolved.append(match)
+            if resolved.count == limit {
+                return resolved
+            }
+        }
+
+        for reference in references where seenTemplateIDs.insert(reference.templateID).inserted {
+            resolved.append(reference)
+            if resolved.count == limit {
+                break
+            }
+        }
+
+        return resolved
+    }
+}
+
+enum PersonalRecordSelection {
+    static func mergedNewestFirst(
+        _ newRecords: [PersonalRecord],
+        existingRecords: [PersonalRecord],
+        limit: Int? = nil
+    ) -> [PersonalRecord] {
+        let mergedRecords = Array(newRecords.reversed()) + existingRecords
+        var seenRecordIDs: Set<UUID> = []
+        let deduplicated = mergedRecords.filter { record in
+            seenRecordIDs.insert(record.id).inserted
+        }
+
+        if let limit {
+            return Array(deduplicated.prefix(limit))
+        }
+
+        return deduplicated
+    }
+}
+
+enum ExerciseAnalyticsSelection {
+    static func selectedExerciseID(
+        _ currentSelection: UUID?,
+        summaries: [ExerciseAnalyticsSummary]
+    ) -> UUID? {
+        guard !summaries.isEmpty else {
+            return nil
+        }
+
+        if let currentSelection,
+           summaries.contains(where: { $0.exerciseID == currentSelection }) {
+            return currentSelection
+        }
+
+        return summaries.first?.exerciseID
+    }
+}
+
 enum PresetPack: String, CaseIterable, Identifiable, Sendable {
     case generalGym
     case startingStrength
@@ -926,17 +1079,5 @@ extension String {
     var nonEmptyTrimmed: String? {
         let trimmed = trimmingCharacters(in: .whitespacesAndNewlines)
         return trimmed.isEmpty ? nil : trimmed
-    }
-}
-
-extension Array {
-    @discardableResult
-    mutating func removeIfPresent(at index: Int) -> Bool {
-        guard indices.contains(index) else {
-            return false
-        }
-
-        remove(at: index)
-        return true
     }
 }

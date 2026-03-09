@@ -146,18 +146,6 @@ final class PlansStore {
         savePlan(plan)
     }
 
-    func ensureProfile(for exerciseID: UUID) -> ExerciseProfile {
-        if let existing = profiles.first(where: { $0.exerciseID == exerciseID }) {
-            return existing
-        }
-
-        let profile = ExerciseProfile(exerciseID: exerciseID)
-        profiles.append(profile)
-        rebuildProfileCaches()
-        repository.saveProfiles(profiles)
-        return profile
-    }
-
     func profile(for exerciseID: UUID) -> ExerciseProfile? {
         profilesByExerciseID[exerciseID]
     }

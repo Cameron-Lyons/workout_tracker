@@ -59,11 +59,10 @@ final class ProgressStore {
         )
 
         if let finishSummary, !finishSummary.personalRecords.isEmpty {
-            let mergedRecords = finishSummary.personalRecords.reversed() + personalRecords
-            var seenRecordIDs: Set<UUID> = []
-            personalRecords = mergedRecords.filter { record in
-                seenRecordIDs.insert(record.id).inserted
-            }
+            personalRecords = PersonalRecordSelection.mergedNewestFirst(
+                finishSummary.personalRecords,
+                existingRecords: personalRecords
+            )
         }
 
         let payloadsByExerciseID = Dictionary(grouping: analytics.sessionExercisePayloads(from: session), by: \.exerciseID)
@@ -113,7 +112,7 @@ final class ProgressStore {
             summariesByID: summariesByExerciseID,
             changedExerciseIDs: Set(payloadsByExerciseID.keys)
         )
-        self.selectedExerciseID = resolvedSelectedExerciseID(
+        self.selectedExerciseID = ExerciseAnalyticsSelection.selectedExerciseID(
             selectedExerciseID,
             summaries: exerciseSummaries
         )
@@ -148,22 +147,6 @@ final class ProgressStore {
     func selectDay(_ day: Date?) {
         selectedDay = day.map { calendar.startOfDay(for: $0) }
         historySessions = resolvedHistorySessions(for: selectedDay)
-    }
-
-    private func resolvedSelectedExerciseID(
-        _ selectedExerciseID: UUID?,
-        summaries: [ExerciseAnalyticsSummary]
-    ) -> UUID? {
-        guard !summaries.isEmpty else {
-            return nil
-        }
-
-        if let selectedExerciseID,
-           summaries.contains(where: { $0.exerciseID == selectedExerciseID }) {
-            return selectedExerciseID
-        }
-
-        return summaries.first?.exerciseID
     }
 
     private func rebuildHistoryCaches(from completedSessions: [CompletedSession]) {
@@ -302,9 +285,9 @@ private extension ProgressOverview {
         let calendar = Calendar.autoupdatingCurrent
         let startOfToday = calendar.startOfDay(for: now)
         let startOfWeek = calendar.dateInterval(of: .weekOfYear, for: startOfToday)?.start ?? startOfToday
-        let last30Days = calendar.date(byAdding: .day, value: -30, to: startOfToday) ?? startOfToday
+        let last30Days = AnalyticsDefaults.rollingWindowStart(from: startOfToday, calendar: calendar)
         let resolvedFirstSessionDate = firstSessionDate ?? session.completedAt
-        let weeksSpan = max(1.0, startOfToday.timeIntervalSince(resolvedFirstSessionDate) / (60 * 60 * 24 * 7))
+        let weeksSpan = AnalyticsDefaults.weeksSpan(from: resolvedFirstSessionDate, to: startOfToday)
 
         return ProgressOverview(
             totalSessions: sessionCount,

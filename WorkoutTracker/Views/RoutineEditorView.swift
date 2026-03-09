@@ -23,10 +23,10 @@ private struct TemplateDraftBlock: Identifiable, Equatable {
         exerciseID: UUID? = nil,
         exerciseName: String = "",
         blockNote: String = "",
-        restSeconds: Int = 90,
-        setCount: Int = 3,
-        repLower: Int = 8,
-        repUpper: Int = 12,
+        restSeconds: Int = ExerciseBlockDefaults.restSeconds,
+        setCount: Int = ExerciseBlockDefaults.setCount,
+        repLower: Int = ExerciseBlockDefaults.repRange.lowerBound,
+        repUpper: Int = ExerciseBlockDefaults.repRange.upperBound,
         targetWeightText: String = "",
         supersetGroup: String = "",
         progressionKind: ProgressionRuleKind = .manual,
@@ -118,7 +118,6 @@ struct TemplateEditorSheet: View {
     @Environment(\.dismiss) private var dismiss
     @Environment(AppStore.self) private var appStore
 
-    let planID: UUID
     let existingTemplate: WorkoutTemplate?
     let onSave: (WorkoutTemplate, [ExerciseProfile]) -> Void
 
@@ -299,7 +298,7 @@ struct TemplateEditorSheet: View {
         blocks = existingTemplate.blocks.map { block in
             let profile = appStore.plansStore.profile(for: block.exerciseID)
             let targetWeight = block.targets.first?.targetWeight
-            let repRange = block.targets.first?.repRange ?? RepRange(8, 12)
+            let repRange = block.targets.first?.repRange ?? ExerciseBlockDefaults.repRange
 
             return TemplateDraftBlock(
                 id: block.id,
@@ -407,42 +406,8 @@ struct TemplateEditorSheet: View {
             case .percentageWave:
                 progressionRule = ProgressionRule(
                     kind: .percentageWave,
-                    percentageWave: PercentageWaveRule(
+                    percentageWave: PercentageWaveRule.fiveThreeOne(
                         trainingMax: profileTrainingMax,
-                        weeks: [
-                            PercentageWaveWeek(
-                                name: "Week 1",
-                                sets: [
-                                    PercentageWaveSet(percentage: 0.65, repRange: RepRange(5, 5)),
-                                    PercentageWaveSet(percentage: 0.75, repRange: RepRange(5, 5)),
-                                    PercentageWaveSet(percentage: 0.85, repRange: RepRange(5, 5), note: "AMRAP")
-                                ]
-                            ),
-                            PercentageWaveWeek(
-                                name: "Week 2",
-                                sets: [
-                                    PercentageWaveSet(percentage: 0.70, repRange: RepRange(3, 3)),
-                                    PercentageWaveSet(percentage: 0.80, repRange: RepRange(3, 3)),
-                                    PercentageWaveSet(percentage: 0.90, repRange: RepRange(3, 3), note: "AMRAP")
-                                ]
-                            ),
-                            PercentageWaveWeek(
-                                name: "Week 3",
-                                sets: [
-                                    PercentageWaveSet(percentage: 0.75, repRange: RepRange(5, 5)),
-                                    PercentageWaveSet(percentage: 0.85, repRange: RepRange(3, 3)),
-                                    PercentageWaveSet(percentage: 0.95, repRange: RepRange(1, 1), note: "AMRAP")
-                                ]
-                            ),
-                            PercentageWaveWeek(
-                                name: "Deload",
-                                sets: [
-                                    PercentageWaveSet(percentage: 0.40, repRange: RepRange(5, 5)),
-                                    PercentageWaveSet(percentage: 0.50, repRange: RepRange(5, 5)),
-                                    PercentageWaveSet(percentage: 0.60, repRange: RepRange(5, 5))
-                                ]
-                            )
-                        ],
                         currentWeekIndex: existingTemplate?.blocks.first(where: { $0.id == block.id })?.progressionRule.percentageWave?.currentWeekIndex ?? 0,
                         cycle: existingTemplate?.blocks.first(where: { $0.id == block.id })?.progressionRule.percentageWave?.cycle ?? 1,
                         cycleIncrement: increment ?? appStore.settingsStore.preferredIncrement(for: exerciseName)

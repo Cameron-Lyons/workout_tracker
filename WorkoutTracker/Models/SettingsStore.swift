@@ -61,7 +61,8 @@ final class SettingsStore {
             ?? WeightUnit.pounds.defaultUpperBodyIncrement
         self.lowerBodyIncrement = defaults.object(forKey: Keys.lowerIncrement) as? Double
             ?? WeightUnit.pounds.defaultLowerBodyIncrement
-        self.defaultRestSeconds = defaults.object(forKey: Keys.defaultRestSeconds) as? Int ?? 90
+        self.defaultRestSeconds = defaults.object(forKey: Keys.defaultRestSeconds) as? Int
+            ?? ExerciseBlockDefaults.restSeconds
         self.hasCompletedOnboarding = defaults.bool(forKey: Keys.completedOnboarding)
         if let data = defaults.data(forKey: Keys.warmupRamp),
            let decoded = try? decoder.decode([WarmupRampStep].self, from: data),

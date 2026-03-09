@@ -242,32 +242,12 @@ struct TodayView: View {
                 Text("Finish sessions and the latest PRs will appear here.")
                     .font(.subheadline)
                     .foregroundStyle(AppColors.textSecondary)
-                    .padding(14)
+                    .padding(AppCardMetrics.compactPadding)
                     .frame(maxWidth: .infinity, alignment: .leading)
-                    .appSurface(cornerRadius: 14, shadow: false)
+                    .appSurface(cornerRadius: AppCardMetrics.compactCornerRadius, shadow: false)
             } else {
                 ForEach(todayStore.recentPersonalRecords) { record in
-                    HStack(alignment: .top) {
-                        VStack(alignment: .leading, spacing: 6) {
-                            Text(record.displayName)
-                                .font(.headline.weight(.semibold))
-                                .foregroundStyle(AppColors.textPrimary)
-
-                            Text(
-                                "\(WeightFormatter.displayString(record.weight, unit: weightUnit)) \(weightUnit.symbol) x \(record.reps)"
-                            )
-                            .font(.subheadline)
-                            .foregroundStyle(AppColors.textSecondary)
-                        }
-
-                        Spacer()
-
-                        Text(record.achievedAt.formatted(date: .abbreviated, time: .omitted))
-                            .font(.caption)
-                            .foregroundStyle(AppColors.accent)
-                    }
-                    .padding(14)
-                    .appSurface(cornerRadius: 14, shadow: false)
+                    PersonalRecordSummaryCardView(record: record, weightUnit: weightUnit)
                 }
             }
         }
@@ -281,27 +261,12 @@ struct TodayView: View {
                 Text("Your finished workouts will show up here.")
                     .font(.subheadline)
                     .foregroundStyle(AppColors.textSecondary)
-                    .padding(14)
+                    .padding(AppCardMetrics.compactPadding)
                     .frame(maxWidth: .infinity, alignment: .leading)
-                    .appSurface(cornerRadius: 14, shadow: false)
+                    .appSurface(cornerRadius: AppCardMetrics.compactCornerRadius, shadow: false)
             } else {
                 ForEach(todayStore.recentSessions) { session in
-                    VStack(alignment: .leading, spacing: 6) {
-                        Text(session.templateNameSnapshot)
-                            .font(.headline.weight(.semibold))
-                            .foregroundStyle(AppColors.textPrimary)
-
-                        Text(session.completedAt.formatted(date: .abbreviated, time: .shortened))
-                            .font(.caption)
-                            .foregroundStyle(AppColors.textSecondary)
-
-                        Text("\(session.blocks.count) exercise block\(session.blocks.count == 1 ? "" : "s") logged")
-                            .font(.caption)
-                            .foregroundStyle(AppColors.accent)
-                    }
-                    .padding(14)
-                    .frame(maxWidth: .infinity, alignment: .leading)
-                    .appSurface(cornerRadius: 14, shadow: false)
+                    CompletedSessionSummaryCardView(session: session, detailSuffix: " logged")
                 }
             }
         }
@@ -392,7 +357,6 @@ struct PlansView: View {
             }
             .sheet(item: $editingTemplateContext) { context in
                 TemplateEditorSheet(
-                    planID: context.planID,
                     existingTemplate: context.template
                 ) { template, profiles in
                     appStore.saveProfiles(profiles)

@@ -24,79 +24,24 @@ final class TodayStore {
         finishSummary: SessionFinishSummary?,
         now: Date = .now
     ) {
-        recentSessions = Array(([session] + recentSessions).prefix(5))
+        recentSessions = Array(([session] + recentSessions).prefix(AnalyticsDefaults.recentActivityLimit))
 
         if let finishSummary, !finishSummary.personalRecords.isEmpty {
-            let mergedRecords = finishSummary.personalRecords.reversed() + recentPersonalRecords
-            var seenRecordIDs: Set<UUID> = []
-            recentPersonalRecords = mergedRecords.filter { record in
-                seenRecordIDs.insert(record.id).inserted
-            }
-            .prefix(5)
-            .map { $0 }
+            recentPersonalRecords = PersonalRecordSelection.mergedNewestFirst(
+                finishSummary.personalRecords,
+                existingRecords: recentPersonalRecords,
+                limit: AnalyticsDefaults.recentActivityLimit
+            )
         }
 
-        pinnedTemplate = resolvePinnedTemplate(from: plans, references: references, now: now)
-        quickStartTemplates = resolveQuickStarts(
+        pinnedTemplate = TemplateReferenceSelection.pinnedTemplate(
+            from: plans,
+            references: references,
+            now: now
+        )
+        quickStartTemplates = TemplateReferenceSelection.quickStarts(
             references: references,
             sessions: allSessions
         )
-    }
-
-    private func resolvePinnedTemplate(
-        from plans: [Plan],
-        references: [TemplateReference],
-        now: Date
-    ) -> TemplateReference? {
-        let referencesByTemplateID = Dictionary(uniqueKeysWithValues: references.map { ($0.templateID, $0) })
-        let weekday = Weekday(rawValue: Calendar.autoupdatingCurrent.component(.weekday, from: now))
-
-        if let weekday {
-            if let scheduledToday = references.first(where: { $0.scheduledWeekdays.contains(weekday) }) {
-                return scheduledToday
-            }
-        }
-
-        for plan in plans {
-            if let pinnedTemplateID = plan.pinnedTemplateID,
-               let pinned = referencesByTemplateID[pinnedTemplateID] {
-                return pinned
-            }
-        }
-
-        return references.max(by: {
-            ($0.lastStartedAt ?? .distantPast) < ($1.lastStartedAt ?? .distantPast)
-        }) ?? references.first
-    }
-
-    private func resolveQuickStarts(
-        references: [TemplateReference],
-        sessions: [CompletedSession]
-    ) -> [TemplateReference] {
-        let referencesByTemplateID = Dictionary(uniqueKeysWithValues: references.map { ($0.templateID, $0) })
-        let recentTemplateIDs = sessions.reversed().map(\.templateID)
-        var resolved: [TemplateReference] = []
-        var seenTemplateIDs: Set<UUID> = []
-
-        for templateID in recentTemplateIDs {
-            guard let match = referencesByTemplateID[templateID],
-                  seenTemplateIDs.insert(match.templateID).inserted else {
-                continue
-            }
-
-            resolved.append(match)
-            if resolved.count == 4 {
-                return resolved
-            }
-        }
-
-        for reference in references where seenTemplateIDs.insert(reference.templateID).inserted {
-            resolved.append(reference)
-            if resolved.count == 4 {
-                break
-            }
-        }
-
-        return resolved
     }
 }

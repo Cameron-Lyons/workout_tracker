@@ -92,27 +92,7 @@ private struct ProgressRecordsSectionView: View {
                 .foregroundStyle(AppColors.textPrimary)
 
             ForEach(Array(progressStore.personalRecords.prefix(6))) { record in
-                HStack(alignment: .top) {
-                    VStack(alignment: .leading, spacing: 6) {
-                        Text(record.displayName)
-                            .font(.headline.weight(.semibold))
-                            .foregroundStyle(AppColors.textPrimary)
-
-                        Text(
-                            "\(WeightFormatter.displayString(record.weight, unit: settingsStore.weightUnit)) \(settingsStore.weightUnit.symbol) x \(record.reps)"
-                        )
-                        .font(.subheadline)
-                        .foregroundStyle(AppColors.textSecondary)
-                    }
-
-                    Spacer()
-
-                    Text(record.achievedAt.formatted(date: .abbreviated, time: .omitted))
-                        .font(.caption)
-                        .foregroundStyle(AppColors.accent)
-                }
-                .padding(14)
-                .appSurface(cornerRadius: 14, shadow: false)
+                PersonalRecordSummaryCardView(record: record, weightUnit: settingsStore.weightUnit)
             }
         }
     }
@@ -262,27 +242,12 @@ private struct ProgressHistorySectionView: View {
                 Text("No workouts match the selected day.")
                     .font(.subheadline)
                     .foregroundStyle(AppColors.textSecondary)
-                    .padding(14)
+                    .padding(AppCardMetrics.compactPadding)
                     .frame(maxWidth: .infinity, alignment: .leading)
-                    .appSurface(cornerRadius: 14, shadow: false)
+                    .appSurface(cornerRadius: AppCardMetrics.compactCornerRadius, shadow: false)
             } else {
                 ForEach(progressStore.historySessions) { session in
-                    VStack(alignment: .leading, spacing: 8) {
-                        Text(session.templateNameSnapshot)
-                            .font(.headline.weight(.semibold))
-                            .foregroundStyle(AppColors.textPrimary)
-
-                        Text(session.completedAt.formatted(date: .abbreviated, time: .shortened))
-                            .font(.caption)
-                            .foregroundStyle(AppColors.textSecondary)
-
-                        Text("\(session.blocks.count) exercise block\(session.blocks.count == 1 ? "" : "s")")
-                            .font(.caption)
-                            .foregroundStyle(AppColors.accent)
-                    }
-                    .padding(14)
-                    .frame(maxWidth: .infinity, alignment: .leading)
-                    .appSurface(cornerRadius: 14, shadow: false)
+                    CompletedSessionSummaryCardView(session: session)
                 }
             }
         }
@@ -323,8 +288,7 @@ struct AppCalendarMonthLayout: Equatable {
             )
         }
 
-        let leadingEmptyCount = max(0, firstWeekday - calendar.firstWeekday)
-        let normalizedLeading = leadingEmptyCount < 0 ? leadingEmptyCount + 7 : leadingEmptyCount
+        let normalizedLeading = max(0, firstWeekday - calendar.firstWeekday)
         var dayEntries: [DayEntry] = []
         dayEntries.reserveCapacity(normalizedLeading + dayRange.count)
 

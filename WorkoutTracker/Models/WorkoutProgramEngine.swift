@@ -147,7 +147,7 @@ enum ProgressionEngine {
 }
 
 enum SessionEngine {
-    private static let defaultRepRange = RepRange(8, 12)
+    private static let defaultRepRange = ExerciseBlockDefaults.repRange
 
     static func startSession(
         planID: UUID?,
