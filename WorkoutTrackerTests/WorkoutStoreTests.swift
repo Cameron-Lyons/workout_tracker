@@ -557,6 +557,31 @@ final class WorkoutStoreTests: XCTestCase {
         XCTAssertEqual(index.filter(query: "   ").map(\.name), catalog.map(\.name))
     }
 
+    func testCalendarMonthLayoutPrecomputesWorkoutDays() throws {
+        var calendar = Calendar(identifier: .gregorian)
+        calendar.timeZone = try XCTUnwrap(TimeZone(secondsFromGMT: 0))
+        calendar.firstWeekday = 1
+
+        let displayedMonth = try XCTUnwrap(
+            calendar.date(from: DateComponents(year: 2026, month: 3, day: 15))
+        )
+        let workoutDay = try XCTUnwrap(
+            calendar.date(from: DateComponents(year: 2026, month: 3, day: 9))
+        )
+
+        let layout = AppCalendarMonthLayout.make(
+            for: displayedMonth,
+            workoutDays: [workoutDay],
+            calendar: calendar
+        )
+
+        XCTAssertEqual(layout.monthStart, calendar.date(from: DateComponents(year: 2026, month: 3, day: 1)))
+        XCTAssertEqual(layout.dayEntries.count, 31)
+        XCTAssertTrue(layout.dayEntries.contains(where: { $0.date == workoutDay && $0.hasWorkout }))
+        XCTAssertEqual(layout.dayEntries.first?.dayNumber, 1)
+        XCTAssertEqual(layout.dayEntries.last?.dayNumber, 31)
+    }
+
     @MainActor
     func testFinishSessionIncrementallyUpdatesTodayAndProgressStores() async throws {
         let store = makeStore()

@@ -289,38 +289,145 @@ private struct ProgressHistorySectionView: View {
     }
 }
 
+struct AppCalendarMonthLayout: Equatable {
+    struct DayEntry: Identifiable, Equatable {
+        let id: Int
+        let date: Date?
+        let dayNumber: Int?
+        let hasWorkout: Bool
+    }
+
+    let monthStart: Date
+    let title: String
+    let weekdaySymbols: [String]
+    let dayEntries: [DayEntry]
+
+    static func make(
+        for displayedMonth: Date,
+        workoutDays: Set<Date>,
+        calendar: Calendar = .autoupdatingCurrent
+    ) -> AppCalendarMonthLayout {
+        let monthStart = calendar.date(
+            from: calendar.dateComponents([.year, .month], from: displayedMonth)
+        ) ?? displayedMonth
+        let title = monthStart.formatted(.dateTime.month(.wide).year())
+        let weekdaySymbols = calendar.shortStandaloneWeekdaySymbols
+
+        guard let dayRange = calendar.range(of: .day, in: .month, for: monthStart),
+              let firstWeekday = calendar.dateComponents([.weekday], from: monthStart).weekday else {
+            return AppCalendarMonthLayout(
+                monthStart: monthStart,
+                title: title,
+                weekdaySymbols: weekdaySymbols,
+                dayEntries: []
+            )
+        }
+
+        let leadingEmptyCount = max(0, firstWeekday - calendar.firstWeekday)
+        let normalizedLeading = leadingEmptyCount < 0 ? leadingEmptyCount + 7 : leadingEmptyCount
+        var dayEntries: [DayEntry] = []
+        dayEntries.reserveCapacity(normalizedLeading + dayRange.count)
+
+        for _ in 0..<normalizedLeading {
+            dayEntries.append(
+                DayEntry(
+                    id: dayEntries.count,
+                    date: nil,
+                    dayNumber: nil,
+                    hasWorkout: false
+                )
+            )
+        }
+
+        for dayNumber in dayRange {
+            let date = calendar.date(byAdding: .day, value: dayNumber - 1, to: monthStart)
+            let normalizedDate = date.map { calendar.startOfDay(for: $0) }
+            dayEntries.append(
+                DayEntry(
+                    id: dayEntries.count,
+                    date: normalizedDate,
+                    dayNumber: dayNumber,
+                    hasWorkout: normalizedDate.map { workoutDays.contains($0) } ?? false
+                )
+            )
+        }
+
+        return AppCalendarMonthLayout(
+            monthStart: monthStart,
+            title: title,
+            weekdaySymbols: weekdaySymbols,
+            dayEntries: dayEntries
+        )
+    }
+}
+
+private struct AppCalendarDayCellView: View, Equatable {
+    let entry: AppCalendarMonthLayout.DayEntry
+    let isSelected: Bool
+    let onSelect: () -> Void
+
+    nonisolated static func == (lhs: AppCalendarDayCellView, rhs: AppCalendarDayCellView) -> Bool {
+        lhs.entry == rhs.entry && lhs.isSelected == rhs.isSelected
+    }
+
+    var body: some View {
+        Group {
+            if let date = entry.date,
+               let dayNumber = entry.dayNumber {
+                Button {
+                    onSelect()
+                } label: {
+                    VStack(spacing: 3) {
+                        Text("\(dayNumber)")
+                            .font(.subheadline.weight(entry.hasWorkout ? .semibold : .regular))
+                            .foregroundStyle(entry.hasWorkout ? AppColors.textPrimary : AppColors.textSecondary)
+
+                        Circle()
+                            .fill(entry.hasWorkout ? AppColors.accent : .clear)
+                            .frame(width: 6, height: 6)
+                    }
+                    .frame(maxWidth: .infinity, minHeight: 42)
+                    .background(
+                        RoundedRectangle(cornerRadius: 8)
+                            .fill(
+                                isSelected
+                                    ? AppColors.accent.opacity(0.20)
+                                    : AppColors.surface.opacity(0.35)
+                            )
+                    )
+                }
+                .buttonStyle(.plain)
+                .disabled(!entry.hasWorkout)
+                .accessibilityIdentifier("progress.calendar.day.\(date.formatted(.iso8601.year().month().day()))")
+            } else {
+                Color.clear
+                    .frame(height: 42)
+            }
+        }
+    }
+}
+
 private struct AppCalendarGrid: View {
+    private static let columns = Array(repeating: GridItem(.flexible(), spacing: 4), count: 7)
+
     @Binding var displayedMonth: Date
     let workoutDays: Set<Date>
     @Binding var selectedDay: Date?
 
     private let calendar = Calendar.autoupdatingCurrent
 
-    private var monthStart: Date {
-        calendar.date(from: calendar.dateComponents([.year, .month], from: displayedMonth)) ?? displayedMonth
-    }
+    @State private var monthLayout: AppCalendarMonthLayout
 
-    private var monthTitle: String {
-        monthStart.formatted(.dateTime.month(.wide).year())
-    }
-
-    private var weekdaySymbols: [String] {
-        calendar.shortStandaloneWeekdaySymbols
-    }
-
-    private var days: [Date?] {
-        guard let dayRange = calendar.range(of: .day, in: .month, for: monthStart),
-              let firstWeekday = calendar.dateComponents([.weekday], from: monthStart).weekday else {
-            return []
-        }
-
-        let leadingEmptyCount = max(0, firstWeekday - calendar.firstWeekday)
-        let normalizedLeading = leadingEmptyCount < 0 ? leadingEmptyCount + 7 : leadingEmptyCount
-        let placeholders = Array(repeating: Optional<Date>.none, count: normalizedLeading)
-        let monthDays = dayRange.compactMap { day -> Date? in
-            calendar.date(byAdding: .day, value: day - 1, to: monthStart)
-        }
-        return placeholders + monthDays
+    init(displayedMonth: Binding<Date>, workoutDays: Set<Date>, selectedDay: Binding<Date?>) {
+        self._displayedMonth = displayedMonth
+        self.workoutDays = workoutDays
+        self._selectedDay = selectedDay
+        _monthLayout = State(
+            initialValue: AppCalendarMonthLayout.make(
+                for: displayedMonth.wrappedValue,
+                workoutDays: workoutDays
+            )
+        )
     }
 
     var body: some View {
@@ -334,7 +441,7 @@ private struct AppCalendarGrid: View {
 
                 Spacer()
 
-                Text(monthTitle)
+                Text(monthLayout.title)
                     .font(.system(.title3, design: .rounded).weight(.bold))
                     .foregroundStyle(AppColors.textPrimary)
 
@@ -347,62 +454,36 @@ private struct AppCalendarGrid: View {
                 }
             }
 
-            LazyVGrid(
-                columns: Array(repeating: GridItem(.flexible(), spacing: 4), count: 7),
-                spacing: 8
-            ) {
-                ForEach(Array(weekdaySymbols.enumerated()), id: \.offset) { _, symbol in
+            LazyVGrid(columns: Self.columns, spacing: 8) {
+                ForEach(Array(monthLayout.weekdaySymbols.enumerated()), id: \.offset) { _, symbol in
                     Text(symbol)
                         .font(.caption.weight(.semibold))
                         .foregroundStyle(AppColors.textSecondary)
                         .frame(maxWidth: .infinity)
                 }
 
-                ForEach(Array(days.enumerated()), id: \.offset) { _, day in
-                    if let day {
-                        dayButton(day)
-                    } else {
-                        Color.clear
-                            .frame(height: 42)
-                    }
+                ForEach(monthLayout.dayEntries) { entry in
+                    AppCalendarDayCellView(
+                        entry: entry,
+                        isSelected: entry.date == selectedDay,
+                        onSelect: {
+                            selectedDay = entry.date == selectedDay ? nil : entry.date
+                        }
+                    )
+                    .equatable()
                 }
             }
         }
-    }
-
-    private func dayButton(_ day: Date) -> some View {
-        let normalized = calendar.startOfDay(for: day)
-        let hasWorkout = workoutDays.contains(normalized)
-        let isSelected = selectedDay.map { calendar.isDate($0, inSameDayAs: day) } ?? false
-
-        return Button {
-            selectedDay = isSelected ? nil : normalized
-        } label: {
-            VStack(spacing: 3) {
-                Text("\(calendar.component(.day, from: day))")
-                    .font(.subheadline.weight(hasWorkout ? .semibold : .regular))
-                    .foregroundStyle(hasWorkout ? AppColors.textPrimary : AppColors.textSecondary)
-
-                Circle()
-                    .fill(hasWorkout ? AppColors.accent : .clear)
-                    .frame(width: 6, height: 6)
-            }
-            .frame(maxWidth: .infinity, minHeight: 42)
-            .background(
-                RoundedRectangle(cornerRadius: 8)
-                    .fill(
-                        isSelected
-                            ? AppColors.accent.opacity(0.20)
-                            : AppColors.surface.opacity(0.35)
-                    )
-            )
+        .onChange(of: displayedMonth, initial: false) { _, newValue in
+            monthLayout = AppCalendarMonthLayout.make(for: newValue, workoutDays: workoutDays)
         }
-        .buttonStyle(.plain)
-        .disabled(!hasWorkout)
+        .onChange(of: workoutDays, initial: false) { _, newValue in
+            monthLayout = AppCalendarMonthLayout.make(for: displayedMonth, workoutDays: newValue)
+        }
     }
 
     private func shiftMonth(by value: Int) {
-        guard let nextMonth = calendar.date(byAdding: .month, value: value, to: monthStart) else {
+        guard let nextMonth = calendar.date(byAdding: .month, value: value, to: monthLayout.monthStart) else {
             return
         }
 
