@@ -2,14 +2,9 @@ import Charts
 import SwiftUI
 
 struct ProgressDashboardView: View {
-    @Environment(SettingsStore.self) private var settingsStore
     @Environment(ProgressStore.self) private var progressStore
 
     @State private var displayedMonth = Calendar.autoupdatingCurrent.startOfDay(for: .now)
-
-    private var weightUnit: WeightUnit {
-        settingsStore.weightUnit
-    }
 
     var body: some View {
         NavigationStack {
@@ -24,11 +19,11 @@ struct ProgressDashboardView: View {
                 } else {
                     ScrollView {
                         VStack(spacing: 16) {
-                            overviewSection
-                            personalRecordsSection
-                            progressChartSection
-                            calendarSection
-                            sessionHistorySection
+                            ProgressOverviewSectionView()
+                            ProgressRecordsSectionView()
+                            ProgressChartSectionView()
+                            ProgressCalendarSectionView(displayedMonth: $displayedMonth)
+                            ProgressHistorySectionView()
                         }
                         .padding(.horizontal, 14)
                         .padding(.vertical, 14)
@@ -41,8 +36,13 @@ struct ProgressDashboardView: View {
             .toolbarBackground(.visible, for: .navigationBar)
         }
     }
+}
 
-    private var overviewSection: some View {
+private struct ProgressOverviewSectionView: View {
+    @Environment(SettingsStore.self) private var settingsStore
+    @Environment(ProgressStore.self) private var progressStore
+
+    var body: some View {
         AppHeroCard(
             eyebrow: "Analytics",
             title: "\(progressStore.overview.totalSessions) sessions logged",
@@ -64,7 +64,10 @@ struct ProgressDashboardView: View {
                 AppHeroMetric(
                     id: "volume",
                     label: "Volume",
-                    value: WeightFormatter.displayString(progressStore.overview.totalVolume, unit: weightUnit),
+                    value: WeightFormatter.displayString(
+                        progressStore.overview.totalVolume,
+                        unit: settingsStore.weightUnit
+                    ),
                     systemImage: "scalemass"
                 ),
                 AppHeroMetric(
@@ -76,8 +79,13 @@ struct ProgressDashboardView: View {
             ]
         )
     }
+}
 
-    private var personalRecordsSection: some View {
+private struct ProgressRecordsSectionView: View {
+    @Environment(SettingsStore.self) private var settingsStore
+    @Environment(ProgressStore.self) private var progressStore
+
+    var body: some View {
         VStack(alignment: .leading, spacing: 12) {
             Label("Recent Personal Records", systemImage: "rosette")
                 .font(.headline.weight(.semibold))
@@ -91,7 +99,7 @@ struct ProgressDashboardView: View {
                             .foregroundStyle(AppColors.textPrimary)
 
                         Text(
-                            "\(WeightFormatter.displayString(record.weight, unit: weightUnit)) \(weightUnit.symbol) x \(record.reps)"
+                            "\(WeightFormatter.displayString(record.weight, unit: settingsStore.weightUnit)) \(settingsStore.weightUnit.symbol) x \(record.reps)"
                         )
                         .font(.subheadline)
                         .foregroundStyle(AppColors.textSecondary)
@@ -108,8 +116,13 @@ struct ProgressDashboardView: View {
             }
         }
     }
+}
 
-    private var progressChartSection: some View {
+private struct ProgressChartSectionView: View {
+    @Environment(SettingsStore.self) private var settingsStore
+    @Environment(ProgressStore.self) private var progressStore
+
+    var body: some View {
         VStack(alignment: .leading, spacing: 12) {
             Label("Exercise Trends", systemImage: "chart.line.uptrend.xyaxis")
                 .font(.headline.weight(.semibold))
@@ -134,32 +147,37 @@ struct ProgressDashboardView: View {
                 .pickerStyle(.menu)
                 .tint(AppColors.textPrimary)
 
-                if let summary = progressStore.selectedExerciseSummary {
-                    Chart(summary.points) { point in
-                        AreaMark(
-                            x: .value("Date", point.date),
-                            y: .value("Top Weight", point.topWeight)
-                        )
-                        .foregroundStyle(
-                            LinearGradient(
-                                colors: [AppColors.accent.opacity(0.30), AppColors.accent.opacity(0.04)],
-                                startPoint: .top,
-                                endPoint: .bottom
+                if let summary = progressStore.selectedExerciseSummary,
+                   let chartSeries = progressStore.selectedExerciseChartSeries {
+                    Chart {
+                        ForEach(chartSeries.trendPoints) { point in
+                            AreaMark(
+                                x: .value("Date", point.date),
+                                y: .value("Top Weight", point.topWeight)
                             )
-                        )
+                            .foregroundStyle(
+                                LinearGradient(
+                                    colors: [AppColors.accent.opacity(0.30), AppColors.accent.opacity(0.04)],
+                                    startPoint: .top,
+                                    endPoint: .bottom
+                                )
+                            )
 
-                        LineMark(
-                            x: .value("Date", point.date),
-                            y: .value("Top Weight", point.topWeight)
-                        )
-                        .lineStyle(StrokeStyle(lineWidth: 2.5, lineCap: .round, lineJoin: .round))
-                        .foregroundStyle(AppColors.accent)
+                            LineMark(
+                                x: .value("Date", point.date),
+                                y: .value("Top Weight", point.topWeight)
+                            )
+                            .lineStyle(StrokeStyle(lineWidth: 2.5, lineCap: .round, lineJoin: .round))
+                            .foregroundStyle(AppColors.accent)
+                        }
 
-                        PointMark(
-                            x: .value("Date", point.date),
-                            y: .value("Top Weight", point.topWeight)
-                        )
-                        .foregroundStyle(AppColors.accent)
+                        ForEach(chartSeries.markerPoints) { point in
+                            PointMark(
+                                x: .value("Date", point.date),
+                                y: .value("Top Weight", point.topWeight)
+                            )
+                            .foregroundStyle(AppColors.accent)
+                        }
                     }
                     .frame(height: 220)
                     .chartXAxis {
@@ -167,6 +185,12 @@ struct ProgressDashboardView: View {
                     }
                     .chartYAxis {
                         AxisMarks(position: .leading)
+                    }
+
+                    if chartSeries.isSampled {
+                        Text("Showing a sampled trend for longer exercise histories.")
+                            .font(.caption)
+                            .foregroundStyle(AppColors.textSecondary)
                     }
 
                     HStack(spacing: 10) {
@@ -177,7 +201,7 @@ struct ProgressDashboardView: View {
                         )
                         MetricBadge(
                             label: "Volume",
-                            value: WeightFormatter.displayString(summary.totalVolume, unit: weightUnit),
+                            value: WeightFormatter.displayString(summary.totalVolume, unit: settingsStore.weightUnit),
                             systemImage: "scalemass"
                         )
                     }
@@ -187,8 +211,14 @@ struct ProgressDashboardView: View {
         .padding(14)
         .appSurface(cornerRadius: 14, shadow: false)
     }
+}
 
-    private var calendarSection: some View {
+private struct ProgressCalendarSectionView: View {
+    @Environment(ProgressStore.self) private var progressStore
+
+    @Binding var displayedMonth: Date
+
+    var body: some View {
         VStack(alignment: .leading, spacing: 12) {
             Label("Session Calendar", systemImage: "calendar")
                 .font(.headline.weight(.semibold))
@@ -206,8 +236,12 @@ struct ProgressDashboardView: View {
         .padding(14)
         .appSurface(cornerRadius: 14, shadow: false)
     }
+}
 
-    private var sessionHistorySection: some View {
+private struct ProgressHistorySectionView: View {
+    @Environment(ProgressStore.self) private var progressStore
+
+    var body: some View {
         VStack(alignment: .leading, spacing: 12) {
             HStack {
                 Label("Logged Sessions", systemImage: "clock.arrow.circlepath")

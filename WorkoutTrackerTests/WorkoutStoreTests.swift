@@ -493,6 +493,42 @@ final class WorkoutStoreTests: XCTestCase {
     }
 
     @MainActor
+    func testProgressStoreSamplesDenseExerciseTrendCharts() throws {
+        let analytics = AnalyticsRepository()
+        let progressStore = ProgressStore()
+        let start = Date(timeIntervalSince1970: 1_741_478_400)
+        let sessions = (0..<240).map { index in
+            makeCompletedSession(
+                date: start.addingTimeInterval(Double(index) * 86_400),
+                exerciseID: CatalogSeed.benchPress,
+                exerciseName: "Bench Press",
+                rows: [makeRow(kind: .working, weight: Double(135 + index), reps: 5)]
+            )
+        }
+        let snapshot = analytics.makeProgressSnapshot(
+            sessions: sessions,
+            catalogByID: [
+                CatalogSeed.benchPress: ExerciseCatalogItem(
+                    id: CatalogSeed.benchPress,
+                    name: "Bench Press",
+                    category: .chest
+                )
+            ],
+            selectedExerciseID: CatalogSeed.benchPress,
+            now: start.addingTimeInterval(Double(sessions.count) * 86_400)
+        )
+
+        progressStore.apply(snapshot, completedSessions: sessions)
+
+        let chartSeries = try XCTUnwrap(progressStore.selectedExerciseChartSeries)
+        XCTAssertTrue(chartSeries.isSampled)
+        XCTAssertLessThanOrEqual(chartSeries.trendPoints.count, 160)
+        XCTAssertLessThanOrEqual(chartSeries.markerPoints.count, 24)
+        XCTAssertEqual(chartSeries.trendPoints.first?.sessionID, snapshot.exerciseSummaries.first?.points.first?.sessionID)
+        XCTAssertEqual(chartSeries.trendPoints.last?.sessionID, snapshot.exerciseSummaries.first?.points.last?.sessionID)
+    }
+
+    @MainActor
     func testFinishSessionIncrementallyUpdatesTodayAndProgressStores() async throws {
         let store = makeStore()
         await store.hydrateIfNeeded()

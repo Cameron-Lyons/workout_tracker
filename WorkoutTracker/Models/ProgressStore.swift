@@ -1,12 +1,24 @@
 import Foundation
 import Observation
 
+struct ExerciseChartSeries: Equatable, Sendable {
+    var trendPoints: [ProgressPoint]
+    var markerPoints: [ProgressPoint]
+    var isSampled: Bool
+}
+
 @MainActor
 @Observable
 final class ProgressStore {
+    private static let maxTrendPointCount = 160
+    private static let maxMarkerPointCount = 24
+
     @ObservationIgnored private let calendar = Calendar.autoupdatingCurrent
     @ObservationIgnored private var allSessionsDescending: [CompletedSession] = []
     @ObservationIgnored private var sessionsByDay: [Date: [CompletedSession]] = [:]
+    @ObservationIgnored private var exerciseSummariesByID: [UUID: ExerciseAnalyticsSummary] = [:]
+    @ObservationIgnored private var exerciseChartSeriesByID: [UUID: ExerciseChartSeries] = [:]
+    @ObservationIgnored private var personalBestByExerciseID: [UUID: Double] = [:]
 
     var overview: ProgressOverview = .empty
     var personalRecords: [PersonalRecord] = []
@@ -17,15 +29,7 @@ final class ProgressStore {
     var workoutDays: Set<Date> = []
 
     var personalBestOneRepMaxByExerciseID: [UUID: Double] {
-        Dictionary(
-            uniqueKeysWithValues: exerciseSummaries.compactMap { summary in
-                guard let currentPR = summary.currentPR else {
-                    return nil
-                }
-
-                return (summary.exerciseID, currentPR.estimatedOneRepMax)
-            }
-        )
+        personalBestByExerciseID
     }
 
     func apply(
@@ -35,6 +39,7 @@ final class ProgressStore {
         overview = snapshot.overview
         personalRecords = snapshot.personalRecords
         exerciseSummaries = snapshot.exerciseSummaries
+        rebuildExerciseSummaryCache()
         selectedExerciseID = snapshot.selectedExerciseID
         rebuildHistoryCaches(from: completedSessions)
     }
@@ -62,7 +67,7 @@ final class ProgressStore {
         }
 
         let payloadsByExerciseID = Dictionary(grouping: analytics.sessionExercisePayloads(from: session), by: \.exerciseID)
-        var summariesByExerciseID = Dictionary(uniqueKeysWithValues: exerciseSummaries.map { ($0.exerciseID, $0) })
+        var summariesByExerciseID = exerciseSummariesByID
         let newPersonalRecordsByExerciseID = Dictionary(grouping: finishSummary?.personalRecords ?? [], by: \.exerciseID)
 
         for (exerciseID, payloads) in payloadsByExerciseID {
@@ -86,8 +91,7 @@ final class ProgressStore {
             }
 
             summary.displayName = catalogByID[exerciseID]?.name ?? summary.displayName
-            summary.points.append(contentsOf: newPoints)
-            summary.points.sort(by: { $0.date < $1.date })
+            appendPoints(newPoints, to: &summary)
             summary.pointCount = summary.points.count
             summary.totalVolume += payloads.reduce(0) { $0 + $1.volume }
 
@@ -105,11 +109,20 @@ final class ProgressStore {
         }
 
         exerciseSummaries = summariesByExerciseID.values.sorted(by: { $0.displayName < $1.displayName })
+        rebuildExerciseSummaryCache(
+            summariesByID: summariesByExerciseID,
+            changedExerciseIDs: Set(payloadsByExerciseID.keys)
+        )
         self.selectedExerciseID = resolvedSelectedExerciseID(
             selectedExerciseID,
             summaries: exerciseSummaries
         )
-        rebuildHistoryCaches(from: completedSessions)
+
+        if completedSessions.count == allSessionsDescending.count + 1 {
+            appendHistoryCaches(with: session)
+        } else {
+            rebuildHistoryCaches(from: completedSessions)
+        }
     }
 
     var selectedExerciseSummary: ExerciseAnalyticsSummary? {
@@ -117,7 +130,15 @@ final class ProgressStore {
             return nil
         }
 
-        return exerciseSummaries.first(where: { $0.exerciseID == selectedExerciseID })
+        return exerciseSummariesByID[selectedExerciseID]
+    }
+
+    var selectedExerciseChartSeries: ExerciseChartSeries? {
+        guard let selectedExerciseID else {
+            return nil
+        }
+
+        return exerciseChartSeriesByID[selectedExerciseID]
     }
 
     func selectExercise(_ exerciseID: UUID?) {
@@ -159,12 +180,114 @@ final class ProgressStore {
         historySessions = resolvedHistorySessions(for: selectedDay)
     }
 
+    private func appendHistoryCaches(with session: CompletedSession) {
+        let day = calendar.startOfDay(for: session.completedAt)
+        allSessionsDescending.insert(session, at: 0)
+        sessionsByDay[day, default: []].insert(session, at: 0)
+        workoutDays.insert(day)
+        historySessions = resolvedHistorySessions(for: selectedDay)
+    }
+
     private func resolvedHistorySessions(for selectedDay: Date?) -> [CompletedSession] {
         guard let selectedDay else {
             return allSessionsDescending
         }
 
         return sessionsByDay[selectedDay] ?? []
+    }
+
+    private func rebuildExerciseSummaryCache(
+        summariesByID: [UUID: ExerciseAnalyticsSummary]? = nil,
+        changedExerciseIDs: Set<UUID>? = nil
+    ) {
+        let summariesByID = summariesByID ?? Dictionary(
+            uniqueKeysWithValues: exerciseSummaries.map { ($0.exerciseID, $0) }
+        )
+        exerciseSummariesByID = summariesByID
+
+        if let changedExerciseIDs {
+            for exerciseID in changedExerciseIDs {
+                guard let summary = summariesByID[exerciseID] else {
+                    exerciseChartSeriesByID.removeValue(forKey: exerciseID)
+                    personalBestByExerciseID.removeValue(forKey: exerciseID)
+                    continue
+                }
+
+                exerciseChartSeriesByID[exerciseID] = Self.makeChartSeries(from: summary.points)
+
+                if let currentPR = summary.currentPR {
+                    personalBestByExerciseID[exerciseID] = currentPR.estimatedOneRepMax
+                } else {
+                    personalBestByExerciseID.removeValue(forKey: exerciseID)
+                }
+            }
+            return
+        }
+
+        exerciseChartSeriesByID = Dictionary(
+            uniqueKeysWithValues: summariesByID.map { exerciseID, summary in
+                (exerciseID, Self.makeChartSeries(from: summary.points))
+            }
+        )
+        personalBestByExerciseID = Dictionary(
+            uniqueKeysWithValues: summariesByID.compactMap { exerciseID, summary in
+                guard let currentPR = summary.currentPR else {
+                    return nil
+                }
+
+                return (exerciseID, currentPR.estimatedOneRepMax)
+            }
+        )
+    }
+
+    private func appendPoints(_ newPoints: [ProgressPoint], to summary: inout ExerciseAnalyticsSummary) {
+        guard !newPoints.isEmpty else {
+            return
+        }
+
+        if let lastDate = summary.points.last?.date,
+           let firstNewDate = newPoints.first?.date,
+           lastDate > firstNewDate {
+            summary.points.append(contentsOf: newPoints)
+            summary.points.sort(by: { $0.date < $1.date })
+            return
+        }
+
+        summary.points.append(contentsOf: newPoints)
+    }
+
+    private static func makeChartSeries(from points: [ProgressPoint]) -> ExerciseChartSeries {
+        let trendPoints = sampledPoints(from: points, maxCount: maxTrendPointCount)
+        return ExerciseChartSeries(
+            trendPoints: trendPoints,
+            markerPoints: sampledPoints(from: trendPoints, maxCount: maxMarkerPointCount),
+            isSampled: trendPoints.count != points.count
+        )
+    }
+
+    private static func sampledPoints(
+        from points: [ProgressPoint],
+        maxCount: Int
+    ) -> [ProgressPoint] {
+        guard points.count > maxCount, maxCount > 1 else {
+            return points
+        }
+
+        let lastIndex = points.count - 1
+        var indexes: [Int] = [0]
+        indexes.reserveCapacity(maxCount)
+
+        for position in 1..<(maxCount - 1) {
+            let rawIndex = Int(
+                (Double(position) * Double(lastIndex) / Double(maxCount - 1))
+                    .rounded(.down)
+            )
+            let nextIndex = min(lastIndex - 1, max(indexes[indexes.count - 1] + 1, rawIndex))
+            indexes.append(nextIndex)
+        }
+
+        indexes.append(lastIndex)
+        return indexes.map { points[$0] }
     }
 }
 
