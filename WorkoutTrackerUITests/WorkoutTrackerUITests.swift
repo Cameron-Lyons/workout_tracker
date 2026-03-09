@@ -6,7 +6,7 @@ final class WorkoutTrackerUITests: XCTestCase {
     }
 
     @MainActor
-    func testCreateRoutineLogWorkoutAndSeeSessionInHistory() throws {
+    func testOnboardingPresetStartAndFinishWorkoutUpdatesProgress() throws {
         let app = XCUIApplication()
         app.launchArguments += [
             "--uitesting",
@@ -15,29 +15,120 @@ final class WorkoutTrackerUITests: XCTestCase {
         ]
         app.launch()
 
-        let routinesTab = app.tabBars.buttons["Routines"]
-        XCTAssertTrue(routinesTab.waitForExistence(timeout: 12))
-        routinesTab.tap()
+        let presetButton = app.buttons["onboarding.preset.generalGym"]
+        XCTAssertTrue(presetButton.waitForExistence(timeout: 8))
+        presetButton.tap()
 
-        let addMenuButton = app.buttons["routines.addMenuButton"]
-        XCTAssertTrue(addMenuButton.waitForExistence(timeout: 6))
-        addMenuButton.tap()
+        let pinnedStart = app.buttons["today.pinnedStartButton"]
+        XCTAssertTrue(pinnedStart.waitForExistence(timeout: 8))
+        pinnedStart.tap()
 
-        let startingStrengthItem = app.buttons["Starting Strength"]
-        XCTAssertTrue(startingStrengthItem.waitForExistence(timeout: 4))
-        startingStrengthItem.tap()
+        let finishButton = app.buttons["session.finishButton"]
+        XCTAssertTrue(finishButton.waitForExistence(timeout: 8))
+        finishButton.tap()
 
-        XCTAssertTrue(app.staticTexts["Starting Strength"].waitForExistence(timeout: 6))
+        let doneButton = app.buttons["Done"]
+        XCTAssertTrue(doneButton.waitForExistence(timeout: 8))
+        doneButton.tap()
 
-        let logTab = app.tabBars.buttons["Log"]
-        XCTAssertTrue(logTab.waitForExistence(timeout: 4))
-        logTab.tap()
+        let progressTab = app.tabBars.buttons["Progress"]
+        XCTAssertTrue(progressTab.waitForExistence(timeout: 4))
+        progressTab.tap()
 
-        let saveWorkoutButton = app.buttons["logger.saveWorkoutButton"]
-        XCTAssertTrue(saveWorkoutButton.waitForExistence(timeout: 8))
-        XCTAssertTrue(saveWorkoutButton.isEnabled)
-        saveWorkoutButton.tap()
+        XCTAssertTrue(app.staticTexts["1 sessions logged"].waitForExistence(timeout: 8))
+    }
 
-        XCTAssertTrue(app.staticTexts["logger.savedToast"].waitForExistence(timeout: 4))
+    @MainActor
+    func testSessionCanBeClosedAndResumedFromToday() throws {
+        let app = XCUIApplication()
+        app.launchArguments += [
+            "--uitesting",
+            "--uitesting-in-memory",
+            "--uitesting-empty-store"
+        ]
+        app.launch()
+
+        app.buttons["onboarding.preset.generalGym"].tap()
+        app.buttons["today.pinnedStartButton"].tap()
+
+        let closeButton = app.buttons["Close"]
+        XCTAssertTrue(closeButton.waitForExistence(timeout: 6))
+        closeButton.tap()
+
+        let resumeButton = app.buttons["today.resumeSessionButton"]
+        XCTAssertTrue(resumeButton.waitForExistence(timeout: 6))
+        resumeButton.tap()
+
+        XCTAssertTrue(app.buttons["session.finishButton"].waitForExistence(timeout: 6))
+    }
+
+    @MainActor
+    func testCreateCustomTemplateAndLaunchIt() throws {
+        let app = XCUIApplication()
+        app.launchArguments += [
+            "--uitesting",
+            "--uitesting-in-memory",
+            "--uitesting-empty-store"
+        ]
+        app.launch()
+
+        let blankButton = app.buttons["onboarding.startBlank"]
+        XCTAssertTrue(blankButton.waitForExistence(timeout: 8))
+        blankButton.tap()
+
+        let plansTab = app.tabBars.buttons["Plans"]
+        XCTAssertTrue(plansTab.waitForExistence(timeout: 4))
+        plansTab.tap()
+
+        let addPlanButton = app.buttons["plans.addPlanButton"]
+        XCTAssertTrue(addPlanButton.waitForExistence(timeout: 4))
+        addPlanButton.tap()
+
+        let planNameField = app.textFields["Plan name"]
+        XCTAssertTrue(planNameField.waitForExistence(timeout: 4))
+        planNameField.tap()
+        planNameField.typeText("Custom Plan")
+        app.buttons["Save"].tap()
+
+        let addTemplateButton = app.buttons["Add Template"].firstMatch
+        XCTAssertTrue(addTemplateButton.waitForExistence(timeout: 4))
+        addTemplateButton.tap()
+
+        let templateNameField = app.textFields["Template name"]
+        XCTAssertTrue(templateNameField.waitForExistence(timeout: 4))
+        templateNameField.tap()
+        templateNameField.typeText("Upper Builder")
+
+        let addBlockButton = app.buttons["plans.template.addBlockButton"]
+        XCTAssertTrue(addBlockButton.waitForExistence(timeout: 4))
+        addBlockButton.tap()
+
+        let pickButton = app.buttons["Pick"].firstMatch
+        XCTAssertTrue(pickButton.waitForExistence(timeout: 4))
+        pickButton.tap()
+
+        let benchOption = app.buttons["exercisePicker.item.Bench Press"]
+        XCTAssertTrue(benchOption.waitForExistence(timeout: 4))
+        benchOption.tap()
+
+        let doubleSegment = app.buttons["Double"]
+        if doubleSegment.waitForExistence(timeout: 4) {
+            doubleSegment.tap()
+        }
+
+        let supersetField = app.textFields["Superset group"]
+        XCTAssertTrue(supersetField.waitForExistence(timeout: 4))
+        supersetField.tap()
+        supersetField.typeText("A")
+
+        let saveTemplateButton = app.buttons["plans.template.saveButton"]
+        XCTAssertTrue(saveTemplateButton.waitForExistence(timeout: 4))
+        saveTemplateButton.tap()
+
+        let startButton = app.buttons["Start"].firstMatch
+        XCTAssertTrue(startButton.waitForExistence(timeout: 6))
+        startButton.tap()
+
+        XCTAssertTrue(app.buttons["session.finishButton"].waitForExistence(timeout: 8))
     }
 }

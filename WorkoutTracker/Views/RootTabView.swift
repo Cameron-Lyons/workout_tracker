@@ -1,3 +1,4 @@
+import Observation
 import SwiftUI
 import UIKit
 
@@ -19,11 +20,6 @@ enum AppColors {
 
 @MainActor
 enum AppAppearance {
-    private enum Metrics {
-        static let tabBarShadowOpacity = 0.38
-        static let largeTitleFontSize: CGFloat = 33
-    }
-
     private static var didConfigure = false
 
     static func configureIfNeeded() {
@@ -33,7 +29,7 @@ enum AppAppearance {
         let tabBarAppearance = UITabBarAppearance()
         tabBarAppearance.configureWithOpaqueBackground()
         tabBarAppearance.backgroundColor = UIColor(AppColors.chrome)
-        tabBarAppearance.shadowColor = UIColor(AppColors.stroke.opacity(Metrics.tabBarShadowOpacity))
+        tabBarAppearance.shadowColor = UIColor(AppColors.stroke)
         tabBarAppearance.stackedLayoutAppearance.normal.iconColor = UIColor(AppColors.textSecondary)
         tabBarAppearance.stackedLayoutAppearance.normal.titleTextAttributes = [
             .foregroundColor: UIColor(AppColors.textSecondary)
@@ -42,7 +38,6 @@ enum AppAppearance {
         tabBarAppearance.stackedLayoutAppearance.selected.titleTextAttributes = [
             .foregroundColor: UIColor(AppColors.accent)
         ]
-
         UITabBar.appearance().standardAppearance = tabBarAppearance
         UITabBar.appearance().scrollEdgeAppearance = tabBarAppearance
 
@@ -56,9 +51,8 @@ enum AppAppearance {
         ]
         navAppearance.largeTitleTextAttributes = [
             .foregroundColor: UIColor(AppColors.textPrimary),
-            .font: UIFont.systemFont(ofSize: Metrics.largeTitleFontSize, weight: .bold)
+            .font: UIFont.systemFont(ofSize: 33, weight: .bold)
         ]
-
         UINavigationBar.appearance().standardAppearance = navAppearance
         UINavigationBar.appearance().scrollEdgeAppearance = navAppearance
         UINavigationBar.appearance().compactAppearance = navAppearance
@@ -66,32 +60,6 @@ enum AppAppearance {
 }
 
 struct AppBackground: View {
-    private enum Layout {
-        static let accentStartRadius: CGFloat = 40
-        static let accentEndRadius: CGFloat = 420
-        static let accentBlurRadius: CGFloat = 24
-        static let accentOpacity = 0.20
-
-        static let accentAltStartRadius: CGFloat = 20
-        static let accentAltEndRadius: CGFloat = 380
-        static let accentAltBlurRadius: CGFloat = 30
-        static let accentAltOpacity = 0.12
-
-        static let topGlowOpacity = 0.06
-        static let topGlowSize: CGFloat = 300
-        static let topGlowBlurRadius: CGFloat = 70
-        static let topGlowOffsetX: CGFloat = 90
-        static let topGlowOffsetY: CGFloat = -110
-
-        static let bottomGlowOpacity = 0.04
-        static let bottomGlowSize: CGFloat = 300
-        static let bottomGlowBlurRadius: CGFloat = 85
-        static let bottomGlowOffsetX: CGFloat = -100
-        static let bottomGlowOffsetY: CGFloat = 120
-
-        static let darkOverlayOpacity = 0.16
-    }
-
     var body: some View {
         LinearGradient(
             colors: [AppColors.canvasTop, AppColors.canvasMid, AppColors.canvasBottom],
@@ -100,62 +68,31 @@ struct AppBackground: View {
         )
         .overlay {
             RadialGradient(
-                gradient: Gradient(colors: [
-                    AppColors.accent.opacity(Layout.accentOpacity),
-                    .clear
-                ]),
+                colors: [AppColors.accent.opacity(0.22), .clear],
                 center: .topTrailing,
-                startRadius: Layout.accentStartRadius,
-                endRadius: Layout.accentEndRadius
+                startRadius: 40,
+                endRadius: 420
             )
-            .blur(radius: Layout.accentBlurRadius)
+            .blur(radius: 24)
         }
         .overlay {
             RadialGradient(
-                gradient: Gradient(colors: [
-                    AppColors.accentAlt.opacity(Layout.accentAltOpacity),
-                    .clear
-                ]),
+                colors: [AppColors.accentAlt.opacity(0.16), .clear],
                 center: .bottomLeading,
-                startRadius: Layout.accentAltStartRadius,
-                endRadius: Layout.accentAltEndRadius
+                startRadius: 20,
+                endRadius: 360
             )
-            .blur(radius: Layout.accentAltBlurRadius)
-        }
-        .overlay(alignment: .topTrailing) {
-            Circle()
-                .fill(.white.opacity(Layout.topGlowOpacity))
-                .frame(width: Layout.topGlowSize, height: Layout.topGlowSize)
-                .blur(radius: Layout.topGlowBlurRadius)
-                .offset(x: Layout.topGlowOffsetX, y: Layout.topGlowOffsetY)
-        }
-        .overlay(alignment: .bottomLeading) {
-            Circle()
-                .fill(.white.opacity(Layout.bottomGlowOpacity))
-                .frame(width: Layout.bottomGlowSize, height: Layout.bottomGlowSize)
-                .blur(radius: Layout.bottomGlowBlurRadius)
-                .offset(x: Layout.bottomGlowOffsetX, y: Layout.bottomGlowOffsetY)
+            .blur(radius: 30)
         }
         .overlay {
             Rectangle()
-                .fill(.black.opacity(Layout.darkOverlayOpacity))
+                .fill(.black.opacity(0.18))
         }
         .ignoresSafeArea()
     }
 }
 
 private struct AppSurfaceModifier: ViewModifier {
-    private enum Style {
-        static let materialOpacity = 0.62
-        static let highlightOpacity = 0.06
-        static let accentHighlightOpacity = 0.04
-        static let edgeHighlightOpacity = 0.14
-        static let innerStrokeWidth: CGFloat = 0.8
-        static let highlightStrokeWidth: CGFloat = 0.6
-        static let shadowRadius: CGFloat = 14
-        static let shadowYOffset: CGFloat = 8
-    }
-
     let cornerRadius: CGFloat
     let shadowOpacity: Double
 
@@ -173,79 +110,34 @@ private struct AppSurfaceModifier: ViewModifier {
                         )
                     RoundedRectangle(cornerRadius: cornerRadius, style: .continuous)
                         .fill(.ultraThinMaterial)
-                        .opacity(Style.materialOpacity)
-                    RoundedRectangle(cornerRadius: cornerRadius, style: .continuous)
-                        .fill(
-                            LinearGradient(
-                                colors: [
-                                    .white.opacity(Style.highlightOpacity),
-                                    .clear,
-                                    AppColors.accentAlt.opacity(Style.accentHighlightOpacity)
-                                ],
-                                startPoint: .topLeading,
-                                endPoint: .bottomTrailing
-                            )
-                        )
+                        .opacity(0.62)
                 }
             }
             .overlay(
                 RoundedRectangle(cornerRadius: cornerRadius, style: .continuous)
-                    .stroke(AppColors.stroke, lineWidth: Style.innerStrokeWidth)
+                    .stroke(AppColors.stroke, lineWidth: 0.8)
             )
-            .overlay(
-                RoundedRectangle(cornerRadius: cornerRadius, style: .continuous)
-                    .stroke(
-                        LinearGradient(
-                            colors: [.white.opacity(Style.edgeHighlightOpacity), .clear, .clear],
-                            startPoint: .topLeading,
-                            endPoint: .bottomTrailing
-                        ),
-                        lineWidth: Style.highlightStrokeWidth
-                    )
-            )
-            .shadow(
-                color: .black.opacity(shadowOpacity),
-                radius: shadowOpacity > 0 ? Style.shadowRadius : 0,
-                x: 0,
-                y: Style.shadowYOffset
-            )
+            .shadow(color: .black.opacity(shadowOpacity), radius: 14, x: 0, y: 8)
     }
 }
 
 private struct AppInputFieldModifier: ViewModifier {
-    private enum Layout {
-        static let horizontalPadding: CGFloat = 12
-        static let verticalPadding: CGFloat = 10
-        static let cornerRadius: CGFloat = 10
-        static let fillOpacity = 0.88
-        static let borderOpacity = 0.58
-        static let borderWidth: CGFloat = 1
-    }
-
     func body(content: Content) -> some View {
         content
-            .padding(.horizontal, Layout.horizontalPadding)
-            .padding(.vertical, Layout.verticalPadding)
+            .padding(.horizontal, 12)
+            .padding(.vertical, 10)
             .background(
-                RoundedRectangle(cornerRadius: Layout.cornerRadius, style: .continuous)
-                    .fill(AppColors.input)
-                    .opacity(Layout.fillOpacity)
+                RoundedRectangle(cornerRadius: 10, style: .continuous)
+                    .fill(AppColors.input.opacity(0.88))
             )
             .overlay(
-                RoundedRectangle(cornerRadius: Layout.cornerRadius, style: .continuous)
-                    .stroke(
-                        AppColors.stroke.opacity(Layout.borderOpacity),
-                        lineWidth: Layout.borderWidth
-                    )
+                RoundedRectangle(cornerRadius: 10, style: .continuous)
+                    .stroke(AppColors.stroke.opacity(0.6), lineWidth: 1)
             )
     }
 }
 
 private struct AppInsetCardModifier: ViewModifier {
-    private enum Style {
-        static let borderWidth: CGFloat = 1
-    }
-
     let cornerRadius: CGFloat
     let fillOpacity: Double
     let borderOpacity: Double
@@ -258,83 +150,25 @@ private struct AppInsetCardModifier: ViewModifier {
             )
             .overlay(
                 RoundedRectangle(cornerRadius: cornerRadius, style: .continuous)
-                    .stroke(
-                        AppColors.stroke.opacity(borderOpacity),
-                        lineWidth: Style.borderWidth
-                    )
+                    .stroke(AppColors.stroke.opacity(borderOpacity), lineWidth: 1)
             )
     }
 }
 
 private struct AppRevealModifier: ViewModifier {
-    private enum Motion {
-        static let initialOffsetY: CGFloat = 10
-        static let animation = Animation.spring(response: 0.46, dampingFraction: 0.86)
-    }
-
     let delay: Double
     @State private var isVisible = false
 
     func body(content: Content) -> some View {
         content
             .opacity(isVisible ? 1 : 0)
-            .offset(y: isVisible ? 0 : Motion.initialOffsetY)
+            .offset(y: isVisible ? 0 : 10)
             .onAppear {
                 guard !isVisible else { return }
-                withAnimation(Motion.animation.delay(delay)) {
+                withAnimation(.spring(response: 0.46, dampingFraction: 0.86).delay(delay)) {
                     isVisible = true
                 }
             }
-    }
-}
-
-struct AppEmptyStateCard: View {
-    private enum Layout {
-        static let spacing: CGFloat = 12
-        static let iconSize: CGFloat = 36
-        static let iconContainerSize: CGFloat = 68
-        static let titleSize: CGFloat = 28
-        static let outerPadding: CGFloat = 24
-        static let horizontalPadding: CGFloat = 20
-    }
-
-    let systemImage: String
-    let title: String
-    let message: String
-
-    var body: some View {
-        VStack(spacing: Layout.spacing) {
-            ZStack {
-                Circle()
-                    .fill(
-                        LinearGradient(
-                            colors: [
-                                AppColors.accent.opacity(0.28),
-                                AppColors.accent.opacity(0.10)
-                            ],
-                            startPoint: .topLeading,
-                            endPoint: .bottomTrailing
-                        )
-                    )
-
-                Image(systemName: systemImage)
-                    .font(.system(size: Layout.iconSize, weight: .semibold))
-                    .foregroundStyle(AppColors.accent)
-            }
-            .frame(width: Layout.iconContainerSize, height: Layout.iconContainerSize)
-
-            Text(title)
-                .font(.system(size: Layout.titleSize, weight: .bold, design: .rounded))
-                .foregroundStyle(AppColors.textPrimary)
-
-            Text(message)
-                .font(.subheadline)
-                .foregroundStyle(AppColors.textSecondary)
-                .multilineTextAlignment(.center)
-        }
-        .padding(Layout.outerPadding)
-        .appSurface()
-        .padding(.horizontal, Layout.horizontalPadding)
     }
 }
 
@@ -346,36 +180,14 @@ struct AppHeroMetric: Identifiable {
 }
 
 struct AppHeroCard: View {
-    private enum Layout {
-        static let cardSpacing: CGFloat = 14
-        static let iconSize: CGFloat = 18
-        static let iconContainerSize: CGFloat = 42
-        static let eyebrowTracking: CGFloat = 0.6
-        static let titleSize: CGFloat = 25
-        static let subtitleLineSpacing: CGFloat = 3
-        static let metricsSpacing: CGFloat = 10
-        static let metricLabelTracking: CGFloat = 0.4
-        static let metricValueSize: CGFloat = 17
-        static let horizontalPadding: CGFloat = 16
-        static let verticalPadding: CGFloat = 16
-        static let cornerRadius: CGFloat = 18
-    }
-
     let eyebrow: String?
     let title: String
     let subtitle: String
     let systemImage: String
     let metrics: [AppHeroMetric]
 
-    private var metricColumns: [GridItem] {
-        [
-            GridItem(.flexible(minimum: 110), spacing: Layout.metricsSpacing),
-            GridItem(.flexible(minimum: 110), spacing: Layout.metricsSpacing)
-        ]
-    }
-
     var body: some View {
-        VStack(alignment: .leading, spacing: Layout.cardSpacing) {
+        VStack(alignment: .leading, spacing: 14) {
             HStack(alignment: .top, spacing: 12) {
                 ZStack {
                     Circle()
@@ -391,47 +203,46 @@ struct AppHeroCard: View {
                         )
 
                     Image(systemName: systemImage)
-                        .font(.system(size: Layout.iconSize, weight: .semibold))
+                        .font(.system(size: 18, weight: .semibold))
                         .foregroundStyle(AppColors.accent)
                 }
-                .frame(width: Layout.iconContainerSize, height: Layout.iconContainerSize)
+                .frame(width: 42, height: 42)
 
                 VStack(alignment: .leading, spacing: 5) {
                     if let eyebrow, !eyebrow.isEmpty {
                         Text(eyebrow.uppercased())
                             .font(.caption2.weight(.semibold))
-                            .tracking(Layout.eyebrowTracking)
+                            .tracking(0.6)
                             .foregroundStyle(AppColors.textSecondary)
                     }
 
                     Text(title)
-                        .font(.system(size: Layout.titleSize, weight: .bold, design: .rounded))
+                        .font(.system(size: 25, weight: .bold, design: .rounded))
                         .foregroundStyle(AppColors.textPrimary)
 
                     Text(subtitle)
                         .font(.subheadline)
                         .foregroundStyle(AppColors.textSecondary)
-                        .lineSpacing(Layout.subtitleLineSpacing)
                 }
             }
 
             if !metrics.isEmpty {
-                LazyVGrid(columns: metricColumns, alignment: .leading, spacing: Layout.metricsSpacing) {
+                LazyVGrid(
+                    columns: [
+                        GridItem(.flexible(minimum: 110), spacing: 10),
+                        GridItem(.flexible(minimum: 110), spacing: 10)
+                    ],
+                    alignment: .leading,
+                    spacing: 10
+                ) {
                     ForEach(metrics) { metric in
                         VStack(alignment: .leading, spacing: 4) {
                             Label(metric.label, systemImage: metric.systemImage)
                                 .font(.caption2.weight(.medium))
-                                .tracking(Layout.metricLabelTracking)
                                 .foregroundStyle(AppColors.textSecondary)
 
                             Text(metric.value)
-                                .font(
-                                    .system(
-                                        size: Layout.metricValueSize,
-                                        weight: .semibold,
-                                        design: .rounded
-                                    )
-                                )
+                                .font(.system(size: 17, weight: .semibold, design: .rounded))
                                 .foregroundStyle(AppColors.textPrimary)
                         }
                         .frame(maxWidth: .infinity, alignment: .leading)
@@ -442,37 +253,247 @@ struct AppHeroCard: View {
                 }
             }
         }
-        .padding(.horizontal, Layout.horizontalPadding)
-        .padding(.vertical, Layout.verticalPadding)
-        .appSurface(cornerRadius: Layout.cornerRadius, shadow: false)
+        .padding(16)
+        .appSurface(cornerRadius: 18, shadow: false)
     }
 }
 
-struct ExerciseNameInputRow: View {
-    @Binding var exerciseName: String
-    var placeholder: String = "Add exercise name"
-    var textFieldAccessibilityIdentifier: String?
-    var addButtonAccessibilityIdentifier: String?
-    let addAction: () -> Void
+struct AppEmptyStateCard: View {
+    let systemImage: String
+    let title: String
+    let message: String
 
     var body: some View {
-        HStack(spacing: 10) {
-            TextField(placeholder, text: $exerciseName)
-                .textInputAutocapitalization(.words)
-                .foregroundStyle(AppColors.textPrimary)
-                .appInputField()
-                .accessibilityIdentifierIfPresent(textFieldAccessibilityIdentifier)
+        VStack(spacing: 12) {
+            ZStack {
+                Circle()
+                    .fill(
+                        LinearGradient(
+                            colors: [
+                                AppColors.accent.opacity(0.28),
+                                AppColors.accent.opacity(0.10)
+                            ],
+                            startPoint: .topLeading,
+                            endPoint: .bottomTrailing
+                        )
+                    )
 
-            Button {
-                addAction()
-            } label: {
-                Label("Add", systemImage: "plus")
-                    .font(.subheadline.weight(.semibold))
+                Image(systemName: systemImage)
+                    .font(.system(size: 36, weight: .semibold))
+                    .foregroundStyle(AppColors.accent)
             }
-            .buttonStyle(.borderedProminent)
-            .disabled(exerciseName.nonEmptyTrimmed == nil)
-            .tint(AppColors.accent)
-            .accessibilityIdentifierIfPresent(addButtonAccessibilityIdentifier)
+            .frame(width: 68, height: 68)
+
+            Text(title)
+                .font(.system(size: 28, weight: .bold, design: .rounded))
+                .foregroundStyle(AppColors.textPrimary)
+
+            Text(message)
+                .font(.subheadline)
+                .foregroundStyle(AppColors.textSecondary)
+                .multilineTextAlignment(.center)
+        }
+        .padding(24)
+        .appSurface()
+        .padding(.horizontal, 20)
+    }
+}
+
+struct MetricBadge: View {
+    let label: String
+    let value: String
+    let systemImage: String
+
+    var body: some View {
+        Label {
+            Text("\(label): \(value)")
+        } icon: {
+            Image(systemName: systemImage)
+        }
+        .font(.caption.weight(.semibold))
+        .foregroundStyle(AppColors.textSecondary)
+        .padding(.horizontal, 10)
+        .padding(.vertical, 7)
+        .appInsetCard(cornerRadius: 10, fillOpacity: 0.75, borderOpacity: 0.6)
+    }
+}
+
+struct RootAppView: View {
+    @Environment(AppStore.self) private var appStore
+
+    init() {
+        AppAppearance.configureIfNeeded()
+    }
+
+    var body: some View {
+        @Bindable var appStore = appStore
+
+        Group {
+            if appStore.shouldShowOnboarding {
+                OnboardingView()
+            } else {
+                RootTabView()
+                    .environment(appStore)
+                    .environment(appStore.settingsStore)
+                    .environment(appStore.plansStore)
+                    .environment(appStore.sessionStore)
+                    .environment(appStore.todayStore)
+                    .environment(appStore.progressStore)
+            }
+        }
+        .preferredColorScheme(.dark)
+        .fullScreenCover(
+            isPresented: Binding(
+                get: { appStore.sessionStore.isPresentingSession },
+                set: { isPresented in
+                    if !isPresented {
+                        appStore.sessionStore.dismissSessionPresentation()
+                    }
+                }
+            )
+        ) {
+            ActiveSessionView()
+                .environment(appStore)
+                .environment(appStore.settingsStore)
+                .environment(appStore.plansStore)
+                .environment(appStore.sessionStore)
+        }
+        .sheet(
+            item: Binding(
+                get: { appStore.sessionStore.lastFinishedSummary },
+                set: { appStore.sessionStore.lastFinishedSummary = $0 }
+            )
+        ) { summary in
+            SessionFinishSummaryView(summary: summary)
+                .environment(appStore.settingsStore)
+        }
+    }
+}
+
+struct RootTabView: View {
+    var body: some View {
+        TabView {
+            TodayView()
+                .tabItem {
+                    Label("Today", systemImage: "sun.max")
+                }
+
+            PlansView()
+                .tabItem {
+                    Label("Plans", systemImage: "list.bullet.rectangle")
+                }
+
+            ProgressDashboardView()
+                .tabItem {
+                    Label("Progress", systemImage: "chart.line.uptrend.xyaxis")
+                }
+        }
+        .tint(AppColors.accent)
+        .toolbarBackground(AppColors.chrome, for: .tabBar)
+        .toolbarBackground(.visible, for: .tabBar)
+    }
+}
+
+struct SessionFinishSummaryView: View {
+    let summary: SessionFinishSummary
+    @Environment(\.dismiss) private var dismiss
+    @Environment(SettingsStore.self) private var settingsStore
+
+    private var weightUnit: WeightUnit {
+        settingsStore.weightUnit
+    }
+
+    var body: some View {
+        NavigationStack {
+            ZStack {
+                AppBackground()
+                ScrollView {
+                    VStack(spacing: 16) {
+                        AppHeroCard(
+                            eyebrow: "Workout Complete",
+                            title: summary.templateName,
+                            subtitle: "Session saved and analytics refreshed.",
+                            systemImage: "checkmark.seal.fill",
+                            metrics: [
+                                AppHeroMetric(
+                                    id: "sets",
+                                    label: "Completed Sets",
+                                    value: "\(summary.completedSetCount)",
+                                    systemImage: "checklist"
+                                ),
+                                AppHeroMetric(
+                                    id: "volume",
+                                    label: "Volume",
+                                    value: WeightFormatter.displayString(summary.totalVolume, unit: weightUnit),
+                                    systemImage: "scalemass"
+                                ),
+                                AppHeroMetric(
+                                    id: "records",
+                                    label: "New PRs",
+                                    value: "\(summary.personalRecords.count)",
+                                    systemImage: "rosette"
+                                ),
+                                AppHeroMetric(
+                                    id: "time",
+                                    label: "Finished",
+                                    value: summary.completedAt.formatted(date: .omitted, time: .shortened),
+                                    systemImage: "clock"
+                                )
+                            ]
+                        )
+
+                        if summary.personalRecords.isEmpty {
+                            AppEmptyStateCard(
+                                systemImage: "bolt.badge.clock",
+                                title: "Session locked in",
+                                message: "No new PRs this time, but the log is saved and progression rules were advanced."
+                            )
+                        } else {
+                            VStack(alignment: .leading, spacing: 12) {
+                                Text("New Personal Records")
+                                    .font(.headline.weight(.semibold))
+                                    .foregroundStyle(AppColors.textPrimary)
+
+                                ForEach(summary.personalRecords) { record in
+                                    VStack(alignment: .leading, spacing: 6) {
+                                        Text(record.displayName)
+                                            .font(.headline.weight(.semibold))
+                                            .foregroundStyle(AppColors.textPrimary)
+
+                                        Text(
+                                            "\(WeightFormatter.displayString(record.weight, unit: weightUnit)) \(weightUnit.symbol) x \(record.reps)"
+                                        )
+                                        .font(.subheadline)
+                                        .foregroundStyle(AppColors.textSecondary)
+
+                                        Text(
+                                            "Estimated 1RM \(WeightFormatter.displayString(record.estimatedOneRepMax, unit: weightUnit)) \(weightUnit.symbol)"
+                                        )
+                                        .font(.caption)
+                                        .foregroundStyle(AppColors.accent)
+                                    }
+                                    .padding(14)
+                                    .frame(maxWidth: .infinity, alignment: .leading)
+                                    .appSurface(cornerRadius: 14, shadow: false)
+                                }
+                            }
+                            .padding(.horizontal)
+                        }
+                    }
+                    .padding(.horizontal)
+                    .padding(.vertical, 16)
+                }
+            }
+            .navigationTitle("Summary")
+            .toolbarBackground(AppColors.chrome, for: .navigationBar)
+            .toolbarBackground(.visible, for: .navigationBar)
+            .toolbar {
+                ToolbarItem(placement: .topBarTrailing) {
+                    Button("Done") {
+                        dismiss()
+                    }
+                }
+            }
         }
     }
 }
@@ -502,43 +523,5 @@ extension View {
 
     func appReveal(delay: Double = 0) -> some View {
         modifier(AppRevealModifier(delay: delay))
-    }
-
-    @ViewBuilder
-    func accessibilityIdentifierIfPresent(_ identifier: String?) -> some View {
-        if let identifier {
-            self.accessibilityIdentifier(identifier)
-        } else {
-            self
-        }
-    }
-}
-
-struct RootTabView: View {
-    init() {
-        AppAppearance.configureIfNeeded()
-    }
-
-    var body: some View {
-        TabView {
-            RoutinesView()
-                .tabItem {
-                    Label("Routines", systemImage: "list.bullet.clipboard")
-                }
-
-            WorkoutLoggerView()
-                .tabItem {
-                    Label("Log", systemImage: "figure.strengthtraining.traditional")
-                }
-
-            HistoryView()
-                .tabItem {
-                    Label("History", systemImage: "clock.arrow.circlepath")
-                }
-        }
-        .tint(AppColors.accent)
-        .toolbarBackground(AppColors.chrome, for: .tabBar)
-        .toolbarBackground(.visible, for: .tabBar)
-        .preferredColorScheme(.dark)
     }
 }

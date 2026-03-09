@@ -1,6 +1,7 @@
 import Foundation
 import SwiftData
 
+// Legacy v1/v1.5 models remain registered so older stores can be opened and reset.
 @Model
 final class StoredRoutine {
     @Attribute(.unique) var id: UUID
@@ -113,6 +114,71 @@ final class StoredWorkoutSet {
     }
 }
 
+@Model
+final class StoredPlanRecord {
+    @Attribute(.unique) var id: UUID
+    var payload: Data
+    var updatedAt: Date
+
+    init(id: UUID, payload: Data, updatedAt: Date = .now) {
+        self.id = id
+        self.payload = payload
+        self.updatedAt = updatedAt
+    }
+}
+
+@Model
+final class StoredExerciseCatalogRecord {
+    @Attribute(.unique) var id: UUID
+    var payload: Data
+    var sortOrder: Int
+
+    init(id: UUID, payload: Data, sortOrder: Int) {
+        self.id = id
+        self.payload = payload
+        self.sortOrder = sortOrder
+    }
+}
+
+@Model
+final class StoredExerciseProfileRecord {
+    @Attribute(.unique) var id: UUID
+    var exerciseID: UUID
+    var payload: Data
+
+    init(id: UUID, exerciseID: UUID, payload: Data) {
+        self.id = id
+        self.exerciseID = exerciseID
+        self.payload = payload
+    }
+}
+
+@Model
+final class StoredActiveSessionRecord {
+    @Attribute(.unique) var id: UUID
+    var payload: Data
+    var updatedAt: Date
+
+    init(id: UUID, payload: Data, updatedAt: Date = .now) {
+        self.id = id
+        self.payload = payload
+        self.updatedAt = updatedAt
+    }
+}
+
+@Model
+final class StoredCompletedSessionRecord {
+    @Attribute(.unique) var id: UUID
+    var completedAt: Date
+    var payload: Data
+
+    init(id: UUID, completedAt: Date, payload: Data) {
+        self.id = id
+        self.completedAt = completedAt
+        self.payload = payload
+    }
+}
+
 enum WorkoutModelContainerFactory {
     static func makeContainer(isStoredInMemoryOnly: Bool = false) -> ModelContainer {
         let configuration = ModelConfiguration(isStoredInMemoryOnly: isStoredInMemoryOnly)
@@ -124,6 +190,11 @@ enum WorkoutModelContainerFactory {
                 StoredWorkoutSession.self,
                 StoredWorkoutEntry.self,
                 StoredWorkoutSet.self,
+                StoredPlanRecord.self,
+                StoredExerciseCatalogRecord.self,
+                StoredExerciseProfileRecord.self,
+                StoredActiveSessionRecord.self,
+                StoredCompletedSessionRecord.self,
                 configurations: configuration
             )
         } catch {
@@ -131,3 +202,4 @@ enum WorkoutModelContainerFactory {
         }
     }
 }
+

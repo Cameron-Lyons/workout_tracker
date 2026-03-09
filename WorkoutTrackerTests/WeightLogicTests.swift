@@ -9,13 +9,9 @@ final class WeightLogicTests: XCTestCase {
         XCTAssertNil(WeightInputParser.parseDisplayValue("-5", allowsZero: true))
     }
 
-    func testParseStoredPoundsConvertsFromKilograms() throws {
-        let pounds = WeightInputConversion.parseStoredPounds(
-            from: "100",
-            unit: .kilograms
-        )
-
-        XCTAssertEqual(try XCTUnwrap(pounds), 220.46226218, accuracy: 0.0000001)
+    func testParseStoredPoundsConvertsFromKilograms() {
+        let pounds = WeightInputConversion.parseStoredPounds(from: "100", unit: .kilograms)
+        XCTAssertEqual(pounds ?? 0, 220.46226218, accuracy: 0.0000001)
     }
 
     func testFormatterProducesExpectedStrings() {
@@ -43,25 +39,14 @@ final class WeightLogicTests: XCTestCase {
         )
     }
 
-    func testNormalizedDisplayIncreaseAppliesFloorAndGymRounding() {
-        XCTAssertEqual(WeightUnit.pounds.normalizedDisplayIncrease(0.5), 2.5)
-        XCTAssertEqual(WeightUnit.pounds.normalizedDisplayIncrease(4.0), 5.0)
+    func testRoundedForGymDisplayUsesExpectedIncrement() {
+        XCTAssertEqual(WeightUnit.pounds.roundedForGymDisplay(226.1), 225.0)
+        XCTAssertEqual(WeightUnit.pounds.roundedForGymDisplay(227.4), 227.5)
     }
 
-    func testWeightUnitTransitionOnlyReturnsChangedPair() {
-        var current = WeightUnit.pounds
-
-        let changed = WeightUnitTransition.changedUnits(previous: &current, next: .kilograms)
-        XCTAssertEqual(changed?.old, .pounds)
-        XCTAssertEqual(changed?.new, .kilograms)
-
-        let unchanged = WeightUnitTransition.changedUnits(previous: &current, next: .kilograms)
-        XCTAssertNil(unchanged)
-    }
-
-    func testLiftClassifierDetectsLowerBodyNames() {
-        XCTAssertTrue(LiftClassifier.isLowerBodyLift("Front Squat"))
-        XCTAssertTrue(LiftClassifier.isLowerBodyLift("Romanian Deadlift"))
-        XCTAssertFalse(LiftClassifier.isLowerBodyLift("Bench Press"))
+    func testExerciseClassificationDetectsLowerBodyNames() {
+        XCTAssertTrue(ExerciseClassification.isLowerBody("Front Squat"))
+        XCTAssertTrue(ExerciseClassification.isLowerBody("Romanian Deadlift"))
+        XCTAssertFalse(ExerciseClassification.isLowerBody("Bench Press"))
     }
 }

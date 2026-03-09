@@ -1,320 +1,622 @@
 import SwiftUI
 
-struct RoutinesView: View {
-    private enum Constants {
-        static let listAnimation = Animation.spring(response: 0.42, dampingFraction: 0.86)
-        static let scrollFadeOpacity = 0.82
-        static let scrollScale = 0.985
-        static let standardHorizontalInset: CGFloat = 14
-        static let sectionInset: CGFloat = 8
-        static let rowInsetTop: CGFloat = 7
-        static let rowInsetLeadingTrailing: CGFloat = 14
-        static let rowInsetBottom: CGFloat = 7
-        static let rowDotSize: CGFloat = 11
-        static let rowDotShadowOpacity = 0.65
-        static let rowDotShadowRadius: CGFloat = 6
-        static let rowDotTopPadding: CGFloat = 8
-        static let rowOuterPadding: CGFloat = 16
-        static let rowCornerRadius: CGFloat = 16
-        static let rowTitleSize: CGFloat = 21
-        static let rowProgramTagSpacing: CGFloat = 8
-        static let rowProgramTagVerticalPadding: CGFloat = 4
-        static let rowProgramTagTracking: CGFloat = 0.8
-        static let rowProgramTagFillOpacity = 0.12
-        static let rowProgramTagStrokeOpacity = 0.45
-        static let rowChevronOpacity = 0.8
-        static let rowDotGradientEndRadius: CGFloat = 8
-        static let rowDotGradientStartRadius: CGFloat = 1
-        static let rowDotGradientEndOpacity = 0.4
-        static let rowTextLineLimit = 2
-        static let rowSpacing: CGFloat = 12
-        static let rowMetaSpacing: CGFloat = 8
-        static let rowMetaHorizontalPadding: CGFloat = 9
-        static let rowMetaVerticalPadding: CGFloat = 6
-        static let emptyStateSpacing: CGFloat = 14
+struct TodayView: View {
+    @Environment(AppStore.self) private var appStore
+    @Environment(PlansStore.self) private var plansStore
+    @Environment(SessionStore.self) private var sessionStore
+    @Environment(SettingsStore.self) private var settingsStore
+    @Environment(TodayStore.self) private var todayStore
+    @Environment(ProgressStore.self) private var progressStore
+
+    private var activeDraft: SessionDraft? {
+        sessionStore.activeDraft
     }
 
-    @EnvironmentObject private var store: WorkoutStore
-    @State private var showingAddRoutine = false
-    @State private var exerciseSummaryByRoutineID: [UUID: String] = [:]
-
-    private var totalExerciseCount: Int {
-        store.routines.reduce(0) { $0 + $1.exercises.count }
-    }
-
-    private var templateRoutineCount: Int {
-        store.routines.filter { $0.program != nil }.count
+    private var weightUnit: WeightUnit {
+        settingsStore.weightUnit
     }
 
     var body: some View {
         NavigationStack {
             ZStack {
                 AppBackground()
-                Group {
-                    if store.routines.isEmpty {
-                        emptyState
+                ScrollView {
+                    VStack(spacing: 16) {
+                        heroCard
+                            .appReveal(delay: 0.01)
+
+                        if let activeDraft {
+                            resumeCard(activeDraft)
+                                .appReveal(delay: 0.03)
+                        } else if let pinnedTemplate = todayStore.pinnedTemplate {
+                            pinnedTemplateCard(pinnedTemplate)
+                                .appReveal(delay: 0.03)
+                        } else {
+                            AppEmptyStateCard(
+                                systemImage: "sparkles.rectangle.stack",
+                                title: "Start from a plan",
+                                message: "Finish onboarding or create a template in Plans to get a pinned next workout."
+                            )
                             .appReveal(delay: 0.03)
-                    } else {
-                        routinesList
-                            .appReveal(delay: 0.03)
+                        }
+
+                        quickStartSection
+                            .appReveal(delay: 0.05)
+
+                        recentPRSection
+                            .appReveal(delay: 0.07)
+
+                        recentSessionsSection
+                            .appReveal(delay: 0.09)
                     }
+                    .padding(.horizontal, 14)
+                    .padding(.vertical, 14)
                 }
+                .scrollIndicators(.hidden)
             }
-            .navigationTitle("Routines")
+            .navigationTitle("Today")
             .toolbarBackground(AppColors.chrome, for: .navigationBar)
             .toolbarBackground(.visible, for: .navigationBar)
-            .toolbar {
-                ToolbarItem(placement: .topBarLeading) {
-                    EditButton()
-                }
-                ToolbarItem(placement: .topBarTrailing) {
-                    Menu {
-                        Button("Custom Routine", systemImage: "square.and.pencil") {
-                            showingAddRoutine = true
-                        }
-
-                        Divider()
-
-                        Button("Starting Strength", systemImage: "figure.strengthtraining.traditional") {
-                            store.addProgramTemplate(.startingStrength)
-                        }
-                        Button("5/3/1", systemImage: "number") {
-                            store.addProgramTemplate(.fiveThreeOne)
-                        }
-                        Button("Boring But Big", systemImage: "scalemass") {
-                            store.addProgramTemplate(.boringButBig)
-                        }
-
-                        Divider()
-
-                        Menu("Popular Online Packs", systemImage: "globe") {
-                            ForEach(PopularRoutinePack.allCases) { pack in
-                                Button(pack.displayName, systemImage: pack.systemImage) {
-                                    store.addPopularRoutinePack(pack)
-                                }
-                            }
-                        }
-                    } label: {
-                        Image(systemName: "plus")
-                    }
-                    .accessibilityIdentifier("routines.addMenuButton")
-                }
-            }
-            .tint(AppColors.accent)
-            .sheet(isPresented: $showingAddRoutine) {
-                AddRoutineSheet { name, exercises in
-                    store.addRoutine(name: name, exerciseNames: exercises)
-                }
-            }
-            .onAppear {
-                rebuildExerciseSummaryCache()
-            }
-            .onChange(of: store.routines) { _, _ in
-                rebuildExerciseSummaryCache()
-            }
         }
     }
 
-    private var routinesList: some View {
-        List {
-            Section {
-                AppHeroCard(
-                    eyebrow: "Training Library",
-                    title: "\(store.routines.count) routines ready",
-                    subtitle: "Mix custom plans with progression templates and jump into logging faster.",
-                    systemImage: "list.bullet.clipboard",
-                    metrics: [
-                        AppHeroMetric(
-                            id: "routines",
-                            label: "Routines",
-                            value: "\(store.routines.count)",
-                            systemImage: "list.bullet"
-                        ),
-                        AppHeroMetric(
-                            id: "exercises",
-                            label: "Exercises",
-                            value: "\(totalExerciseCount)",
-                            systemImage: "dumbbell"
-                        ),
-                        AppHeroMetric(
-                            id: "templates",
-                            label: "Templates",
-                            value: "\(templateRoutineCount)",
-                            systemImage: "sparkles"
-                        ),
-                        AppHeroMetric(
-                            id: "custom",
-                            label: "Custom",
-                            value: "\(max(0, store.routines.count - templateRoutineCount))",
-                            systemImage: "square.and.pencil"
-                        )
-                    ]
-                )
-                .appReveal(delay: 0.01)
-                .listRowBackground(Color.clear)
-                .listRowSeparator(.hidden)
-                .listRowInsets(
-                    EdgeInsets(
-                        top: Constants.sectionInset,
-                        leading: Constants.standardHorizontalInset,
-                        bottom: Constants.sectionInset,
-                        trailing: Constants.standardHorizontalInset
-                    )
-                )
-            }
+    private var heroCard: some View {
+        let sessionsLast30 = progressStore.overview.sessionsLast30Days
+        let recentPRCount = todayStore.recentPersonalRecords.count
+        let activeStatus = activeDraft == nil ? "Ready" : "In Progress"
 
-            Section {
-                ForEach(store.routines) { routine in
-                    NavigationLink {
-                        RoutineEditorView(routineID: routine.id)
-                    } label: {
-                        routineRow(routine)
-                    }
-                    .scrollTransition(axis: .vertical) { content, phase in
-                        content
-                            .opacity(phase.isIdentity ? 1 : Constants.scrollFadeOpacity)
-                            .scaleEffect(phase.isIdentity ? 1 : Constants.scrollScale)
-                    }
-                    .listRowBackground(Color.clear)
-                    .listRowSeparator(.hidden)
-                    .listRowInsets(
-                        EdgeInsets(
-                            top: Constants.rowInsetTop,
-                            leading: Constants.rowInsetLeadingTrailing,
-                            bottom: Constants.rowInsetBottom,
-                            trailing: Constants.rowInsetLeadingTrailing
-                        )
-                    )
-                }
-                .onDelete(perform: store.deleteRoutines)
-                .onMove(perform: store.moveRoutines)
-            } header: {
-                Text("Saved routines")
-            } footer: {
-                Text("Use Edit to reorder or remove routines.")
-                    .font(.caption)
-                    .foregroundStyle(AppColors.textSecondary)
-            }
-        }
-        .listStyle(.plain)
-        .scrollContentBackground(.hidden)
-        .scrollIndicators(.hidden)
-        .animation(Constants.listAnimation, value: store.routines)
+        return AppHeroCard(
+            eyebrow: "Session-First Logger",
+            title: activeDraft?.templateNameSnapshot ?? "Ready to train",
+            subtitle: activeDraft == nil
+                ? "Start from a pinned template, relaunch a recent session, or jump into Plans to build something custom."
+                : "Your active session is autosaved after every change. Resume exactly where you left it.",
+            systemImage: "figure.strengthtraining.traditional",
+            metrics: [
+                AppHeroMetric(
+                    id: "status",
+                    label: "Status",
+                    value: activeStatus,
+                    systemImage: "play.circle"
+                ),
+                AppHeroMetric(
+                    id: "plans",
+                    label: "Templates",
+                    value: "\(plansStore.templateReferences().count)",
+                    systemImage: "rectangle.stack"
+                ),
+                AppHeroMetric(
+                    id: "sessions",
+                    label: "Last 30d",
+                    value: "\(sessionsLast30)",
+                    systemImage: "calendar"
+                ),
+                AppHeroMetric(
+                    id: "records",
+                    label: "Recent PRs",
+                    value: "\(recentPRCount)",
+                    systemImage: "rosette"
+                )
+            ]
+        )
     }
 
-    private var emptyState: some View {
-        VStack(spacing: Constants.emptyStateSpacing) {
-            AppEmptyStateCard(
-                systemImage: "list.bullet.rectangle",
-                title: "Build your first routine",
-                message: "Create a custom plan or start from a proven strength template."
-            )
+    private func resumeCard(_ draft: SessionDraft) -> some View {
+        VStack(alignment: .leading, spacing: 14) {
+            HStack(alignment: .top) {
+                VStack(alignment: .leading, spacing: 4) {
+                    Text("Active Session")
+                        .font(.caption.weight(.semibold))
+                        .tracking(0.6)
+                        .foregroundStyle(AppColors.textSecondary)
+
+                    Text(draft.templateNameSnapshot)
+                        .font(.system(.title3, design: .rounded).weight(.bold))
+                        .foregroundStyle(AppColors.textPrimary)
+
+                    Text("Last updated \(draft.lastUpdatedAt.formatted(date: .abbreviated, time: .shortened))")
+                        .font(.caption)
+                        .foregroundStyle(AppColors.textSecondary)
+                }
+
+                Spacer()
+
+                MetricBadge(
+                    label: "Blocks",
+                    value: "\(draft.blocks.count)",
+                    systemImage: "square.grid.2x2"
+                )
+            }
 
             Button {
-                showingAddRoutine = true
+                appStore.resumeActiveSession()
             } label: {
-                Label("Create Routine", systemImage: "plus")
+                Label("Resume Session", systemImage: "play.fill")
                     .font(.headline)
                     .frame(maxWidth: .infinity)
             }
             .buttonStyle(.borderedProminent)
             .tint(AppColors.accent)
-            .controlSize(.large)
-            .padding(.horizontal, 20)
+            .accessibilityIdentifier("today.resumeSessionButton")
         }
+        .padding(16)
+        .appSurface(cornerRadius: 18, shadow: false)
     }
 
-    private func routineRow(_ routine: Routine) -> some View {
-        HStack(alignment: .top, spacing: Constants.rowSpacing) {
-            Circle()
-                .fill(
-                    RadialGradient(
-                        gradient: Gradient(
-                            colors: [
-                                AppColors.accent,
-                                AppColors.accent.opacity(Constants.rowDotGradientEndOpacity)
-                            ]
-                        ),
-                        center: .center,
-                        startRadius: Constants.rowDotGradientStartRadius,
-                        endRadius: Constants.rowDotGradientEndRadius
-                    )
-                )
-                .frame(width: Constants.rowDotSize, height: Constants.rowDotSize)
-                .shadow(
-                    color: AppColors.accent.opacity(Constants.rowDotShadowOpacity),
-                    radius: Constants.rowDotShadowRadius,
-                    x: 0,
-                    y: 0
-                )
-                .padding(.top, Constants.rowDotTopPadding)
+    private func pinnedTemplateCard(_ reference: TemplateReference) -> some View {
+        VStack(alignment: .leading, spacing: 14) {
+            Text("Pinned Next Workout")
+                .font(.caption.weight(.semibold))
+                .tracking(0.6)
+                .foregroundStyle(AppColors.textSecondary)
 
-            VStack(alignment: .leading, spacing: 10) {
-                HStack(alignment: .firstTextBaseline, spacing: 8) {
-                    Text(routine.name)
-                        .font(.system(size: Constants.rowTitleSize, weight: .bold, design: .rounded))
-                        .foregroundStyle(AppColors.textPrimary)
+            Text(reference.templateName)
+                .font(.system(.title3, design: .rounded).weight(.bold))
+                .foregroundStyle(AppColors.textPrimary)
 
-                    Spacer()
+            Text(reference.planName)
+                .font(.subheadline)
+                .foregroundStyle(AppColors.textSecondary)
 
-                    Image(systemName: "chevron.right")
+            HStack(spacing: 8) {
+                ForEach(reference.scheduledWeekdays) { weekday in
+                    Text(weekday.shortLabel)
                         .font(.caption.weight(.semibold))
-                        .foregroundStyle(AppColors.textSecondary.opacity(Constants.rowChevronOpacity))
-                }
-
-                if let program = routine.program {
-                    Text(program.kind.displayName.uppercased())
-                        .font(.caption2.weight(.semibold))
-                        .tracking(Constants.rowProgramTagTracking)
                         .foregroundStyle(AppColors.accent)
-                        .padding(.horizontal, Constants.rowProgramTagSpacing)
-                        .padding(.vertical, Constants.rowProgramTagVerticalPadding)
-                        .background(AppColors.accent.opacity(Constants.rowProgramTagFillOpacity), in: Capsule())
-                        .overlay(
-                            Capsule()
-                                .stroke(AppColors.accent.opacity(Constants.rowProgramTagStrokeOpacity), lineWidth: 1)
-                        )
+                        .padding(.horizontal, 8)
+                        .padding(.vertical, 5)
+                        .appInsetCard(cornerRadius: 8, fillOpacity: 0.8, borderOpacity: 0.65)
                 }
+            }
 
-                Text(exerciseSummaryByRoutineID[routine.id] ?? routine.exercises.map(\.name).joined(separator: " • "))
+            Button {
+                appStore.startSession(planID: reference.planID, templateID: reference.templateID)
+            } label: {
+                Label("Start \(reference.templateName)", systemImage: "play.fill")
+                    .font(.headline)
+                    .frame(maxWidth: .infinity)
+            }
+            .buttonStyle(.borderedProminent)
+            .tint(AppColors.accent)
+            .accessibilityIdentifier("today.pinnedStartButton")
+        }
+        .padding(16)
+        .appSurface(cornerRadius: 18, shadow: false)
+    }
+
+    private var quickStartSection: some View {
+        VStack(alignment: .leading, spacing: 12) {
+            sectionLabel("Quick Start", systemImage: "bolt")
+
+            if todayStore.quickStartTemplates.isEmpty {
+                Text("Templates you start most often will show up here.")
                     .font(.subheadline)
                     .foregroundStyle(AppColors.textSecondary)
-                    .lineLimit(Constants.rowTextLineLimit)
+                    .padding(14)
+                    .frame(maxWidth: .infinity, alignment: .leading)
+                    .appSurface(cornerRadius: 14, shadow: false)
+            } else {
+                LazyVGrid(
+                    columns: [GridItem(.flexible(), spacing: 12), GridItem(.flexible(), spacing: 12)],
+                    spacing: 12
+                ) {
+                    ForEach(todayStore.quickStartTemplates) { reference in
+                        Button {
+                            appStore.startSession(planID: reference.planID, templateID: reference.templateID)
+                        } label: {
+                            VStack(alignment: .leading, spacing: 10) {
+                                Text(reference.templateName)
+                                    .font(.headline.weight(.semibold))
+                                    .foregroundStyle(AppColors.textPrimary)
+                                    .frame(maxWidth: .infinity, alignment: .leading)
 
-                HStack(spacing: Constants.rowMetaSpacing) {
-                    rowMetadataChip(
-                        label: "\(routine.exercises.count) exercise\(routine.exercises.count == 1 ? "" : "s")",
-                        systemImage: "figure.strengthtraining.traditional"
-                    )
+                                Text(reference.planName)
+                                    .font(.caption)
+                                    .foregroundStyle(AppColors.textSecondary)
+                                    .frame(maxWidth: .infinity, alignment: .leading)
 
-                    rowMetadataChip(
-                        label: routine.program == nil ? "Custom" : "Template",
-                        systemImage: routine.program == nil ? "square.and.pencil" : "sparkles"
-                    )
+                                if let lastStartedAt = reference.lastStartedAt {
+                                    Text("Last started \(lastStartedAt.formatted(date: .abbreviated, time: .omitted))")
+                                        .font(.caption2)
+                                        .foregroundStyle(AppColors.textSecondary)
+                                        .frame(maxWidth: .infinity, alignment: .leading)
+                                }
+                            }
+                            .padding(14)
+                            .frame(maxWidth: .infinity, alignment: .leading)
+                            .appSurface(cornerRadius: 14, shadow: false)
+                        }
+                        .buttonStyle(.plain)
+                        .accessibilityIdentifier("today.quickStart.\(reference.templateID.uuidString)")
+                    }
                 }
             }
         }
-        .padding(Constants.rowOuterPadding)
-        .appSurface(cornerRadius: Constants.rowCornerRadius, shadow: false)
     }
 
-    private func rowMetadataChip(label: String, systemImage: String) -> some View {
-        Label(label, systemImage: systemImage)
-            .font(.caption2.weight(.medium))
-            .foregroundStyle(AppColors.textSecondary)
-            .padding(.horizontal, Constants.rowMetaHorizontalPadding)
-            .padding(.vertical, Constants.rowMetaVerticalPadding)
-            .appInsetCard(cornerRadius: 9, fillOpacity: 0.78, borderOpacity: 0.68)
-    }
+    private var recentPRSection: some View {
+        VStack(alignment: .leading, spacing: 12) {
+            sectionLabel("Recent PRs", systemImage: "rosette")
 
-    private func rebuildExerciseSummaryCache() {
-        var summaries: [UUID: String] = [:]
-        summaries.reserveCapacity(store.routines.count)
+            if todayStore.recentPersonalRecords.isEmpty {
+                Text("Finish sessions and the latest PRs will appear here.")
+                    .font(.subheadline)
+                    .foregroundStyle(AppColors.textSecondary)
+                    .padding(14)
+                    .frame(maxWidth: .infinity, alignment: .leading)
+                    .appSurface(cornerRadius: 14, shadow: false)
+            } else {
+                ForEach(todayStore.recentPersonalRecords) { record in
+                    HStack(alignment: .top) {
+                        VStack(alignment: .leading, spacing: 6) {
+                            Text(record.displayName)
+                                .font(.headline.weight(.semibold))
+                                .foregroundStyle(AppColors.textPrimary)
 
-        for routine in store.routines {
-            summaries[routine.id] = routine.exercises.map(\.name).joined(separator: " • ")
+                            Text(
+                                "\(WeightFormatter.displayString(record.weight, unit: weightUnit)) \(weightUnit.symbol) x \(record.reps)"
+                            )
+                            .font(.subheadline)
+                            .foregroundStyle(AppColors.textSecondary)
+                        }
+
+                        Spacer()
+
+                        Text(record.achievedAt.formatted(date: .abbreviated, time: .omitted))
+                            .font(.caption)
+                            .foregroundStyle(AppColors.accent)
+                    }
+                    .padding(14)
+                    .appSurface(cornerRadius: 14, shadow: false)
+                }
+            }
         }
+    }
 
-        exerciseSummaryByRoutineID = summaries
+    private var recentSessionsSection: some View {
+        VStack(alignment: .leading, spacing: 12) {
+            sectionLabel("Recent Sessions", systemImage: "clock.arrow.circlepath")
+
+            if todayStore.recentSessions.isEmpty {
+                Text("Your finished workouts will show up here.")
+                    .font(.subheadline)
+                    .foregroundStyle(AppColors.textSecondary)
+                    .padding(14)
+                    .frame(maxWidth: .infinity, alignment: .leading)
+                    .appSurface(cornerRadius: 14, shadow: false)
+            } else {
+                ForEach(todayStore.recentSessions) { session in
+                    VStack(alignment: .leading, spacing: 6) {
+                        Text(session.templateNameSnapshot)
+                            .font(.headline.weight(.semibold))
+                            .foregroundStyle(AppColors.textPrimary)
+
+                        Text(session.completedAt.formatted(date: .abbreviated, time: .shortened))
+                            .font(.caption)
+                            .foregroundStyle(AppColors.textSecondary)
+
+                        Text("\(session.blocks.count) exercise block\(session.blocks.count == 1 ? "" : "s") logged")
+                            .font(.caption)
+                            .foregroundStyle(AppColors.accent)
+                    }
+                    .padding(14)
+                    .frame(maxWidth: .infinity, alignment: .leading)
+                    .appSurface(cornerRadius: 14, shadow: false)
+                }
+            }
+        }
+    }
+
+    private func sectionLabel(_ title: String, systemImage: String) -> some View {
+        Label(title, systemImage: systemImage)
+            .font(.headline.weight(.semibold))
+            .foregroundStyle(AppColors.textPrimary)
+            .frame(maxWidth: .infinity, alignment: .leading)
+    }
+}
+
+private struct TemplateEditorContext: Identifiable {
+    var id: UUID {
+        template?.id ?? UUID()
+    }
+
+    var planID: UUID
+    var template: WorkoutTemplate?
+}
+
+struct PlansView: View {
+    @Environment(AppStore.self) private var appStore
+    @Environment(PlansStore.self) private var plansStore
+
+    @State private var editingPlan: Plan?
+    @State private var editingTemplateContext: TemplateEditorContext?
+    @State private var selectedPresetPack: PresetPack?
+
+    var body: some View {
+        NavigationStack {
+            ZStack {
+                AppBackground()
+                ScrollView {
+                    VStack(spacing: 16) {
+                        plansHero
+                            .appReveal(delay: 0.01)
+
+                        if plansStore.plans.isEmpty {
+                            AppEmptyStateCard(
+                                systemImage: "list.bullet.rectangle",
+                                title: "No plans yet",
+                                message: "Create a custom plan or install one of the preset packs."
+                            )
+                            .appReveal(delay: 0.03)
+                        } else {
+                            ForEach(plansStore.plans) { plan in
+                                planCard(plan)
+                                    .appReveal(delay: 0.03)
+                            }
+                        }
+                    }
+                    .padding(.horizontal, 14)
+                    .padding(.vertical, 14)
+                }
+                .scrollIndicators(.hidden)
+            }
+            .navigationTitle("Plans")
+            .toolbarBackground(AppColors.chrome, for: .navigationBar)
+            .toolbarBackground(.visible, for: .navigationBar)
+            .toolbar {
+                ToolbarItem(placement: .topBarLeading) {
+                    Menu {
+                        ForEach(PresetPack.allCases) { pack in
+                            Button(pack.displayName, systemImage: pack.systemImage) {
+                                selectedPresetPack = pack
+                            }
+                        }
+                    } label: {
+                        Label("Preset", systemImage: "sparkles")
+                    }
+                }
+
+                ToolbarItem(placement: .topBarTrailing) {
+                    Button {
+                        editingPlan = appStore.makePlan(name: "")
+                    } label: {
+                        Label("Plan", systemImage: "plus")
+                    }
+                    .accessibilityIdentifier("plans.addPlanButton")
+                }
+            }
+            .sheet(item: $editingPlan) { plan in
+                PlanEditorSheet(existingPlan: plan.name.isEmpty ? nil : plan) { savedPlan in
+                    appStore.savePlan(savedPlan)
+                }
+            }
+            .sheet(item: $editingTemplateContext) { context in
+                TemplateEditorSheet(
+                    planID: context.planID,
+                    existingTemplate: context.template
+                ) { template, profiles in
+                    appStore.saveProfiles(profiles)
+                    appStore.saveTemplate(planID: context.planID, template: template)
+                }
+            }
+            .confirmationDialog(
+                "Install preset pack",
+                isPresented: Binding(
+                    get: { selectedPresetPack != nil },
+                    set: { isPresented in
+                        if !isPresented {
+                            selectedPresetPack = nil
+                        }
+                    }
+                ),
+                titleVisibility: .visible
+            ) {
+                if let selectedPresetPack {
+                    Button("Add \(selectedPresetPack.displayName)") {
+                        appStore.plansStore.addPresetPack(selectedPresetPack, settings: appStore.settingsStore)
+                        appStore.refreshTodayStore()
+                    }
+                }
+
+                Button("Cancel", role: .cancel) {
+                    selectedPresetPack = nil
+                }
+            } message: {
+                Text(selectedPresetPack?.description ?? "")
+            }
+        }
+    }
+
+    private var plansHero: some View {
+        AppHeroCard(
+            eyebrow: "Plan Builder",
+            title: "\(plansStore.plans.count) plans",
+            subtitle: "Templates define your future sessions. Schedule them loosely, pin the important ones, and start from Today whenever you want.",
+            systemImage: "list.bullet.rectangle",
+            metrics: [
+                AppHeroMetric(
+                    id: "plans",
+                    label: "Plans",
+                    value: "\(plansStore.plans.count)",
+                    systemImage: "list.bullet"
+                ),
+                AppHeroMetric(
+                    id: "templates",
+                    label: "Templates",
+                    value: "\(plansStore.templateReferences().count)",
+                    systemImage: "rectangle.stack"
+                ),
+                AppHeroMetric(
+                    id: "catalog",
+                    label: "Exercises",
+                    value: "\(plansStore.catalog.count)",
+                    systemImage: "dumbbell"
+                ),
+                AppHeroMetric(
+                    id: "profiles",
+                    label: "Profiles",
+                    value: "\(plansStore.profiles.count)",
+                    systemImage: "slider.horizontal.3"
+                )
+            ]
+        )
+    }
+
+    private func planCard(_ plan: Plan) -> some View {
+        VStack(alignment: .leading, spacing: 14) {
+            HStack(alignment: .top) {
+                VStack(alignment: .leading, spacing: 6) {
+                    Text(plan.name)
+                        .font(.system(.title3, design: .rounded).weight(.bold))
+                        .foregroundStyle(AppColors.textPrimary)
+
+                    Text("\(plan.templates.count) template\(plan.templates.count == 1 ? "" : "s")")
+                        .font(.caption)
+                        .foregroundStyle(AppColors.textSecondary)
+                }
+
+                Spacer()
+
+                Button {
+                    editingTemplateContext = TemplateEditorContext(planID: plan.id, template: nil)
+                } label: {
+                    Label("Add Template", systemImage: "plus")
+                }
+                .buttonStyle(.bordered)
+                .tint(AppColors.accent)
+                .accessibilityIdentifier("plans.addTemplateButton.\(plan.id.uuidString)")
+
+                Menu {
+                    Button("Edit Plan", systemImage: "square.and.pencil") {
+                        editingPlan = plan
+                    }
+                    Button("Delete Plan", systemImage: "trash", role: .destructive) {
+                        appStore.deletePlan(plan.id)
+                    }
+                } label: {
+                    Image(systemName: "ellipsis.circle")
+                        .foregroundStyle(AppColors.textSecondary)
+                }
+            }
+
+            if plan.templates.isEmpty {
+                Text("This plan has no templates yet.")
+                    .font(.subheadline)
+                    .foregroundStyle(AppColors.textSecondary)
+                    .padding(12)
+                    .frame(maxWidth: .infinity, alignment: .leading)
+                    .appInsetCard(cornerRadius: 12, fillOpacity: 0.8, borderOpacity: 0.65)
+            } else {
+                ForEach(plan.templates) { template in
+                    templateCard(plan: plan, template: template)
+                }
+            }
+        }
+        .padding(16)
+        .appSurface(cornerRadius: 18, shadow: false)
+    }
+
+    private func templateCard(plan: Plan, template: WorkoutTemplate) -> some View {
+        VStack(alignment: .leading, spacing: 10) {
+            HStack(alignment: .top) {
+                VStack(alignment: .leading, spacing: 5) {
+                    HStack(spacing: 8) {
+                        Text(template.name)
+                            .font(.headline.weight(.semibold))
+                            .foregroundStyle(AppColors.textPrimary)
+
+                        if plan.pinnedTemplateID == template.id {
+                            Text("PINNED")
+                                .font(.caption2.weight(.bold))
+                                .foregroundStyle(AppColors.accent)
+                                .padding(.horizontal, 6)
+                                .padding(.vertical, 4)
+                                .appInsetCard(cornerRadius: 8, fillOpacity: 0.86, borderOpacity: 0.8)
+                        }
+                    }
+
+                    if !template.note.isEmpty {
+                        Text(template.note)
+                            .font(.caption)
+                            .foregroundStyle(AppColors.textSecondary)
+                    }
+                }
+
+                Spacer()
+            }
+
+            if !template.scheduledWeekdays.isEmpty {
+                HStack(spacing: 8) {
+                    ForEach(template.scheduledWeekdays) { weekday in
+                        Text(weekday.shortLabel)
+                            .font(.caption.weight(.semibold))
+                            .foregroundStyle(AppColors.accent)
+                            .padding(.horizontal, 7)
+                            .padding(.vertical, 5)
+                            .appInsetCard(cornerRadius: 8, fillOpacity: 0.82, borderOpacity: 0.75)
+                    }
+                }
+            }
+
+            ForEach(template.blocks) { block in
+                HStack(alignment: .top) {
+                    VStack(alignment: .leading, spacing: 4) {
+                        Text(block.exerciseNameSnapshot)
+                            .font(.subheadline.weight(.semibold))
+                            .foregroundStyle(AppColors.textPrimary)
+
+                        Text("\(block.targets.count) sets • \(block.targets.first?.repRange.displayLabel ?? "-") reps")
+                            .font(.caption)
+                            .foregroundStyle(AppColors.textSecondary)
+
+                        if let supersetGroup = block.supersetGroup, !supersetGroup.isEmpty {
+                            Text("Superset \(supersetGroup)")
+                                .font(.caption2)
+                                .foregroundStyle(AppColors.accent)
+                        }
+                    }
+
+                    Spacer()
+
+                    MetricBadge(
+                        label: "Rule",
+                        value: block.progressionRule.kind.displayLabel,
+                        systemImage: "arrow.up.right"
+                    )
+                }
+                .padding(12)
+                .appInsetCard(cornerRadius: 12, fillOpacity: 0.78, borderOpacity: 0.68)
+            }
+
+            HStack(spacing: 10) {
+                Button {
+                    appStore.startSession(planID: plan.id, templateID: template.id)
+                } label: {
+                    Label("Start", systemImage: "play.fill")
+                        .frame(maxWidth: .infinity)
+                }
+                .buttonStyle(.borderedProminent)
+                .tint(AppColors.accent)
+                .accessibilityIdentifier("plans.startTemplate.\(template.id.uuidString)")
+
+                Button {
+                    editingTemplateContext = TemplateEditorContext(planID: plan.id, template: template)
+                } label: {
+                    Label("Edit", systemImage: "square.and.pencil")
+                        .frame(maxWidth: .infinity)
+                }
+                .buttonStyle(.bordered)
+                .tint(AppColors.accent)
+
+                Button(role: .destructive) {
+                    appStore.deleteTemplate(planID: plan.id, templateID: template.id)
+                } label: {
+                    Image(systemName: "trash")
+                }
+                .buttonStyle(.bordered)
+            }
+        }
+        .padding(14)
+        .appInsetCard(cornerRadius: 14, fillOpacity: 0.82, borderOpacity: 0.7)
     }
 }

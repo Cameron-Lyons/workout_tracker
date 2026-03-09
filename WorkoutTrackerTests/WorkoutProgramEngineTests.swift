@@ -2,183 +2,177 @@ import XCTest
 @testable import WorkoutTracker
 
 final class WorkoutProgramEngineTests: XCTestCase {
-    func testPlanWithoutProgramReturnsEmpty() {
-        let routine = Routine(
-            name: "No Program",
-            exercises: [Exercise(name: "Bench Press", trainingMax: 185)]
+    func testManualProgressionReturnsExistingTargets() {
+        let block = ExerciseBlock(
+            exerciseID: CatalogSeed.benchPress,
+            exerciseNameSnapshot: "Bench Press",
+            progressionRule: .manual,
+            targets: [
+                SetTarget(targetWeight: 185, repRange: RepRange(5, 5))
+            ]
         )
 
-        let plan = WorkoutProgramEngine.plan(for: routine)
+        let resolvedTargets = ProgressionEngine.resolvedTargets(for: block, profile: nil)
 
-        XCTAssertEqual(plan, .empty)
+        XCTAssertEqual(resolvedTargets, block.targets)
     }
 
-    func testStartingStrengthDayAIncludesExpectedExercisesAndProgression() throws {
-        let squat = Exercise(id: UUID(), name: "Back Squat", trainingMax: 200)
-        let bench = Exercise(id: UUID(), name: "Bench Press", trainingMax: 150)
-        let deadlift = Exercise(id: UUID(), name: "Deadlift", trainingMax: 300)
-        let overhead = Exercise(id: UUID(), name: "Overhead Press", trainingMax: 100)
-        let row = Exercise(id: UUID(), name: "Barbell Row", trainingMax: 160)
-
-        let routine = Routine(
-            name: "Starting Strength",
-            exercises: [squat, bench, deadlift, overhead, row],
-            program: ProgramConfig(
-                kind: .startingStrength,
-                state: ProgramState(step: 0, cycle: 3)
-            )
+    func testDoubleProgressionIncreasesWorkingTargetsAfterTopRepGoalIsMet() {
+        let block = ExerciseBlock(
+            exerciseID: CatalogSeed.backSquat,
+            exerciseNameSnapshot: "Back Squat",
+            progressionRule: ProgressionRule(
+                kind: .doubleProgression,
+                doubleProgression: DoubleProgressionRule(
+                    targetRepRange: RepRange(8, 10),
+                    increment: 5
+                )
+            ),
+            targets: [
+                SetTarget(targetWeight: 225, repRange: RepRange(8, 10)),
+                SetTarget(targetWeight: 225, repRange: RepRange(8, 10))
+            ]
         )
 
-        let plan = WorkoutProgramEngine.plan(for: routine)
+        let completedBlock = CompletedSessionBlock(
+            exerciseID: CatalogSeed.backSquat,
+            exerciseNameSnapshot: "Back Squat",
+            blockNote: "",
+            restSeconds: 90,
+            supersetGroup: nil,
+            progressionRule: block.progressionRule,
+            sets: [
+                SessionSetRow(
+                    target: block.targets[0],
+                    log: SetLog(
+                        setTargetID: block.targets[0].id,
+                        weight: 225,
+                        reps: 10,
+                        completedAt: .now
+                    )
+                ),
+                SessionSetRow(
+                    target: block.targets[1],
+                    log: SetLog(
+                        setTargetID: block.targets[1].id,
+                        weight: 225,
+                        reps: 11,
+                        completedAt: .now
+                    )
+                )
+            ]
+        )
 
-        XCTAssertEqual(plan.contextLabel, "Day A • Workout 3")
-        XCTAssertEqual(plan.activeExerciseIDs, Set([squat.id, bench.id, deadlift.id]))
+        let updated = ProgressionEngine.applyCompletion(
+            to: block,
+            using: completedBlock,
+            profile: nil,
+            fallbackIncrement: 5
+        )
 
-        let squatSets = try XCTUnwrap(plan.setTemplatesByExerciseID[squat.id])
-        XCTAssertEqual(squatSets.count, 3)
-        XCTAssertTrue(squatSets.allSatisfy { $0.reps == 5 })
-        XCTAssertTrue(squatSets.allSatisfy { $0.weight == 210.0 })
-        XCTAssertTrue(squatSets.allSatisfy { $0.note == nil })
-
-        let benchSets = try XCTUnwrap(plan.setTemplatesByExerciseID[bench.id])
-        XCTAssertEqual(benchSets.count, 3)
-        XCTAssertTrue(benchSets.allSatisfy { $0.reps == 5 })
-        XCTAssertTrue(benchSets.allSatisfy { $0.weight == 152.5 })
-
-        let deadliftSets = try XCTUnwrap(plan.setTemplatesByExerciseID[deadlift.id])
-        XCTAssertEqual(deadliftSets.count, 1)
-        XCTAssertEqual(deadliftSets[0].reps, 5)
-        XCTAssertEqual(deadliftSets[0].weight, 305.0)
-
-        XCTAssertNil(plan.setTemplatesByExerciseID[overhead.id])
-        XCTAssertNil(plan.setTemplatesByExerciseID[row.id])
+        XCTAssertEqual(updated.block.targets.compactMap(\.targetWeight), [230, 230])
     }
 
-    func testStartingStrengthDayBIncludesPowerCleanAndTMGuidanceWhenTrainingMaxMissing() throws {
-        let squat = Exercise(id: UUID(), name: "Back Squat", trainingMax: 200)
-        let overhead = Exercise(id: UUID(), name: "Overhead Press", trainingMax: 100)
-        let powerClean = Exercise(id: UUID(), name: "Power Clean", trainingMax: nil)
-
-        let routine = Routine(
-            name: "Starting Strength",
-            exercises: [squat, overhead, powerClean],
-            program: ProgramConfig(
-                kind: .startingStrength,
-                state: ProgramState(step: 1, cycle: 2)
-            )
+    func testPercentageWaveUsesTrainingMaxToResolveWorkingSets() {
+        let block = ExerciseBlock(
+            exerciseID: CatalogSeed.benchPress,
+            exerciseNameSnapshot: "Bench Press",
+            progressionRule: ProgressionRule(
+                kind: .percentageWave,
+                percentageWave: PercentageWaveRule(
+                    trainingMax: 200,
+                    weeks: [
+                        PercentageWaveWeek(
+                            name: "Week 1",
+                            sets: [
+                                PercentageWaveSet(percentage: 0.65, repRange: RepRange(5, 5)),
+                                PercentageWaveSet(percentage: 0.75, repRange: RepRange(5, 5)),
+                                PercentageWaveSet(percentage: 0.85, repRange: RepRange(5, 5))
+                            ]
+                        )
+                    ],
+                    cycleIncrement: 5
+                )
+            ),
+            targets: []
         )
 
-        let plan = WorkoutProgramEngine.plan(for: routine)
+        let resolvedTargets = ProgressionEngine.resolvedTargets(for: block, profile: nil)
 
-        XCTAssertEqual(plan.contextLabel, "Day B • Workout 2")
-        XCTAssertEqual(plan.activeExerciseIDs, Set([squat.id, overhead.id, powerClean.id]))
-
-        let squatSets = try XCTUnwrap(plan.setTemplatesByExerciseID[squat.id])
-        XCTAssertTrue(squatSets.allSatisfy { $0.weight == 205.0 })
-
-        let overheadSets = try XCTUnwrap(plan.setTemplatesByExerciseID[overhead.id])
-        XCTAssertTrue(overheadSets.allSatisfy { $0.weight == 100.0 })
-
-        let powerCleanSets = try XCTUnwrap(plan.setTemplatesByExerciseID[powerClean.id])
-        XCTAssertEqual(powerCleanSets.count, 5)
-        XCTAssertTrue(powerCleanSets.allSatisfy { $0.reps == 3 })
-        XCTAssertTrue(powerCleanSets.allSatisfy { $0.weight == nil })
-        XCTAssertTrue(powerCleanSets.allSatisfy { $0.note == "Set training max (TM) in Edit Routine" })
+        XCTAssertEqual(resolvedTargets.compactMap(\.targetWeight), [130, 150, 170])
+        XCTAssertEqual(resolvedTargets.map(\.repRange), [RepRange(5, 5), RepRange(5, 5), RepRange(5, 5)])
     }
 
-    func testFiveThreeOneWeekOneBuildsPrimarySets() throws {
-        let bench = Exercise(id: UUID(), name: "Bench Press", trainingMax: 200)
-        let routine = Routine(
-            name: "5/3/1",
-            exercises: [bench],
-            program: ProgramConfig(
-                kind: .fiveThreeOne,
-                state: ProgramState(step: 0, cycle: 2)
-            )
+    func testPercentageWaveWrapAdvancesCycleAndTrainingMax() {
+        let wave = PercentageWaveRule(
+            trainingMax: 200,
+            weeks: [
+                PercentageWaveWeek(name: "Week 1", sets: [PercentageWaveSet(percentage: 0.65, repRange: RepRange(5, 5))]),
+                PercentageWaveWeek(name: "Week 2", sets: [PercentageWaveSet(percentage: 0.70, repRange: RepRange(3, 3))])
+            ],
+            currentWeekIndex: 1,
+            cycle: 1,
+            cycleIncrement: 10
+        )
+        let block = ExerciseBlock(
+            exerciseID: CatalogSeed.deadlift,
+            exerciseNameSnapshot: "Deadlift",
+            progressionRule: ProgressionRule(kind: .percentageWave, percentageWave: wave),
+            targets: []
         )
 
-        let plan = WorkoutProgramEngine.plan(for: routine)
+        let completedBlock = CompletedSessionBlock(
+            exerciseID: CatalogSeed.deadlift,
+            exerciseNameSnapshot: "Deadlift",
+            blockNote: "",
+            restSeconds: 180,
+            supersetGroup: nil,
+            progressionRule: block.progressionRule,
+            sets: []
+        )
+        let profile = ExerciseProfile(exerciseID: CatalogSeed.deadlift, trainingMax: 200, preferredIncrement: 10)
 
-        XCTAssertNil(plan.activeExerciseIDs)
-        XCTAssertEqual(plan.contextLabel, "Cycle 2 • Week 1 (5-rep week)")
+        let updated = ProgressionEngine.applyCompletion(
+            to: block,
+            using: completedBlock,
+            profile: profile,
+            fallbackIncrement: 10
+        )
 
-        let sets = try XCTUnwrap(plan.setTemplatesByExerciseID[bench.id])
-        XCTAssertEqual(sets.count, 3)
-        XCTAssertEqual(sets.map(\.reps), [5, 5, 5])
-        XCTAssertEqual(sets.map(\.weight), [130.0, 150.0, 170.0].map(Optional.some))
-        XCTAssertEqual(sets[2].note, "AMRAP (as many reps as possible)")
+        XCTAssertEqual(updated.block.progressionRule.percentageWave?.currentWeekIndex, 0)
+        XCTAssertEqual(updated.block.progressionRule.percentageWave?.cycle, 2)
+        XCTAssertEqual(updated.profile?.trainingMax, 210)
     }
 
-    func testBoringButBigAddsSupplementalSetsExceptDeloadWeek() throws {
-        let squat = Exercise(id: UUID(), name: "Back Squat", trainingMax: 300)
-
-        let weekOneRoutine = Routine(
-            name: "BBB",
-            exercises: [squat],
-            program: ProgramConfig(
-                kind: .boringButBig,
-                state: ProgramState(step: 0, cycle: 1)
-            )
+    func testStartingSessionInjectsWarmupsBeforeWorkingSets() {
+        let template = WorkoutTemplate(
+            name: "Test Template",
+            blocks: [
+                ExerciseBlock(
+                    exerciseID: CatalogSeed.benchPress,
+                    exerciseNameSnapshot: "Bench Press",
+                    progressionRule: .manual,
+                    targets: [
+                        SetTarget(targetWeight: 185, repRange: RepRange(5, 5), restSeconds: 90)
+                    ],
+                    allowsAutoWarmups: true
+                )
+            ]
         )
 
-        let weekOnePlan = WorkoutProgramEngine.plan(for: weekOneRoutine)
-        let weekOneSets = try XCTUnwrap(weekOnePlan.setTemplatesByExerciseID[squat.id])
-        XCTAssertEqual(weekOneSets.count, 8)
-        XCTAssertEqual(weekOneSets.filter { $0.note == "BBB (5x10)" }.count, 5)
-
-        let deloadRoutine = Routine(
-            id: weekOneRoutine.id,
-            name: weekOneRoutine.name,
-            exercises: [squat],
-            program: ProgramConfig(
-                kind: .boringButBig,
-                state: ProgramState(step: 3, cycle: 1)
-            )
+        let draft = SessionEngine.startSession(
+            planID: UUID(),
+            template: template,
+            profilesByExerciseID: [:],
+            warmupRamp: [
+                WarmupRampStep(percentage: 0.40, reps: 5),
+                WarmupRampStep(percentage: 0.60, reps: 3)
+            ]
         )
 
-        let deloadPlan = WorkoutProgramEngine.plan(for: deloadRoutine)
-        let deloadSets = try XCTUnwrap(deloadPlan.setTemplatesByExerciseID[squat.id])
-        XCTAssertEqual(deloadSets.count, 3)
-        XCTAssertFalse(deloadSets.contains { $0.note == "BBB (5x10)" })
-    }
-
-    func testAdvanceProgramStateStartingStrengthWrapsAndIncrementsCycle() {
-        var routine = Routine(
-            name: "Starting Strength",
-            exercises: [Exercise(name: "Back Squat", trainingMax: 200)],
-            program: ProgramConfig(
-                kind: .startingStrength,
-                state: ProgramState(step: 1, cycle: 4)
-            )
-        )
-
-        WorkoutProgramEngine.advanceProgramState(in: &routine)
-
-        XCTAssertEqual(routine.program?.state.step, 0)
-        XCTAssertEqual(routine.program?.state.cycle, 5)
-    }
-
-    func testAdvanceProgramStateFiveThreeOneCycleWrapIncreasesTrainingMaxes() {
-        let squat = Exercise(id: UUID(), name: "Back Squat", trainingMax: 299)
-        let bench = Exercise(id: UUID(), name: "Bench Press", trainingMax: 202.6)
-        let row = Exercise(id: UUID(), name: "Barbell Row", trainingMax: nil)
-
-        var routine = Routine(
-            name: "5/3/1",
-            exercises: [squat, bench, row],
-            program: ProgramConfig(
-                kind: .fiveThreeOne,
-                state: ProgramState(step: 3, cycle: 2)
-            )
-        )
-
-        WorkoutProgramEngine.advanceProgramState(in: &routine)
-
-        XCTAssertEqual(routine.program?.state.step, 0)
-        XCTAssertEqual(routine.program?.state.cycle, 3)
-
-        XCTAssertEqual(routine.exercises[0].trainingMax, 310.0)
-        XCTAssertEqual(routine.exercises[1].trainingMax, 207.5)
-        XCTAssertNil(routine.exercises[2].trainingMax)
+        let setKinds = draft.blocks.first?.sets.map(\.target.setKind)
+        XCTAssertEqual(setKinds, [.warmup, .warmup, .working])
+        XCTAssertEqual(draft.blocks.first?.sets.first?.target.targetWeight, 75)
+        XCTAssertEqual(draft.blocks.first?.sets.dropFirst().first?.target.targetWeight, 110)
     }
 }

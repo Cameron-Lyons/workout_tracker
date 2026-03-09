@@ -1,5 +1,5 @@
-import SwiftUI
 import SwiftData
+import SwiftUI
 
 private struct AppStartupShellView: View {
     var body: some View {
@@ -11,7 +11,7 @@ private struct AppStartupShellView: View {
                     .tint(AppColors.accent)
                     .scaleEffect(1.2)
 
-                Text("Loading workout data...")
+                Text("Loading session-first workspace...")
                     .font(.subheadline.weight(.semibold))
                     .foregroundStyle(AppColors.textPrimary)
             }
@@ -27,22 +27,22 @@ private struct AppStartupShellView: View {
 @main
 struct WorkoutTrackerApp: App {
     @Environment(\.scenePhase) private var scenePhase
+
     private let modelContainer: ModelContainer
-    @StateObject private var store: WorkoutStore
+    @State private var appStore: AppStore
 
     init() {
         let launchArguments = Set(ProcessInfo.processInfo.arguments)
         let useInMemoryStore = launchArguments.contains("--uitesting-in-memory")
-        let useStarterDataWhenEmpty = !launchArguments.contains("--uitesting-empty-store")
-
         let container = WorkoutModelContainerFactory.makeContainer(
             isStoredInMemoryOnly: useInMemoryStore
         )
+
         modelContainer = container
-        _store = StateObject(
-            wrappedValue: WorkoutStore(
+        _appStore = State(
+            initialValue: AppStore(
                 modelContainer: container,
-                useStarterDataWhenEmpty: useStarterDataWhenEmpty
+                launchArguments: launchArguments
             )
         )
     }
@@ -50,21 +50,21 @@ struct WorkoutTrackerApp: App {
     var body: some Scene {
         WindowGroup {
             Group {
-                if store.isHydrated {
-                    RootTabView()
+                if appStore.isHydrated {
+                    RootAppView()
+                        .environment(appStore)
                 } else {
                     AppStartupShellView()
                 }
             }
-                .environmentObject(store)
-                .task {
-                    store.startHydrationIfNeeded()
+            .task {
+                appStore.hydrateIfNeeded()
+            }
+            .onChange(of: scenePhase) { _, phase in
+                if phase == .background || phase == .inactive {
+                    appStore.refreshDerivedStores()
                 }
-                .onChange(of: scenePhase) { _, phase in
-                    if phase == .background || phase == .inactive {
-                        store.flushPendingSaves()
-                    }
-                }
+            }
         }
         .modelContainer(modelContainer)
     }
