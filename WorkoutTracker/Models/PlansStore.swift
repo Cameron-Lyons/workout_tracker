@@ -99,6 +99,10 @@ final class PlansStore {
         cachedTemplateReferences
     }
 
+    var templateReferenceCount: Int {
+        cachedTemplateReferences.count
+    }
+
     func markTemplateStarted(planID: UUID, templateID: UUID, startedAt: Date) {
         guard var plan = plan(for: planID),
               let templateIndex = plan.templates.firstIndex(where: { $0.id == templateID }) else {

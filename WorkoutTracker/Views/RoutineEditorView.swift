@@ -137,7 +137,7 @@ struct TemplateEditorSheet: View {
             ZStack {
                 AppBackground()
                 ScrollView {
-                    VStack(spacing: 16) {
+                    LazyVStack(spacing: 16) {
                         VStack(spacing: 12) {
                             TextField("Template name", text: $templateName)
                                 .textInputAutocapitalization(.words)
@@ -214,8 +214,19 @@ struct TemplateEditorSheet: View {
                                     .font(.subheadline)
                                     .foregroundStyle(AppColors.textSecondary)
                             } else {
-                                ForEach($blocks) { $block in
-                                    blockEditor($block)
+                                LazyVStack(spacing: 12) {
+                                    ForEach($blocks) { $block in
+                                        TemplateDraftBlockEditorView(
+                                            block: $block,
+                                            weightUnit: weightUnit,
+                                            onPickExercise: { blockID in
+                                                showingExercisePickerForBlockID = blockID
+                                            },
+                                            onDelete: { blockID in
+                                                blocks.removeAll(where: { $0.id == blockID })
+                                            }
+                                        )
+                                    }
                                 }
                             }
                         }
@@ -273,88 +284,6 @@ struct TemplateEditorSheet: View {
                 loadTemplate()
             }
         }
-    }
-
-    private func blockEditor(_ block: Binding<TemplateDraftBlock>) -> some View {
-        VStack(alignment: .leading, spacing: 12) {
-            HStack {
-                Text(block.wrappedValue.exerciseName.nonEmptyTrimmed ?? "Choose exercise")
-                    .font(.headline.weight(.semibold))
-                    .foregroundStyle(AppColors.textPrimary)
-
-                Spacer()
-
-                Button("Pick") {
-                    showingExercisePickerForBlockID = block.wrappedValue.id
-                }
-                .buttonStyle(.bordered)
-                .tint(AppColors.accent)
-
-                Button(role: .destructive) {
-                    blocks.removeAll(where: { $0.id == block.wrappedValue.id })
-                } label: {
-                    Image(systemName: "trash")
-                }
-                .buttonStyle(.bordered)
-            }
-
-            Picker("Progression", selection: block.progressionKind) {
-                Text("Manual").tag(ProgressionRuleKind.manual)
-                Text("Double").tag(ProgressionRuleKind.doubleProgression)
-                Text("Wave").tag(ProgressionRuleKind.percentageWave)
-            }
-            .pickerStyle(.segmented)
-
-            HStack(spacing: 10) {
-                NumericInputField(title: "Sets", text: block.setCountTextBinding, keyboardType: .numberPad)
-                NumericInputField(title: "Rep Min", text: block.repLowerTextBinding, keyboardType: .numberPad)
-                NumericInputField(title: "Rep Max", text: block.repUpperTextBinding, keyboardType: .numberPad)
-            }
-
-            HStack(spacing: 10) {
-                NumericInputField(title: "Target Weight (\(weightUnit.symbol))", text: block.targetWeightText)
-                NumericInputField(title: "Rest (sec)", text: block.restSecondsTextBinding, keyboardType: .numberPad)
-            }
-
-            if block.wrappedValue.progressionKind != .manual {
-                HStack(spacing: 10) {
-                    NumericInputField(title: "Increment (\(weightUnit.symbol))", text: block.incrementText)
-                    NumericInputField(title: "TM / Profile Weight (\(weightUnit.symbol))", text: block.trainingMaxText)
-                }
-
-                NumericInputField(
-                    title: "Preferred Increment Override (\(weightUnit.symbol))",
-                    text: block.preferredIncrementText
-                )
-            }
-
-            HStack(spacing: 10) {
-                TextField("Superset group", text: block.supersetGroup)
-                    .textInputAutocapitalization(.characters)
-                    .foregroundStyle(AppColors.textPrimary)
-                    .appInputField()
-
-                Picker("Set Type", selection: block.setKind) {
-                    Text("Working").tag(SetKind.working)
-                    Text("Dropset").tag(SetKind.dropSet)
-                    Text("Warmup").tag(SetKind.warmup)
-                }
-                .pickerStyle(.menu)
-                .tint(AppColors.textPrimary)
-                .frame(maxWidth: .infinity)
-                .appInputField()
-            }
-
-            Toggle("Auto warmups", isOn: block.allowsAutoWarmups)
-                .tint(AppColors.accent)
-
-            TextField("Block note", text: block.blockNote, axis: .vertical)
-                .foregroundStyle(AppColors.textPrimary)
-                .lineLimit(2...3)
-                .appInputField()
-        }
-        .padding(14)
-        .appInsetCard(cornerRadius: 14, fillOpacity: 0.82, borderOpacity: 0.7)
     }
 
     private func loadTemplate() {
@@ -553,6 +482,96 @@ struct TemplateEditorSheet: View {
         )
         onSave(template, savedProfiles)
         dismiss()
+    }
+}
+
+private struct TemplateDraftBlockEditorView: View {
+    @Binding var block: TemplateDraftBlock
+
+    let weightUnit: WeightUnit
+    let onPickExercise: (UUID) -> Void
+    let onDelete: (UUID) -> Void
+
+    var body: some View {
+        VStack(alignment: .leading, spacing: 12) {
+            HStack {
+                Text(block.exerciseName.nonEmptyTrimmed ?? "Choose exercise")
+                    .font(.headline.weight(.semibold))
+                    .foregroundStyle(AppColors.textPrimary)
+
+                Spacer()
+
+                Button("Pick") {
+                    onPickExercise(block.id)
+                }
+                .buttonStyle(.bordered)
+                .tint(AppColors.accent)
+
+                Button(role: .destructive) {
+                    onDelete(block.id)
+                } label: {
+                    Image(systemName: "trash")
+                }
+                .buttonStyle(.bordered)
+            }
+
+            Picker("Progression", selection: $block.progressionKind) {
+                Text("Manual").tag(ProgressionRuleKind.manual)
+                Text("Double").tag(ProgressionRuleKind.doubleProgression)
+                Text("Wave").tag(ProgressionRuleKind.percentageWave)
+            }
+            .pickerStyle(.segmented)
+
+            HStack(spacing: 10) {
+                NumericInputField(title: "Sets", text: $block.setCountTextBinding, keyboardType: .numberPad)
+                NumericInputField(title: "Rep Min", text: $block.repLowerTextBinding, keyboardType: .numberPad)
+                NumericInputField(title: "Rep Max", text: $block.repUpperTextBinding, keyboardType: .numberPad)
+            }
+
+            HStack(spacing: 10) {
+                NumericInputField(title: "Target Weight (\(weightUnit.symbol))", text: $block.targetWeightText)
+                NumericInputField(title: "Rest (sec)", text: $block.restSecondsTextBinding, keyboardType: .numberPad)
+            }
+
+            if block.progressionKind != .manual {
+                HStack(spacing: 10) {
+                    NumericInputField(title: "Increment (\(weightUnit.symbol))", text: $block.incrementText)
+                    NumericInputField(title: "TM / Profile Weight (\(weightUnit.symbol))", text: $block.trainingMaxText)
+                }
+
+                NumericInputField(
+                    title: "Preferred Increment Override (\(weightUnit.symbol))",
+                    text: $block.preferredIncrementText
+                )
+            }
+
+            HStack(spacing: 10) {
+                TextField("Superset group", text: $block.supersetGroup)
+                    .textInputAutocapitalization(.characters)
+                    .foregroundStyle(AppColors.textPrimary)
+                    .appInputField()
+
+                Picker("Set Type", selection: $block.setKind) {
+                    Text("Working").tag(SetKind.working)
+                    Text("Dropset").tag(SetKind.dropSet)
+                    Text("Warmup").tag(SetKind.warmup)
+                }
+                .pickerStyle(.menu)
+                .tint(AppColors.textPrimary)
+                .frame(maxWidth: .infinity)
+                .appInputField()
+            }
+
+            Toggle("Auto warmups", isOn: $block.allowsAutoWarmups)
+                .tint(AppColors.accent)
+
+            TextField("Block note", text: $block.blockNote, axis: .vertical)
+                .foregroundStyle(AppColors.textPrimary)
+                .lineLimit(2...3)
+                .appInputField()
+        }
+        .padding(14)
+        .appInsetCard(cornerRadius: 14, fillOpacity: 0.82, borderOpacity: 0.7)
     }
 }
 
