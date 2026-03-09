@@ -410,32 +410,32 @@ final class AppSessionCoordinator {
     }
 
     func toggleSetCompletion(blockID: UUID, setID: UUID) {
-        sessionStore.pushMutation {
-            SessionEngine.toggleCompletion(of: setID, in: blockID, draft: $0)
+        sessionStore.pushMutation(persistence: .deferred) { draft in
+            SessionEngine.toggleCompletion(of: setID, in: blockID, draft: &draft)
         }
     }
 
     func adjustSetWeight(blockID: UUID, setID: UUID, delta: Double) {
-        sessionStore.pushMutation {
-            SessionEngine.adjustWeight(by: delta, setID: setID, in: blockID, draft: $0)
+        sessionStore.pushMutation(persistence: .deferred) { draft in
+            SessionEngine.adjustWeight(by: delta, setID: setID, in: blockID, draft: &draft)
         }
     }
 
     func adjustSetReps(blockID: UUID, setID: UUID, delta: Int) {
-        sessionStore.pushMutation {
-            SessionEngine.adjustReps(by: delta, setID: setID, in: blockID, draft: $0)
+        sessionStore.pushMutation(persistence: .deferred) { draft in
+            SessionEngine.adjustReps(by: delta, setID: setID, in: blockID, draft: &draft)
         }
     }
 
     func addSet(to blockID: UUID) {
-        sessionStore.pushMutation {
-            SessionEngine.addSet(to: blockID, draft: $0)
+        sessionStore.pushMutation(persistence: .deferred) { draft in
+            SessionEngine.addSet(to: blockID, draft: &draft)
         }
     }
 
     func copyLastSet(in blockID: UUID) {
-        sessionStore.pushMutation {
-            SessionEngine.copyLastSet(in: blockID, draft: $0)
+        sessionStore.pushMutation(persistence: .deferred) { draft in
+            SessionEngine.copyLastSet(in: blockID, draft: &draft)
         }
     }
 
@@ -444,10 +444,10 @@ final class AppSessionCoordinator {
             return
         }
 
-        sessionStore.pushMutation {
+        sessionStore.pushMutation(persistence: .deferred) { draft in
             SessionEngine.addExerciseBlock(
                 exercise: exercise,
-                draft: $0,
+                draft: &draft,
                 defaultRestSeconds: settingsStore.defaultRestSeconds
             )
         }
@@ -463,14 +463,14 @@ final class AppSessionCoordinator {
     }
 
     func updateActiveBlockNotes(blockID: UUID, note: String) {
-        sessionStore.pushMutation(persistence: .deferred) {
-            SessionEngine.updateNotes(in: blockID, note: note, draft: $0)
+        sessionStore.pushMutation(persistence: .deferred) { draft in
+            SessionEngine.updateNotes(in: blockID, note: note, draft: &draft)
         }
     }
 
     func updateActiveSessionNotes(_ notes: String) {
-        sessionStore.pushMutation(persistence: .deferred) {
-            SessionEngine.updateSessionNotes(notes, draft: $0)
+        sessionStore.pushMutation(persistence: .deferred) { draft in
+            SessionEngine.updateSessionNotes(notes, draft: &draft)
         }
     }
 
@@ -514,5 +514,9 @@ final class AppSessionCoordinator {
 
     func undoSessionMutation() {
         sessionStore.undoLastMutation()
+    }
+
+    func flushPendingDraftPersistence() {
+        sessionStore.flushPendingDraftSave()
     }
 }

@@ -68,13 +68,14 @@ final class SessionStore {
 
     func pushMutation(
         persistence: DraftPersistenceBehavior = .immediate,
-        _ mutation: (SessionDraft) -> SessionDraft
+        _ mutation: (inout SessionDraft) -> Void
     ) {
         guard let activeDraft else {
             return
         }
 
-        let updatedDraft = mutation(activeDraft)
+        var updatedDraft = activeDraft
+        mutation(&updatedDraft)
         guard updatedDraft != activeDraft else {
             return
         }
@@ -101,6 +102,15 @@ final class SessionStore {
 
         activeDraft.restTimerEndsAt = nil
         self.activeDraft = activeDraft
+        cancelPendingDraftSave()
+        repository.saveActiveDraft(activeDraft)
+    }
+
+    func flushPendingDraftSave() {
+        guard draftSaveTask != nil else {
+            return
+        }
+
         cancelPendingDraftSave()
         repository.saveActiveDraft(activeDraft)
     }

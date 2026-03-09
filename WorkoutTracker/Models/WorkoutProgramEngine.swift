@@ -190,10 +190,10 @@ enum SessionEngine {
     static func toggleCompletion(
         of setID: UUID,
         in blockID: UUID,
-        draft: SessionDraft,
+        draft: inout SessionDraft,
         completedAt: Date = .now
-    ) -> SessionDraft {
-        let updatedDraft = draft.mutatingBlock(blockID) { block in
+    ) {
+        draft.mutateBlock(blockID) { block in
             block.mutatingSet(setID) { row in
                 if row.log.isCompleted {
                     row.log.completedAt = nil
@@ -209,8 +209,9 @@ enum SessionEngine {
             }
         }
 
-        return updatedDraft.touchingDraft(
-            restTimerEndsAtFor(blockID, setID: setID, now: completedAt, in: updatedDraft)
+        draft.touch(
+            restTimerEndsAtFor(blockID, setID: setID, now: completedAt, in: draft),
+            now: completedAt
         )
     }
 
@@ -218,57 +219,61 @@ enum SessionEngine {
         by delta: Double,
         setID: UUID,
         in blockID: UUID,
-        draft: SessionDraft
-    ) -> SessionDraft {
-        draft.mutatingBlock(blockID) { block in
+        draft: inout SessionDraft,
+        now: Date = .now
+    ) {
+        draft.mutateBlock(blockID) { block in
             block.mutatingSet(setID) { row in
                 let baseWeight = row.log.weight ?? row.target.targetWeight ?? 0
                 row.log.weight = max(0, baseWeight + delta)
             }
         }
-        .touchingDraft()
+        draft.touch(now: now)
     }
 
     static func adjustReps(
         by delta: Int,
         setID: UUID,
         in blockID: UUID,
-        draft: SessionDraft
-    ) -> SessionDraft {
-        draft.mutatingBlock(blockID) { block in
+        draft: inout SessionDraft,
+        now: Date = .now
+    ) {
+        draft.mutateBlock(blockID) { block in
             block.mutatingSet(setID) { row in
                 let baseReps = row.log.reps ?? row.target.repRange.upperBound
                 row.log.reps = max(0, baseReps + delta)
             }
         }
-        .touchingDraft()
+        draft.touch(now: now)
     }
 
     static func updateNotes(
         in blockID: UUID,
         note: String,
-        draft: SessionDraft
-    ) -> SessionDraft {
-        draft.mutatingBlock(blockID) { block in
+        draft: inout SessionDraft,
+        now: Date = .now
+    ) {
+        draft.mutateBlock(blockID) { block in
             block.blockNote = note
         }
-        .touchingDraft()
+        draft.touch(now: now)
     }
 
     static func updateSessionNotes(
         _ notes: String,
-        draft: SessionDraft
-    ) -> SessionDraft {
-        var updatedDraft = draft
-        updatedDraft.notes = notes
-        return updatedDraft.touchingDraft()
+        draft: inout SessionDraft,
+        now: Date = .now
+    ) {
+        draft.notes = notes
+        draft.touch(now: now)
     }
 
     static func addSet(
         to blockID: UUID,
-        draft: SessionDraft
-    ) -> SessionDraft {
-        draft.mutatingBlock(blockID) { block in
+        draft: inout SessionDraft,
+        now: Date = .now
+    ) {
+        draft.mutateBlock(blockID) { block in
             let copiedTarget = block.sets.last?.target ?? SetTarget(repRange: defaultRepRange)
             let copiedLog = block.sets.last?.log
             var newRow = SessionSetRow(target: copiedTarget)
@@ -279,14 +284,15 @@ enum SessionEngine {
             }
             block.sets.append(newRow)
         }
-        .touchingDraft()
+        draft.touch(now: now)
     }
 
     static func copyLastSet(
         in blockID: UUID,
-        draft: SessionDraft
-    ) -> SessionDraft {
-        draft.mutatingBlock(blockID) { block in
+        draft: inout SessionDraft,
+        now: Date = .now
+    ) {
+        draft.mutateBlock(blockID) { block in
             guard let lastRow = block.sets.last else {
                 return
             }
@@ -304,16 +310,16 @@ enum SessionEngine {
             newRow.log.setTargetID = newRow.target.id
             block.sets.append(newRow)
         }
-        .touchingDraft()
+        draft.touch(now: now)
     }
 
     static func addExerciseBlock(
         exercise: ExerciseCatalogItem,
-        draft: SessionDraft,
-        defaultRestSeconds: Int
-    ) -> SessionDraft {
-        var updatedDraft = draft
-        updatedDraft.blocks.append(
+        draft: inout SessionDraft,
+        defaultRestSeconds: Int,
+        now: Date = .now
+    ) {
+        draft.blocks.append(
             SessionBlock(
                 exerciseID: exercise.id,
                 exerciseNameSnapshot: exercise.name,
@@ -331,7 +337,7 @@ enum SessionEngine {
                 ]
             )
         )
-        return updatedDraft.touchingDraft()
+        draft.touch(now: now)
     }
 
     static func finishSession(
@@ -433,24 +439,20 @@ private extension ExerciseBlock {
 }
 
 private extension SessionDraft {
-    func mutatingBlock(
+    mutating func mutateBlock(
         _ blockID: UUID,
         mutation: (inout SessionBlock) -> Void
-    ) -> SessionDraft {
-        var updatedDraft = self
-        guard let index = updatedDraft.blocks.firstIndex(where: { $0.id == blockID }) else {
-            return updatedDraft
+    ) {
+        guard let index = blocks.firstIndex(where: { $0.id == blockID }) else {
+            return
         }
 
-        mutation(&updatedDraft.blocks[index])
-        return updatedDraft
+        mutation(&blocks[index])
     }
 
-    func touchingDraft(_ restTimerEndsAt: Date? = nil) -> SessionDraft {
-        var updatedDraft = self
-        updatedDraft.lastUpdatedAt = .now
-        updatedDraft.restTimerEndsAt = restTimerEndsAt ?? updatedDraft.restTimerEndsAt
-        return updatedDraft
+    mutating func touch(_ restTimerEndsAt: Date? = nil, now: Date = .now) {
+        lastUpdatedAt = now
+        self.restTimerEndsAt = restTimerEndsAt ?? self.restTimerEndsAt
     }
 }
 

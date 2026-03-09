@@ -399,6 +399,47 @@ final class WorkoutStoreTests: XCTestCase {
     }
 
     @MainActor
+    func testDeferredDraftMutationsPersistWhenFlushed() throws {
+        let container = WorkoutModelContainerFactory.makeContainer(isStoredInMemoryOnly: true)
+        let context = ModelContext(container)
+        context.autosaveEnabled = false
+        let repository = SessionRepository(modelContext: context)
+        let store = SessionStore(repository: repository)
+        let row = SessionSetRow(
+            target: SetTarget(
+                setKind: .working,
+                targetWeight: 185,
+                repRange: RepRange(5, 5)
+            )
+        )
+        let block = SessionBlock(
+            exerciseID: CatalogSeed.benchPress,
+            exerciseNameSnapshot: "Bench Press",
+            restSeconds: 90,
+            progressionRule: .manual,
+            sets: [row]
+        )
+        let draft = SessionDraft(
+            planID: nil,
+            templateID: UUID(),
+            templateNameSnapshot: "Bench Day",
+            blocks: [block]
+        )
+
+        store.beginSession(draft)
+        store.pushMutation(persistence: .deferred) { updatedDraft in
+            SessionEngine.adjustWeight(by: 5, setID: row.id, in: block.id, draft: &updatedDraft)
+        }
+
+        XCTAssertEqual(store.activeDraft?.blocks.first?.sets.first?.log.weight, 190)
+        XCTAssertNil(repository.loadActiveDraft()?.blocks.first?.sets.first?.log.weight)
+
+        store.flushPendingDraftSave()
+
+        XCTAssertEqual(repository.loadActiveDraft()?.blocks.first?.sets.first?.log.weight, 190)
+    }
+
+    @MainActor
     func testFinishSessionIncrementallyUpdatesTodayAndProgressStores() async throws {
         let store = makeStore()
         await store.hydrateIfNeeded()

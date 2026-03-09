@@ -251,4 +251,8 @@ final class AppStore {
     func refreshProgressStore() async {
         await derivedStateController.refreshProgress(plansStore: plansStore, sessionStore: sessionStore)
     }
+
+    func flushPendingSessionPersistence() {
+        sessionCoordinator.flushPendingDraftPersistence()
+    }
 }

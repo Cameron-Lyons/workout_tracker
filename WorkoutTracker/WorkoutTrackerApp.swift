@@ -61,10 +61,17 @@ struct WorkoutTrackerApp: App {
                 await appStore.hydrateIfNeeded()
             }
             .onChange(of: scenePhase, initial: false) { _, phase in
-                if phase == .active {
+                switch phase {
+                case .active:
                     Task {
                         await appStore.refreshDerivedStores()
                     }
+
+                case .inactive, .background:
+                    appStore.flushPendingSessionPersistence()
+
+                @unknown default:
+                    break
                 }
             }
         }
