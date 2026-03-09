@@ -9,34 +9,21 @@ final class TodayStore {
     var recentPersonalRecords: [PersonalRecord] = []
     var recentSessions: [CompletedSession] = []
 
-    func refresh(
-        plansStore: PlansStore,
-        sessionStore: SessionStore,
-        analytics: AnalyticsRepository,
-        now: Date = .now
-    ) {
-        let references = plansStore.templateReferences()
-        recentSessions = Array(sessionStore.completedSessions.suffix(5).reversed())
-        recentPersonalRecords = analytics.recentPersonalRecords(
-            from: sessionStore.completedSessions,
-            catalogByID: plansStore.catalogByID
-        )
-
-        pinnedTemplate = resolvePinnedTemplate(from: plansStore.plans, references: references, now: now)
-        quickStartTemplates = resolveQuickStarts(
-            references: references,
-            sessions: sessionStore.completedSessions
-        )
+    func apply(_ snapshot: AnalyticsRepository.TodaySnapshot) {
+        pinnedTemplate = snapshot.pinnedTemplate
+        quickStartTemplates = snapshot.quickStartTemplates
+        recentPersonalRecords = snapshot.recentPersonalRecords
+        recentSessions = snapshot.recentSessions
     }
 
     func recordCompletedSession(
         _ session: CompletedSession,
-        plansStore: PlansStore,
-        sessionStore: SessionStore,
+        plans: [Plan],
+        references: [TemplateReference],
+        allSessions: [CompletedSession],
         finishSummary: SessionFinishSummary?,
         now: Date = .now
     ) {
-        let references = plansStore.templateReferences()
         recentSessions = Array(([session] + recentSessions).prefix(5))
 
         if let finishSummary, !finishSummary.personalRecords.isEmpty {
@@ -49,10 +36,10 @@ final class TodayStore {
             .map { $0 }
         }
 
-        pinnedTemplate = resolvePinnedTemplate(from: plansStore.plans, references: references, now: now)
+        pinnedTemplate = resolvePinnedTemplate(from: plans, references: references, now: now)
         quickStartTemplates = resolveQuickStarts(
             references: references,
-            sessions: sessionStore.completedSessions
+            sessions: allSessions
         )
     }
 

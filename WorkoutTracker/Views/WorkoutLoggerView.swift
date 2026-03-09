@@ -1,5 +1,13 @@
 import SwiftUI
 
+private struct ActiveSessionHeaderState: Equatable {
+    var templateName: String
+    var startedAt: Date
+    var blockCount: Int
+    var completedSetCount: Int
+    var restTimerEndsAt: Date?
+}
+
 struct ActiveSessionView: View {
     @Environment(AppStore.self) private var appStore
     @Environment(PlansStore.self) private var plansStore
@@ -13,8 +21,20 @@ struct ActiveSessionView: View {
         sessionStore.activeDraft
     }
 
-    private var weightUnit: WeightUnit {
-        settingsStore.weightUnit
+    private var headerState: ActiveSessionHeaderState? {
+        guard let draft else {
+            return nil
+        }
+
+        return ActiveSessionHeaderState(
+            templateName: draft.templateNameSnapshot,
+            startedAt: draft.startedAt,
+            blockCount: draft.blocks.count,
+            completedSetCount: draft.blocks.reduce(0) { partialResult, block in
+                partialResult + block.sets.filter(\.log.isCompleted).count
+            },
+            restTimerEndsAt: draft.restTimerEndsAt
+        )
     }
 
     var body: some View {
@@ -22,25 +42,14 @@ struct ActiveSessionView: View {
             ZStack {
                 AppBackground()
 
-                if let draft {
-                    VStack(spacing: 14) {
-                        ActiveSessionHeaderView(draft: draft)
-
-                        ScrollView {
-                            LazyVStack(spacing: 14) {
-                                sessionNotesCard(draft)
-
-                                ForEach(draft.blocks) { block in
-                                    blockCard(block)
-                                }
-                            }
-                            .padding(.horizontal, 16)
-                            .padding(.bottom, 14)
-                        }
-                        .scrollIndicators(.hidden)
-
-                        footerBar
-                    }
+                if let draft, let headerState {
+                    ActiveSessionContentView(
+                        headerState: headerState,
+                        notes: draft.notes,
+                        blocks: draft.blocks,
+                        weightUnit: settingsStore.weightUnit,
+                        weightStep: settingsStore.upperBodyIncrement
+                    )
                 } else {
                     AppEmptyStateCard(
                         systemImage: "figure.cooldown",
@@ -90,34 +99,55 @@ struct ActiveSessionView: View {
             }
         }
     }
+}
 
-    private var footerBar: some View {
-        HStack(spacing: 12) {
-            Button {
-                appStore.clearRestTimer()
-            } label: {
-                Label("Clear Rest", systemImage: "timer")
-                    .frame(maxWidth: .infinity)
-            }
-            .buttonStyle(.bordered)
-            .tint(AppColors.accent)
+private struct ActiveSessionContentView: View {
+    let headerState: ActiveSessionHeaderState
+    let notes: String
+    let blocks: [SessionBlock]
+    let weightUnit: WeightUnit
+    let weightStep: Double
 
-            Button {
-                appStore.finishActiveSession()
-                dismiss()
-            } label: {
-                Label("Finish Workout", systemImage: "checkmark.circle.fill")
-                    .frame(maxWidth: .infinity)
+    var body: some View {
+        VStack(spacing: 14) {
+            ActiveSessionHeaderView(state: headerState)
+                .equatable()
+
+            ScrollView {
+                LazyVStack(spacing: 14) {
+                    ActiveSessionNotesCardView(notes: notes)
+                        .equatable()
+
+                    ForEach(blocks) { block in
+                        SessionBlockCardView(
+                            block: block,
+                            weightUnit: weightUnit,
+                            weightStep: weightStep
+                        )
+                        .equatable()
+                    }
+                }
+                .padding(.horizontal, 16)
+                .padding(.bottom, 14)
             }
-            .buttonStyle(.borderedProminent)
-            .tint(AppColors.accent)
-            .accessibilityIdentifier("session.finishButton")
+            .scrollIndicators(.hidden)
+
+            ActiveSessionFooterView()
         }
-        .padding(.horizontal, 16)
-        .padding(.bottom, 12)
+    }
+}
+
+@MainActor
+private struct ActiveSessionNotesCardView: View, Equatable {
+    @Environment(AppStore.self) private var appStore
+
+    let notes: String
+
+    nonisolated static func == (lhs: ActiveSessionNotesCardView, rhs: ActiveSessionNotesCardView) -> Bool {
+        lhs.notes == rhs.notes
     }
 
-    private func sessionNotesCard(_ draft: SessionDraft) -> some View {
+    var body: some View {
         VStack(alignment: .leading, spacing: 10) {
             Text("Session Notes")
                 .font(.headline.weight(.semibold))
@@ -126,7 +156,7 @@ struct ActiveSessionView: View {
             TextField(
                 "How did the session feel?",
                 text: Binding(
-                    get: { draft.notes },
+                    get: { notes },
                     set: { appStore.updateActiveSessionNotes($0) }
                 ),
                 axis: .vertical
@@ -138,8 +168,23 @@ struct ActiveSessionView: View {
         .padding(14)
         .appSurface(cornerRadius: 14, shadow: false)
     }
+}
 
-    private func blockCard(_ block: SessionBlock) -> some View {
+@MainActor
+private struct SessionBlockCardView: View, Equatable {
+    @Environment(AppStore.self) private var appStore
+
+    let block: SessionBlock
+    let weightUnit: WeightUnit
+    let weightStep: Double
+
+    nonisolated static func == (lhs: SessionBlockCardView, rhs: SessionBlockCardView) -> Bool {
+        lhs.block == rhs.block
+            && lhs.weightUnit == rhs.weightUnit
+            && lhs.weightStep == rhs.weightStep
+    }
+
+    var body: some View {
         VStack(alignment: .leading, spacing: 12) {
             HStack(alignment: .top) {
                 VStack(alignment: .leading, spacing: 6) {
@@ -186,7 +231,13 @@ struct ActiveSessionView: View {
             .appInputField()
 
             ForEach(block.sets) { row in
-                setRow(row, in: block)
+                SessionSetRowView(
+                    blockID: block.id,
+                    row: row,
+                    weightUnit: weightUnit,
+                    weightStep: weightStep
+                )
+                .equatable()
             }
 
             HStack(spacing: 10) {
@@ -212,8 +263,44 @@ struct ActiveSessionView: View {
         .padding(14)
         .appSurface(cornerRadius: 16, shadow: false)
     }
+}
 
-    private func setRow(_ row: SessionSetRow, in block: SessionBlock) -> some View {
+@MainActor
+private struct SessionSetRowView: View, Equatable {
+    @Environment(AppStore.self) private var appStore
+
+    let blockID: UUID
+    let row: SessionSetRow
+    let weightUnit: WeightUnit
+    let weightStep: Double
+
+    nonisolated static func == (lhs: SessionSetRowView, rhs: SessionSetRowView) -> Bool {
+        lhs.blockID == rhs.blockID
+            && lhs.row == rhs.row
+            && lhs.weightUnit == rhs.weightUnit
+            && lhs.weightStep == rhs.weightStep
+    }
+
+    private var loadValue: String {
+        let resolvedWeight = row.log.weight ?? row.target.targetWeight
+        let displayValue = WeightFormatter.displayString(resolvedWeight, unit: weightUnit)
+        return displayValue.isEmpty ? "0" : displayValue
+    }
+
+    private var repsValue: String {
+        "\(row.log.reps ?? row.target.repRange.upperBound)"
+    }
+
+    private var targetSummary: String {
+        let reps = row.target.repRange.displayLabel
+        if let weight = row.target.targetWeight {
+            return "\(WeightFormatter.displayString(weight, unit: weightUnit)) \(weightUnit.symbol) • \(reps)"
+        }
+
+        return reps
+    }
+
+    var body: some View {
         VStack(alignment: .leading, spacing: 10) {
             HStack {
                 Text(row.target.setKind.displayName)
@@ -223,48 +310,46 @@ struct ActiveSessionView: View {
 
                 Spacer()
 
-                Text(targetSummary(for: row))
+                Text(targetSummary)
                     .font(.caption)
                     .foregroundStyle(AppColors.textSecondary)
             }
 
             HStack(spacing: 10) {
-                statControl(
+                SessionStatControlView(
                     title: "Load",
-                    value: WeightFormatter.displayString(row.log.weight ?? row.target.targetWeight, unit: weightUnit).isEmpty
-                        ? "0"
-                        : WeightFormatter.displayString(row.log.weight ?? row.target.targetWeight, unit: weightUnit),
+                    value: loadValue,
                     unit: weightUnit.symbol,
                     onDecrease: {
                         appStore.adjustSetWeight(
-                            blockID: block.id,
+                            blockID: blockID,
                             setID: row.id,
-                            delta: -settingsStore.upperBodyIncrement
+                            delta: -weightStep
                         )
                     },
                     onIncrease: {
                         appStore.adjustSetWeight(
-                            blockID: block.id,
+                            blockID: blockID,
                             setID: row.id,
-                            delta: settingsStore.upperBodyIncrement
+                            delta: weightStep
                         )
                     }
                 )
 
-                statControl(
+                SessionStatControlView(
                     title: "Reps",
-                    value: "\(row.log.reps ?? row.target.repRange.upperBound)",
+                    value: repsValue,
                     unit: "",
                     onDecrease: {
-                        appStore.adjustSetReps(blockID: block.id, setID: row.id, delta: -1)
+                        appStore.adjustSetReps(blockID: blockID, setID: row.id, delta: -1)
                     },
                     onIncrease: {
-                        appStore.adjustSetReps(blockID: block.id, setID: row.id, delta: 1)
+                        appStore.adjustSetReps(blockID: blockID, setID: row.id, delta: 1)
                     }
                 )
 
                 Button {
-                    appStore.toggleSetCompletion(blockID: block.id, setID: row.id)
+                    appStore.toggleSetCompletion(blockID: blockID, setID: row.id)
                 } label: {
                     VStack(spacing: 4) {
                         Image(systemName: row.log.isCompleted ? "checkmark.circle.fill" : "circle")
@@ -276,7 +361,7 @@ struct ActiveSessionView: View {
                 }
                 .buttonStyle(.borderedProminent)
                 .tint(row.log.isCompleted ? AppColors.accent : AppColors.accent.opacity(0.78))
-                .accessibilityIdentifier("session.completeSet.\(block.id.uuidString).\(row.id.uuidString)")
+                .accessibilityIdentifier("session.completeSet.\(blockID.uuidString).\(row.id.uuidString)")
             }
 
             if let note = row.target.note, !note.isEmpty {
@@ -288,14 +373,16 @@ struct ActiveSessionView: View {
         .padding(12)
         .appInsetCard(cornerRadius: 12, fillOpacity: 0.8, borderOpacity: 0.68)
     }
+}
 
-    private func statControl(
-        title: String,
-        value: String,
-        unit: String,
-        onDecrease: @escaping () -> Void,
-        onIncrease: @escaping () -> Void
-    ) -> some View {
+private struct SessionStatControlView: View {
+    let title: String
+    let value: String
+    let unit: String
+    let onDecrease: () -> Void
+    let onIncrease: () -> Void
+
+    var body: some View {
         VStack(spacing: 6) {
             Text(title)
                 .font(.caption.weight(.semibold))
@@ -327,44 +414,66 @@ struct ActiveSessionView: View {
         }
         .frame(maxWidth: .infinity, minHeight: 74)
     }
-
-    private func targetSummary(for row: SessionSetRow) -> String {
-        let reps = row.target.repRange.displayLabel
-        if let weight = row.target.targetWeight {
-            return "\(WeightFormatter.displayString(weight, unit: weightUnit)) \(weightUnit.symbol) • \(reps)"
-        }
-        return reps
-    }
-
 }
 
-private struct ActiveSessionHeaderView: View {
-    let draft: SessionDraft
+private struct ActiveSessionFooterView: View {
+    @Environment(AppStore.self) private var appStore
+    @Environment(\.dismiss) private var dismiss
+
+    var body: some View {
+        HStack(spacing: 12) {
+            Button {
+                appStore.clearRestTimer()
+            } label: {
+                Label("Clear Rest", systemImage: "timer")
+                    .frame(maxWidth: .infinity)
+            }
+            .buttonStyle(.bordered)
+            .tint(AppColors.accent)
+
+            Button {
+                appStore.finishActiveSession()
+                dismiss()
+            } label: {
+                Label("Finish Workout", systemImage: "checkmark.circle.fill")
+                    .frame(maxWidth: .infinity)
+            }
+            .buttonStyle(.borderedProminent)
+            .tint(AppColors.accent)
+            .accessibilityIdentifier("session.finishButton")
+        }
+        .padding(.horizontal, 16)
+        .padding(.bottom, 12)
+    }
+}
+
+private struct ActiveSessionHeaderView: View, Equatable {
+    let state: ActiveSessionHeaderState
 
     var body: some View {
         TimelineView(.periodic(from: .now, by: 1)) { context in
             AppHeroCard(
                 eyebrow: "Active Session",
-                title: draft.templateNameSnapshot,
+                title: state.templateName,
                 subtitle: restTimerSubtitle(at: context.date),
                 systemImage: "figure.strengthtraining.traditional",
                 metrics: [
                     AppHeroMetric(
                         id: "started",
                         label: "Started",
-                        value: draft.startedAt.formatted(date: .omitted, time: .shortened),
+                        value: state.startedAt.formatted(date: .omitted, time: .shortened),
                         systemImage: "clock"
                     ),
                     AppHeroMetric(
                         id: "blocks",
                         label: "Blocks",
-                        value: "\(draft.blocks.count)",
+                        value: "\(state.blockCount)",
                         systemImage: "square.grid.2x2"
                     ),
                     AppHeroMetric(
                         id: "sets",
                         label: "Completed",
-                        value: "\(completedSetCount)",
+                        value: "\(state.completedSetCount)",
                         systemImage: "checklist"
                     ),
                     AppHeroMetric(
@@ -380,14 +489,8 @@ private struct ActiveSessionHeaderView: View {
         .padding(.top, 14)
     }
 
-    private var completedSetCount: Int {
-        draft.blocks.reduce(0) { partialResult, block in
-            partialResult + block.sets.filter(\.log.isCompleted).count
-        }
-    }
-
     private func restTimerLabel(at now: Date) -> String {
-        guard let endDate = draft.restTimerEndsAt else {
+        guard let endDate = state.restTimerEndsAt else {
             return "Off"
         }
 
@@ -400,7 +503,7 @@ private struct ActiveSessionHeaderView: View {
     }
 
     private func restTimerSubtitle(at now: Date) -> String {
-        guard let endDate = draft.restTimerEndsAt else {
+        guard let endDate = state.restTimerEndsAt else {
             return "Tap complete to auto-start rest timers, then use +/- controls to adjust each set."
         }
 

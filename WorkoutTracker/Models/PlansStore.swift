@@ -6,6 +6,7 @@ import Observation
 final class PlansStore {
     @ObservationIgnored private let repository: PlanRepository
     @ObservationIgnored private(set) var catalogByID: [UUID: ExerciseCatalogItem] = [:]
+    @ObservationIgnored private(set) var catalogRevision = 0
     @ObservationIgnored private var plansByID: [UUID: Plan] = [:]
     @ObservationIgnored private var profilesByExerciseID: [UUID: ExerciseProfile] = [:]
     @ObservationIgnored private var cachedTemplateReferences: [TemplateReference] = []
@@ -28,6 +29,7 @@ final class PlansStore {
         plans = repository.loadPlans().sorted(by: { $0.createdAt < $1.createdAt })
         profiles = repository.loadProfiles()
         rebuildCaches()
+        bumpCatalogRevision()
     }
 
     func resetAllData() {
@@ -36,6 +38,7 @@ final class PlansStore {
         plans = []
         profiles = []
         rebuildCaches()
+        bumpCatalogRevision()
         repository.saveCatalog(catalog)
     }
 
@@ -193,6 +196,7 @@ final class PlansStore {
         updatedItem.category = category
         catalog[index] = updatedItem
         rebuildCatalogCaches()
+        bumpCatalogRevision()
         repository.saveCatalog(catalog)
     }
 
@@ -207,6 +211,7 @@ final class PlansStore {
         catalog.append(item)
         catalog.sort(by: { $0.name < $1.name })
         rebuildCatalogCaches()
+        bumpCatalogRevision()
         repository.saveCatalog(catalog)
         return item
     }
@@ -243,6 +248,10 @@ final class PlansStore {
 
     private func rebuildProfileCaches() {
         profilesByExerciseID = Dictionary(uniqueKeysWithValues: profiles.map { ($0.exerciseID, $0) })
+    }
+
+    private func bumpCatalogRevision() {
+        catalogRevision &+= 1
     }
 
     func updatePlanProgression(

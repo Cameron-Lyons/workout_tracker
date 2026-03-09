@@ -10,38 +10,38 @@ final class ProgressStore {
     var selectedExerciseID: UUID?
     var selectedDay: Date?
 
-    func refresh(
-        plansStore: PlansStore,
-        sessionStore: SessionStore,
-        analytics: AnalyticsRepository
-    ) {
-        overview = analytics.buildOverview(from: sessionStore.completedSessions)
-        personalRecords = analytics.personalRecords(
-            from: sessionStore.completedSessions,
-            catalogByID: plansStore.catalogByID
-        )
-        .reversed()
-        exerciseSummaries = analytics.exerciseSummaries(
-            from: sessionStore.completedSessions,
-            catalogByID: plansStore.catalogByID
-        )
+    var personalBestOneRepMaxByExerciseID: [UUID: Double] {
+        Dictionary(
+            uniqueKeysWithValues: exerciseSummaries.compactMap { summary in
+                guard let currentPR = summary.currentPR else {
+                    return nil
+                }
 
-        if let selectedExerciseID,
-           exerciseSummaries.contains(where: { $0.exerciseID == selectedExerciseID }) == false {
-            self.selectedExerciseID = exerciseSummaries.first?.exerciseID
-        } else if self.selectedExerciseID == nil {
-            self.selectedExerciseID = exerciseSummaries.first?.exerciseID
-        }
+                return (summary.exerciseID, currentPR.estimatedOneRepMax)
+            }
+        )
+    }
+
+    func apply(_ snapshot: AnalyticsRepository.ProgressSnapshot) {
+        overview = snapshot.overview
+        personalRecords = snapshot.personalRecords
+        exerciseSummaries = snapshot.exerciseSummaries
+        selectedExerciseID = snapshot.selectedExerciseID
     }
 
     func recordCompletedSession(
         _ session: CompletedSession,
-        sessionStore: SessionStore,
+        completedSessions: [CompletedSession],
         analytics: AnalyticsRepository,
         catalogByID: [UUID: ExerciseCatalogItem],
         finishSummary: SessionFinishSummary?
     ) {
-        overview = analytics.buildOverview(from: sessionStore.completedSessions)
+        overview = overview.recording(
+            session,
+            sessionCount: completedSessions.count,
+            firstSessionDate: completedSessions.first?.completedAt,
+            addedVolume: analytics.volume(for: session)
+        )
 
         if let finishSummary, !finishSummary.personalRecords.isEmpty {
             let mergedRecords = finishSummary.personalRecords.reversed() + personalRecords
@@ -95,13 +95,10 @@ final class ProgressStore {
         }
 
         exerciseSummaries = summariesByExerciseID.values.sorted(by: { $0.displayName < $1.displayName })
-
-        if let selectedExerciseID,
-           exerciseSummaries.contains(where: { $0.exerciseID == selectedExerciseID }) == false {
-            self.selectedExerciseID = exerciseSummaries.first?.exerciseID
-        } else if self.selectedExerciseID == nil {
-            self.selectedExerciseID = exerciseSummaries.first?.exerciseID
-        }
+        self.selectedExerciseID = resolvedSelectedExerciseID(
+            selectedExerciseID,
+            summaries: exerciseSummaries
+        )
     }
 
     var selectedExerciseSummary: ExerciseAnalyticsSummary? {
@@ -129,5 +126,46 @@ final class ProgressStore {
         return sessions.reversed().filter {
             calendar.isDate($0.completedAt, inSameDayAs: selectedDay)
         }
+    }
+
+    private func resolvedSelectedExerciseID(
+        _ selectedExerciseID: UUID?,
+        summaries: [ExerciseAnalyticsSummary]
+    ) -> UUID? {
+        guard !summaries.isEmpty else {
+            return nil
+        }
+
+        if let selectedExerciseID,
+           summaries.contains(where: { $0.exerciseID == selectedExerciseID }) {
+            return selectedExerciseID
+        }
+
+        return summaries.first?.exerciseID
+    }
+}
+
+private extension ProgressOverview {
+    func recording(
+        _ session: CompletedSession,
+        sessionCount: Int,
+        firstSessionDate: Date?,
+        addedVolume: Double,
+        now: Date = .now
+    ) -> ProgressOverview {
+        let calendar = Calendar.autoupdatingCurrent
+        let startOfToday = calendar.startOfDay(for: now)
+        let startOfWeek = calendar.dateInterval(of: .weekOfYear, for: startOfToday)?.start ?? startOfToday
+        let last30Days = calendar.date(byAdding: .day, value: -30, to: startOfToday) ?? startOfToday
+        let resolvedFirstSessionDate = firstSessionDate ?? session.completedAt
+        let weeksSpan = max(1.0, startOfToday.timeIntervalSince(resolvedFirstSessionDate) / (60 * 60 * 24 * 7))
+
+        return ProgressOverview(
+            totalSessions: sessionCount,
+            sessionsThisWeek: sessionsThisWeek + (session.completedAt >= startOfWeek ? 1 : 0),
+            sessionsLast30Days: sessionsLast30Days + (session.completedAt >= last30Days ? 1 : 0),
+            totalVolume: totalVolume + addedVolume,
+            averageSessionsPerWeek: Double(sessionCount) / weeksSpan
+        )
     }
 }

@@ -6,7 +6,7 @@ enum StrengthProgressionDefaults {
     static let lowerBodyIncreaseInPounds = 5.0
 }
 
-enum WeightUnit: String, CaseIterable, Codable {
+enum WeightUnit: String, CaseIterable, Codable, Sendable {
     case pounds
     case kilograms
 
@@ -156,7 +156,7 @@ enum WeightInputConversion {
     }
 }
 
-enum ExerciseCategory: String, CaseIterable, Codable {
+enum ExerciseCategory: String, CaseIterable, Codable, Sendable {
     case chest
     case back
     case shoulders
@@ -168,7 +168,7 @@ enum ExerciseCategory: String, CaseIterable, Codable {
     case custom
 }
 
-enum Weekday: Int, CaseIterable, Codable, Identifiable {
+enum Weekday: Int, CaseIterable, Codable, Identifiable, Sendable {
     case sunday = 1
     case monday = 2
     case tuesday = 3
@@ -204,7 +204,7 @@ enum Weekday: Int, CaseIterable, Codable, Identifiable {
     }
 }
 
-enum SetKind: String, CaseIterable, Codable {
+enum SetKind: String, CaseIterable, Codable, Sendable {
     case warmup
     case working
     case dropSet
@@ -221,7 +221,7 @@ enum SetKind: String, CaseIterable, Codable {
     }
 }
 
-enum ProgressionRuleKind: String, CaseIterable, Codable {
+enum ProgressionRuleKind: String, CaseIterable, Codable, Sendable {
     case manual
     case doubleProgression
     case percentageWave
@@ -255,12 +255,12 @@ enum ExerciseClassification {
     }
 }
 
-struct WarmupRampStep: Codable, Equatable {
+struct WarmupRampStep: Codable, Equatable, Sendable {
     var percentage: Double
     var reps: Int
 }
 
-struct RepRange: Codable, Equatable {
+struct RepRange: Codable, Equatable, Sendable {
     var lowerBound: Int
     var upperBound: Int
 
@@ -278,7 +278,7 @@ struct RepRange: Codable, Equatable {
     }
 }
 
-struct ExerciseCatalogItem: Identifiable, Codable, Equatable, Hashable {
+struct ExerciseCatalogItem: Identifiable, Codable, Equatable, Hashable, Sendable {
     var id: UUID
     var name: String
     var aliases: [String]
@@ -303,7 +303,7 @@ struct ExerciseCatalogItem: Identifiable, Codable, Equatable, Hashable {
     }
 }
 
-struct ExerciseProfile: Identifiable, Codable, Equatable {
+struct ExerciseProfile: Identifiable, Codable, Equatable, Sendable {
     var id: UUID
     var exerciseID: UUID
     var trainingMax: Double?
@@ -325,12 +325,12 @@ struct ExerciseProfile: Identifiable, Codable, Equatable {
     }
 }
 
-struct DoubleProgressionRule: Codable, Equatable {
+struct DoubleProgressionRule: Codable, Equatable, Sendable {
     var targetRepRange: RepRange
     var increment: Double
 }
 
-struct PercentageWaveSet: Identifiable, Codable, Equatable {
+struct PercentageWaveSet: Identifiable, Codable, Equatable, Sendable {
     var id: UUID
     var percentage: Double
     var repRange: RepRange
@@ -349,7 +349,7 @@ struct PercentageWaveSet: Identifiable, Codable, Equatable {
     }
 }
 
-struct PercentageWaveWeek: Identifiable, Codable, Equatable {
+struct PercentageWaveWeek: Identifiable, Codable, Equatable, Sendable {
     var id: UUID
     var name: String
     var sets: [PercentageWaveSet]
@@ -361,7 +361,7 @@ struct PercentageWaveWeek: Identifiable, Codable, Equatable {
     }
 }
 
-struct PercentageWaveRule: Codable, Equatable {
+struct PercentageWaveRule: Codable, Equatable, Sendable {
     var trainingMax: Double?
     var weeks: [PercentageWaveWeek]
     var currentWeekIndex: Int
@@ -383,7 +383,7 @@ struct PercentageWaveRule: Codable, Equatable {
     }
 }
 
-struct ProgressionRule: Identifiable, Codable, Equatable {
+struct ProgressionRule: Identifiable, Codable, Equatable, Sendable {
     var id: UUID
     var kind: ProgressionRuleKind
     var doubleProgression: DoubleProgressionRule?
@@ -404,7 +404,7 @@ struct ProgressionRule: Identifiable, Codable, Equatable {
     static let manual = ProgressionRule(kind: .manual)
 }
 
-struct SetTarget: Identifiable, Codable, Equatable {
+struct SetTarget: Identifiable, Codable, Equatable, Sendable {
     var id: UUID
     var setKind: SetKind
     var targetWeight: Double?
@@ -432,7 +432,7 @@ struct SetTarget: Identifiable, Codable, Equatable {
     }
 }
 
-struct SetLog: Identifiable, Codable, Equatable {
+struct SetLog: Identifiable, Codable, Equatable, Sendable {
     var id: UUID
     var setTargetID: UUID
     var weight: Double?
@@ -461,7 +461,7 @@ struct SetLog: Identifiable, Codable, Equatable {
     }
 }
 
-struct SessionSetRow: Identifiable, Codable, Equatable {
+struct SessionSetRow: Identifiable, Codable, Equatable, Sendable {
     var id: UUID
     var target: SetTarget
     var log: SetLog
@@ -473,7 +473,7 @@ struct SessionSetRow: Identifiable, Codable, Equatable {
     }
 }
 
-struct ExerciseBlock: Identifiable, Codable, Equatable {
+struct ExerciseBlock: Identifiable, Codable, Equatable, Sendable {
     var id: UUID
     var exerciseID: UUID
     var exerciseNameSnapshot: String
@@ -507,7 +507,7 @@ struct ExerciseBlock: Identifiable, Codable, Equatable {
     }
 }
 
-struct WorkoutTemplate: Identifiable, Codable, Equatable {
+struct WorkoutTemplate: Identifiable, Codable, Equatable, Sendable {
     var id: UUID
     var name: String
     var note: String
@@ -532,7 +532,7 @@ struct WorkoutTemplate: Identifiable, Codable, Equatable {
     }
 }
 
-struct Plan: Identifiable, Codable, Equatable {
+struct Plan: Identifiable, Codable, Equatable, Sendable {
     var id: UUID
     var name: String
     var createdAt: Date
@@ -557,7 +557,7 @@ struct Plan: Identifiable, Codable, Equatable {
     }
 }
 
-struct SessionBlock: Identifiable, Codable, Equatable {
+struct SessionBlock: Identifiable, Codable, Equatable, Sendable {
     var id: UUID
     var sourceBlockID: UUID?
     var exerciseID: UUID
@@ -591,7 +591,7 @@ struct SessionBlock: Identifiable, Codable, Equatable {
     }
 }
 
-struct SessionDraft: Identifiable, Codable, Equatable {
+struct SessionDraft: Identifiable, Codable, Equatable, Sendable {
     var id: UUID
     var planID: UUID?
     var templateID: UUID
@@ -625,7 +625,7 @@ struct SessionDraft: Identifiable, Codable, Equatable {
     }
 }
 
-struct CompletedSessionBlock: Identifiable, Codable, Equatable {
+struct CompletedSessionBlock: Identifiable, Codable, Equatable, Sendable {
     var id: UUID
     var exerciseID: UUID
     var exerciseNameSnapshot: String
@@ -656,7 +656,7 @@ struct CompletedSessionBlock: Identifiable, Codable, Equatable {
     }
 }
 
-struct CompletedSession: Identifiable, Codable, Equatable {
+struct CompletedSession: Identifiable, Codable, Equatable, Sendable {
     var id: UUID
     var planID: UUID?
     var templateID: UUID
@@ -687,7 +687,7 @@ struct CompletedSession: Identifiable, Codable, Equatable {
     }
 }
 
-struct TemplateReference: Identifiable, Equatable {
+struct TemplateReference: Identifiable, Equatable, Sendable {
     var id: UUID { templateID }
     var planID: UUID
     var planName: String
@@ -697,7 +697,7 @@ struct TemplateReference: Identifiable, Equatable {
     var lastStartedAt: Date?
 }
 
-struct ProgressPoint: Identifiable, Equatable {
+struct ProgressPoint: Identifiable, Equatable, Sendable {
     var id: UUID
     var sessionID: UUID
     var date: Date
@@ -722,7 +722,7 @@ struct ProgressPoint: Identifiable, Equatable {
     }
 }
 
-struct PersonalRecord: Identifiable, Equatable {
+struct PersonalRecord: Identifiable, Equatable, Sendable {
     var id: UUID
     var sessionID: UUID
     var exerciseID: UUID
@@ -753,7 +753,7 @@ struct PersonalRecord: Identifiable, Equatable {
     }
 }
 
-struct ExerciseAnalyticsSummary: Identifiable, Equatable {
+struct ExerciseAnalyticsSummary: Identifiable, Equatable, Sendable {
     var id: UUID { exerciseID }
     var exerciseID: UUID
     var displayName: String
@@ -763,7 +763,7 @@ struct ExerciseAnalyticsSummary: Identifiable, Equatable {
     var points: [ProgressPoint]
 }
 
-struct ProgressOverview: Equatable {
+struct ProgressOverview: Equatable, Sendable {
     var totalSessions: Int
     var sessionsThisWeek: Int
     var sessionsLast30Days: Int
@@ -779,7 +779,7 @@ struct ProgressOverview: Equatable {
     )
 }
 
-struct SessionFinishSummary: Identifiable, Equatable {
+struct SessionFinishSummary: Identifiable, Equatable, Sendable {
     var id: UUID
     var templateName: String
     var completedAt: Date
@@ -804,7 +804,7 @@ struct SessionFinishSummary: Identifiable, Equatable {
     }
 }
 
-enum PresetPack: String, CaseIterable, Identifiable {
+enum PresetPack: String, CaseIterable, Identifiable, Sendable {
     case generalGym
     case startingStrength
     case fiveThreeOne
