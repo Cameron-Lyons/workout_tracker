@@ -528,6 +528,35 @@ final class WorkoutStoreTests: XCTestCase {
         XCTAssertEqual(chartSeries.trendPoints.last?.sessionID, snapshot.exerciseSummaries.first?.points.last?.sessionID)
     }
 
+    func testExercisePickerSearchIndexMatchesAliasesAndDiacritics() {
+        let catalog = [
+            ExerciseCatalogItem(
+                id: UUID(),
+                name: "Bench Press",
+                aliases: ["Barbell Bench"],
+                category: .chest
+            ),
+            ExerciseCatalogItem(
+                id: UUID(),
+                name: "Développé Couché",
+                aliases: ["Développé Couché", "Presse poitrine"],
+                category: .chest
+            ),
+            ExerciseCatalogItem(
+                id: UUID(),
+                name: "Back Squat",
+                aliases: ["High Bar"],
+                category: .legs
+            )
+        ]
+        let index = ExercisePickerSearchIndex(catalog: catalog)
+
+        XCTAssertEqual(index.filter(query: "barbell").map(\.name), ["Bench Press"])
+        XCTAssertEqual(index.filter(query: "developpe").map(\.name), ["Développé Couché"])
+        XCTAssertEqual(index.filter(query: "high bar").map(\.name), ["Back Squat"])
+        XCTAssertEqual(index.filter(query: "   ").map(\.name), catalog.map(\.name))
+    }
+
     @MainActor
     func testFinishSessionIncrementallyUpdatesTodayAndProgressStores() async throws {
         let store = makeStore()

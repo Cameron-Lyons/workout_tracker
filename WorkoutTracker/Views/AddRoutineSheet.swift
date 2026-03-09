@@ -1,5 +1,41 @@
 import SwiftUI
 
+struct ExercisePickerSearchIndex {
+    private struct Entry {
+        var item: ExerciseCatalogItem
+        var normalizedSearchText: String
+    }
+
+    private let entries: [Entry]
+
+    init(catalog: [ExerciseCatalogItem]) {
+        entries = catalog.map { item in
+            Entry(
+                item: item,
+                normalizedSearchText: ([item.name] + item.aliases)
+                    .map(Self.normalize)
+                    .joined(separator: "\n")
+            )
+        }
+    }
+
+    func filter(query: String) -> [ExerciseCatalogItem] {
+        let trimmedQuery = query.trimmingCharacters(in: .whitespacesAndNewlines)
+        let normalizedQuery = Self.normalize(trimmedQuery)
+        guard !normalizedQuery.isEmpty else {
+            return entries.map(\.item)
+        }
+
+        return entries.compactMap { entry in
+            entry.normalizedSearchText.contains(normalizedQuery) ? entry.item : nil
+        }
+    }
+
+    private static func normalize(_ text: String) -> String {
+        text.folding(options: [.caseInsensitive, .diacriticInsensitive], locale: .current)
+    }
+}
+
 struct OnboardingView: View {
     @Environment(AppStore.self) private var appStore
 
@@ -93,24 +129,28 @@ struct OnboardingView: View {
 struct ExercisePickerSheet: View {
     @Environment(\.dismiss) private var dismiss
 
-    let catalog: [ExerciseCatalogItem]
     let title: String
     let onPick: (ExerciseCatalogItem) -> Void
     let onCreateCustom: ((String) -> Void)?
 
+    private let searchIndex: ExercisePickerSearchIndex
+
     @State private var searchText = ""
     @State private var customExerciseName = ""
 
-    private var filteredCatalog: [ExerciseCatalogItem] {
-        let trimmedSearch = searchText.trimmingCharacters(in: .whitespacesAndNewlines)
-        guard !trimmedSearch.isEmpty else {
-            return catalog
-        }
+    @State private var visibleCatalog: [ExerciseCatalogItem]
 
-        return catalog.filter {
-            $0.name.localizedCaseInsensitiveContains(trimmedSearch)
-                || $0.aliases.contains(where: { $0.localizedCaseInsensitiveContains(trimmedSearch) })
-        }
+    init(
+        catalog: [ExerciseCatalogItem],
+        title: String,
+        onPick: @escaping (ExerciseCatalogItem) -> Void,
+        onCreateCustom: ((String) -> Void)? = nil
+    ) {
+        self.title = title
+        self.onPick = onPick
+        self.onCreateCustom = onCreateCustom
+        searchIndex = ExercisePickerSearchIndex(catalog: catalog)
+        _visibleCatalog = State(initialValue: catalog)
     }
 
     var body: some View {
@@ -150,7 +190,7 @@ struct ExercisePickerSheet: View {
 
                     ScrollView {
                         LazyVStack(spacing: 10) {
-                            ForEach(filteredCatalog) { item in
+                            ForEach(visibleCatalog) { item in
                                 Button {
                                     onPick(item)
                                     dismiss()
@@ -191,6 +231,9 @@ struct ExercisePickerSheet: View {
                         dismiss()
                     }
                 }
+            }
+            .onChange(of: searchText, initial: false) { _, newValue in
+                visibleCatalog = searchIndex.filter(query: newValue)
             }
         }
     }
