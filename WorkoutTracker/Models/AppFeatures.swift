@@ -55,7 +55,7 @@ final class AppDerivedStateController {
             now: now
         )
 
-        apply(snapshot)
+        apply(snapshot, completedSessions: sessions)
     }
 
     func refreshToday(plansStore: PlansStore, sessionStore: SessionStore, now: Date = .now) {
@@ -96,7 +96,8 @@ final class AppDerivedStateController {
                 analytics.makeProgressSnapshot(
                     sessionAnalytics: sessionAnalytics,
                     selectedExerciseID: selectedExerciseID
-                )
+                ),
+                completedSessions: sessionStore.completedSessions
             )
             progressRefreshTask = nil
             return
@@ -126,7 +127,7 @@ final class AppDerivedStateController {
                     return
                 }
 
-                self.progressStore.apply(snapshot)
+                self.progressStore.apply(snapshot, completedSessions: sessionStore.completedSessions)
                 self.progressRefreshTask = nil
             }
         }
@@ -152,7 +153,7 @@ final class AppDerivedStateController {
             return
         }
 
-        progressStore.apply(snapshot)
+        progressStore.apply(snapshot, completedSessions: sessionStore.completedSessions)
     }
 
     func recordCompletedSession(
@@ -192,9 +193,12 @@ final class AppDerivedStateController {
         )
     }
 
-    private func apply(_ snapshot: AnalyticsRepository.DerivedStoreSnapshot) {
+    private func apply(
+        _ snapshot: AnalyticsRepository.DerivedStoreSnapshot,
+        completedSessions: [CompletedSession]
+    ) {
         todayStore.apply(snapshot.today)
-        progressStore.apply(snapshot.progress)
+        progressStore.apply(snapshot.progress, completedSessions: completedSessions)
     }
 
     private func resolvedSessionAnalyticsSnapshot(

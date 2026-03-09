@@ -2,7 +2,6 @@ import Charts
 import SwiftUI
 
 struct ProgressDashboardView: View {
-    @Environment(SessionStore.self) private var sessionStore
     @Environment(SettingsStore.self) private var settingsStore
     @Environment(ProgressStore.self) private var progressStore
 
@@ -12,15 +11,11 @@ struct ProgressDashboardView: View {
         settingsStore.weightUnit
     }
 
-    private var sessions: [CompletedSession] {
-        progressStore.filteredSessions(from: sessionStore.completedSessions)
-    }
-
     var body: some View {
         NavigationStack {
             ZStack {
                 AppBackground()
-                if sessionStore.completedSessions.isEmpty {
+                if progressStore.overview.totalSessions == 0 {
                     AppEmptyStateCard(
                         systemImage: "chart.xyaxis.line",
                         title: "No progress yet",
@@ -201,7 +196,7 @@ struct ProgressDashboardView: View {
 
             AppCalendarGrid(
                 displayedMonth: $displayedMonth,
-                sessions: sessionStore.completedSessions,
+                workoutDays: progressStore.workoutDays,
                 selectedDay: Binding(
                     get: { progressStore.selectedDay },
                     set: { progressStore.selectDay($0) }
@@ -229,7 +224,7 @@ struct ProgressDashboardView: View {
                 }
             }
 
-            if sessions.isEmpty {
+            if progressStore.historySessions.isEmpty {
                 Text("No workouts match the selected day.")
                     .font(.subheadline)
                     .foregroundStyle(AppColors.textSecondary)
@@ -237,7 +232,7 @@ struct ProgressDashboardView: View {
                     .frame(maxWidth: .infinity, alignment: .leading)
                     .appSurface(cornerRadius: 14, shadow: false)
             } else {
-                ForEach(sessions) { session in
+                ForEach(progressStore.historySessions) { session in
                     VStack(alignment: .leading, spacing: 8) {
                         Text(session.templateNameSnapshot)
                             .font(.headline.weight(.semibold))
@@ -262,14 +257,10 @@ struct ProgressDashboardView: View {
 
 private struct AppCalendarGrid: View {
     @Binding var displayedMonth: Date
-    let sessions: [CompletedSession]
+    let workoutDays: Set<Date>
     @Binding var selectedDay: Date?
 
     private let calendar = Calendar.autoupdatingCurrent
-
-    private var workoutDays: Set<Date> {
-        Set(sessions.map { calendar.startOfDay(for: $0.completedAt) })
-    }
 
     private var monthStart: Date {
         calendar.date(from: calendar.dateComponents([.year, .month], from: displayedMonth)) ?? displayedMonth

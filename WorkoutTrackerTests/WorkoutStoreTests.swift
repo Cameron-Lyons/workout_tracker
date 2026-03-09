@@ -440,6 +440,59 @@ final class WorkoutStoreTests: XCTestCase {
     }
 
     @MainActor
+    func testProgressStoreCachesHistorySessionsBySelectedDay() {
+        let analytics = AnalyticsRepository()
+        let progressStore = ProgressStore()
+        let dayOne = Date(timeIntervalSince1970: 1_741_478_400)
+        let dayTwo = dayOne.addingTimeInterval(86_400)
+        let sessions = [
+            CompletedSession(
+                planID: nil,
+                templateID: UUID(),
+                templateNameSnapshot: "Day One AM",
+                startedAt: dayOne.addingTimeInterval(-3_600),
+                completedAt: dayOne,
+                blocks: []
+            ),
+            CompletedSession(
+                planID: nil,
+                templateID: UUID(),
+                templateNameSnapshot: "Day One PM",
+                startedAt: dayOne.addingTimeInterval(3_600),
+                completedAt: dayOne.addingTimeInterval(7_200),
+                blocks: []
+            ),
+            CompletedSession(
+                planID: nil,
+                templateID: UUID(),
+                templateNameSnapshot: "Day Two",
+                startedAt: dayTwo.addingTimeInterval(-3_600),
+                completedAt: dayTwo,
+                blocks: []
+            )
+        ]
+
+        progressStore.apply(
+            analytics.makeProgressSnapshot(
+                sessions: sessions,
+                catalogByID: [:],
+                selectedExerciseID: nil,
+                now: dayTwo
+            ),
+            completedSessions: sessions
+        )
+
+        XCTAssertEqual(progressStore.historySessions.map(\.templateNameSnapshot), ["Day Two", "Day One PM", "Day One AM"])
+        XCTAssertEqual(progressStore.workoutDays.count, 2)
+
+        progressStore.selectDay(dayOne)
+        XCTAssertEqual(progressStore.historySessions.map(\.templateNameSnapshot), ["Day One PM", "Day One AM"])
+
+        progressStore.selectDay(nil)
+        XCTAssertEqual(progressStore.historySessions.map(\.templateNameSnapshot), ["Day Two", "Day One PM", "Day One AM"])
+    }
+
+    @MainActor
     func testFinishSessionIncrementallyUpdatesTodayAndProgressStores() async throws {
         let store = makeStore()
         await store.hydrateIfNeeded()

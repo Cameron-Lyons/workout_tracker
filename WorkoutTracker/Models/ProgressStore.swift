@@ -4,11 +4,17 @@ import Observation
 @MainActor
 @Observable
 final class ProgressStore {
+    @ObservationIgnored private let calendar = Calendar.autoupdatingCurrent
+    @ObservationIgnored private var allSessionsDescending: [CompletedSession] = []
+    @ObservationIgnored private var sessionsByDay: [Date: [CompletedSession]] = [:]
+
     var overview: ProgressOverview = .empty
     var personalRecords: [PersonalRecord] = []
     var exerciseSummaries: [ExerciseAnalyticsSummary] = []
     var selectedExerciseID: UUID?
     var selectedDay: Date?
+    var historySessions: [CompletedSession] = []
+    var workoutDays: Set<Date> = []
 
     var personalBestOneRepMaxByExerciseID: [UUID: Double] {
         Dictionary(
@@ -22,11 +28,15 @@ final class ProgressStore {
         )
     }
 
-    func apply(_ snapshot: AnalyticsRepository.ProgressSnapshot) {
+    func apply(
+        _ snapshot: AnalyticsRepository.ProgressSnapshot,
+        completedSessions: [CompletedSession]
+    ) {
         overview = snapshot.overview
         personalRecords = snapshot.personalRecords
         exerciseSummaries = snapshot.exerciseSummaries
         selectedExerciseID = snapshot.selectedExerciseID
+        rebuildHistoryCaches(from: completedSessions)
     }
 
     func recordCompletedSession(
@@ -99,6 +109,7 @@ final class ProgressStore {
             selectedExerciseID,
             summaries: exerciseSummaries
         )
+        rebuildHistoryCaches(from: completedSessions)
     }
 
     var selectedExerciseSummary: ExerciseAnalyticsSummary? {
@@ -114,18 +125,8 @@ final class ProgressStore {
     }
 
     func selectDay(_ day: Date?) {
-        selectedDay = day
-    }
-
-    func filteredSessions(from sessions: [CompletedSession]) -> [CompletedSession] {
-        guard let selectedDay else {
-            return sessions.reversed()
-        }
-
-        let calendar = Calendar.autoupdatingCurrent
-        return sessions.reversed().filter {
-            calendar.isDate($0.completedAt, inSameDayAs: selectedDay)
-        }
+        selectedDay = day.map { calendar.startOfDay(for: $0) }
+        historySessions = resolvedHistorySessions(for: selectedDay)
     }
 
     private func resolvedSelectedExerciseID(
@@ -142,6 +143,28 @@ final class ProgressStore {
         }
 
         return summaries.first?.exerciseID
+    }
+
+    private func rebuildHistoryCaches(from completedSessions: [CompletedSession]) {
+        allSessionsDescending = Array(completedSessions.reversed())
+        workoutDays = Set(allSessionsDescending.map { calendar.startOfDay(for: $0.completedAt) })
+
+        var groupedSessions: [Date: [CompletedSession]] = [:]
+        for session in allSessionsDescending {
+            let day = calendar.startOfDay(for: session.completedAt)
+            groupedSessions[day, default: []].append(session)
+        }
+
+        sessionsByDay = groupedSessions
+        historySessions = resolvedHistorySessions(for: selectedDay)
+    }
+
+    private func resolvedHistorySessions(for selectedDay: Date?) -> [CompletedSession] {
+        guard let selectedDay else {
+            return allSessionsDescending
+        }
+
+        return sessionsByDay[selectedDay] ?? []
     }
 }
 
