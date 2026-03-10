@@ -1,5 +1,10 @@
 import SwiftUI
 
+private enum TodayViewMetrics {
+    static let quickStartCardWidth: CGFloat = 238
+    static let spotlightCornerRadius: CGFloat = 22
+}
+
 struct TodayView: View {
     @Environment(AppStore.self) private var appStore
     @Environment(PlansStore.self) private var plansStore
@@ -21,7 +26,7 @@ struct TodayView: View {
             ZStack {
                 AppBackground()
                 ScrollView {
-                    LazyVStack(spacing: 16) {
+                    LazyVStack(spacing: 18) {
                         heroCard
                             .appReveal(delay: 0.01)
 
@@ -35,7 +40,8 @@ struct TodayView: View {
                             AppEmptyStateCard(
                                 systemImage: "sparkles.rectangle.stack",
                                 title: "Start from a plan",
-                                message: "Finish onboarding or create a template in Plans to get a pinned next workout."
+                                message: "Finish onboarding or create a template in Plans to get a pinned next workout.",
+                                tone: .today
                             )
                             .appReveal(delay: 0.03)
                         }
@@ -97,98 +103,144 @@ struct TodayView: View {
                     value: "\(recentPRCount)",
                     systemImage: "rosette"
                 ),
-            ]
+            ],
+            tone: .today
         )
     }
 
     private func resumeCard(_ draft: SessionDraft) -> some View {
-        VStack(alignment: .leading, spacing: 14) {
-            HStack(alignment: .top) {
-                VStack(alignment: .leading, spacing: 4) {
-                    Text("Active Session")
-                        .font(.caption.weight(.semibold))
-                        .tracking(0.6)
-                        .foregroundStyle(AppColors.textSecondary)
+        let completedSetCount = draft.blocks.reduce(0) { partialResult, block in
+            partialResult + block.sets.filter(\.log.isCompleted).count
+        }
 
-                    Text(draft.templateNameSnapshot)
-                        .font(.system(.title3, design: .rounded).weight(.bold))
-                        .foregroundStyle(AppColors.textPrimary)
+        return TodaySpotlightCard(tone: .today) {
+            VStack(alignment: .leading, spacing: 16) {
+                HStack(alignment: .top, spacing: 12) {
+                    VStack(alignment: .leading, spacing: 8) {
+                        AppStatePill(title: "Autosaved", systemImage: "bolt.fill", tone: .warning)
 
-                    Text("Last updated \(draft.lastUpdatedAt.formatted(date: .abbreviated, time: .shortened))")
-                        .font(.caption)
-                        .foregroundStyle(AppColors.textSecondary)
+                        Text(draft.templateNameSnapshot)
+                            .font(.system(.title2, design: .rounded).weight(.bold))
+                            .foregroundStyle(AppColors.textPrimary)
+
+                        Text("Last updated \(draft.lastUpdatedAt.formatted(date: .abbreviated, time: .shortened))")
+                            .font(.caption)
+                            .foregroundStyle(AppColors.textSecondary)
+                    }
+
+                    Spacer(minLength: 12)
+
+                    VStack(alignment: .trailing, spacing: 8) {
+                        MetricBadge(
+                            label: "Blocks",
+                            value: "\(draft.blocks.count)",
+                            systemImage: "square.grid.2x2",
+                            tone: .today
+                        )
+                        MetricBadge(
+                            label: "Logged",
+                            value: "\(completedSetCount)",
+                            systemImage: "checklist",
+                            tone: .success
+                        )
+                    }
                 }
 
-                Spacer()
+                Text("Jump back into the logger with every set, note, and timer exactly where you left it.")
+                    .font(.subheadline)
+                    .foregroundStyle(AppColors.textSecondary)
 
-                MetricBadge(
-                    label: "Blocks",
-                    value: "\(draft.blocks.count)",
-                    systemImage: "square.grid.2x2"
-                )
+                Button {
+                    appStore.resumeActiveSession()
+                } label: {
+                    Label("Resume Session", systemImage: "play.fill")
+                        .font(.headline)
+                        .frame(maxWidth: .infinity)
+                }
+                .buttonStyle(.borderedProminent)
+                .buttonBorderShape(.roundedRectangle(radius: 16))
+                .tint(AppToneStyle.today.accent)
+                .controlSize(.large)
+                .accessibilityIdentifier("today.resumeSessionButton")
             }
-
-            Button {
-                appStore.resumeActiveSession()
-            } label: {
-                Label("Resume Session", systemImage: "play.fill")
-                    .font(.headline)
-                    .frame(maxWidth: .infinity)
-            }
-            .buttonStyle(.borderedProminent)
-            .tint(AppColors.accent)
-            .accessibilityIdentifier("today.resumeSessionButton")
         }
-        .appFeatureSurface()
     }
 
     private func pinnedTemplateCard(_ reference: TemplateReference) -> some View {
-        VStack(alignment: .leading, spacing: 14) {
-            Text("Pinned Next Workout")
-                .font(.caption.weight(.semibold))
-                .tracking(0.6)
-                .foregroundStyle(AppColors.textSecondary)
+        TodaySpotlightCard(tone: .plans) {
+            VStack(alignment: .leading, spacing: 16) {
+                HStack(alignment: .top, spacing: 12) {
+                    VStack(alignment: .leading, spacing: 8) {
+                        AppStatePill(title: "Pinned Next", systemImage: "pin.fill", tone: .plans)
 
-            Text(reference.templateName)
-                .font(.system(.title3, design: .rounded).weight(.bold))
-                .foregroundStyle(AppColors.textPrimary)
+                        Text(reference.templateName)
+                            .font(.system(.title2, design: .rounded).weight(.bold))
+                            .foregroundStyle(AppColors.textPrimary)
 
-            Text(reference.planName)
-                .font(.subheadline)
-                .foregroundStyle(AppColors.textSecondary)
+                        Text(reference.planName)
+                            .font(.subheadline)
+                            .foregroundStyle(AppColors.textSecondary)
+                    }
 
-            HStack(spacing: 8) {
-                ForEach(reference.scheduledWeekdays) { weekday in
-                    Text(weekday.shortLabel)
-                        .font(.caption.weight(.semibold))
-                        .foregroundStyle(AppColors.accent)
-                        .padding(.horizontal, 8)
-                        .padding(.vertical, 5)
-                        .appInsetCard(
-                            cornerRadius: AppCardMetrics.chipCornerRadius,
-                            fillOpacity: 0.8,
-                            borderOpacity: 0.65
-                        )
+                    Spacer(minLength: 12)
+
+                    Image(systemName: "figure.run")
+                        .font(.system(size: 30, weight: .semibold))
+                        .foregroundStyle(AppToneStyle.plans.accent)
+                        .padding(12)
+                        .appInsetCard(cornerRadius: 16, fill: AppToneStyle.plans.softFill, border: AppToneStyle.plans.softBorder)
                 }
-            }
 
-            Button {
-                appStore.startSession(planID: reference.planID, templateID: reference.templateID)
-            } label: {
-                Label("Start \(reference.templateName)", systemImage: "play.fill")
-                    .font(.headline)
-                    .frame(maxWidth: .infinity)
+                if reference.scheduledWeekdays.isEmpty {
+                    Text("No weekday pin yet. Keep this as your default whenever you want a fast start.")
+                        .font(.subheadline)
+                        .foregroundStyle(AppColors.textSecondary)
+                } else {
+                    HStack(spacing: 8) {
+                        ForEach(reference.scheduledWeekdays) { weekday in
+                            Text(weekday.shortLabel)
+                                .font(.caption.weight(.semibold))
+                                .foregroundStyle(AppToneStyle.plans.accent)
+                                .padding(.horizontal, 10)
+                                .padding(.vertical, 6)
+                                .appInsetCard(
+                                    cornerRadius: 999,
+                                    fill: AppToneStyle.plans.softFill.opacity(0.8),
+                                    border: AppToneStyle.plans.softBorder
+                                )
+                        }
+                    }
+                }
+
+                Text("Start straight from Today and drop into the workout logger immediately.")
+                    .font(.subheadline)
+                    .foregroundStyle(AppColors.textSecondary)
+
+                Button {
+                    appStore.startSession(planID: reference.planID, templateID: reference.templateID)
+                } label: {
+                    Label("Start Workout", systemImage: "play.fill")
+                        .font(.headline)
+                        .frame(maxWidth: .infinity)
+                }
+                .buttonStyle(.borderedProminent)
+                .buttonBorderShape(.roundedRectangle(radius: 16))
+                .tint(AppToneStyle.today.accent)
+                .controlSize(.large)
+                .accessibilityIdentifier("today.pinnedStartButton")
             }
-            .buttonStyle(.borderedProminent)
-            .tint(AppColors.accent)
-            .accessibilityIdentifier("today.pinnedStartButton")
         }
-        .appFeatureSurface()
     }
 
     private var quickStartSection: some View {
         VStack(alignment: .leading, spacing: 12) {
-            sectionLabel("Quick Start", systemImage: "bolt")
+            AppSectionHeader(
+                title: "Quick Start",
+                systemImage: "bolt",
+                subtitle: "The templates you launch most often stay close.",
+                trailing: todayStore.quickStartTemplates.isEmpty ? nil : "\(todayStore.quickStartTemplates.count)",
+                tone: .today
+            )
 
             if todayStore.quickStartTemplates.isEmpty {
                 Text("Templates you start most often will show up here.")
@@ -197,46 +249,34 @@ struct TodayView: View {
                     .frame(maxWidth: .infinity, alignment: .leading)
                     .appSectionSurface()
             } else {
-                LazyVGrid(
-                    columns: [GridItem(.flexible(), spacing: 12), GridItem(.flexible(), spacing: 12)],
-                    spacing: 12
-                ) {
-                    ForEach(todayStore.quickStartTemplates) { reference in
-                        Button {
-                            appStore.startSession(planID: reference.planID, templateID: reference.templateID)
-                        } label: {
-                            VStack(alignment: .leading, spacing: 10) {
-                                Text(reference.templateName)
-                                    .font(.headline.weight(.semibold))
-                                    .foregroundStyle(AppColors.textPrimary)
-                                    .frame(maxWidth: .infinity, alignment: .leading)
-
-                                Text(reference.planName)
-                                    .font(.caption)
-                                    .foregroundStyle(AppColors.textSecondary)
-                                    .frame(maxWidth: .infinity, alignment: .leading)
-
-                                if let lastStartedAt = reference.lastStartedAt {
-                                    Text("Last started \(lastStartedAt.formatted(date: .abbreviated, time: .omitted))")
-                                        .font(.caption2)
-                                        .foregroundStyle(AppColors.textSecondary)
-                                        .frame(maxWidth: .infinity, alignment: .leading)
-                                }
+                ScrollView(.horizontal) {
+                    LazyHStack(spacing: 12) {
+                        ForEach(todayStore.quickStartTemplates) { reference in
+                            Button {
+                                appStore.startSession(planID: reference.planID, templateID: reference.templateID)
+                            } label: {
+                                TodayQuickStartTile(reference: reference)
                             }
-                            .frame(maxWidth: .infinity, alignment: .leading)
-                            .appSectionSurface()
+                            .buttonStyle(.plain)
+                            .accessibilityIdentifier("today.quickStart.\(reference.templateID.uuidString)")
                         }
-                        .buttonStyle(.plain)
-                        .accessibilityIdentifier("today.quickStart.\(reference.templateID.uuidString)")
                     }
+                    .padding(.vertical, 2)
                 }
+                .scrollIndicators(.hidden)
             }
         }
     }
 
     private var recentPRSection: some View {
         VStack(alignment: .leading, spacing: 12) {
-            sectionLabel("Recent PRs", systemImage: "rosette")
+            AppSectionHeader(
+                title: "Recent PRs",
+                systemImage: "rosette",
+                subtitle: "Your latest high points stay visible after every session.",
+                trailing: todayStore.recentPersonalRecords.isEmpty ? nil : "\(todayStore.recentPersonalRecords.count)",
+                tone: .success
+            )
 
             if todayStore.recentPersonalRecords.isEmpty {
                 Text("Finish sessions and the latest PRs will appear here.")
@@ -247,7 +287,7 @@ struct TodayView: View {
                     .appSurface(cornerRadius: AppCardMetrics.compactCornerRadius, shadow: false)
             } else {
                 ForEach(todayStore.recentPersonalRecords) { record in
-                    PersonalRecordSummaryCardView(record: record, weightUnit: weightUnit)
+                    PersonalRecordSummaryCardView(record: record, weightUnit: weightUnit, tone: .success)
                 }
             }
         }
@@ -255,7 +295,13 @@ struct TodayView: View {
 
     private var recentSessionsSection: some View {
         VStack(alignment: .leading, spacing: 12) {
-            sectionLabel("Recent Sessions", systemImage: "clock.arrow.circlepath")
+            AppSectionHeader(
+                title: "Recent Sessions",
+                systemImage: "clock.arrow.circlepath",
+                subtitle: "Keep momentum by reliving the last few workouts at a glance.",
+                trailing: todayStore.recentSessions.isEmpty ? nil : "\(todayStore.recentSessions.count)",
+                tone: .progress
+            )
 
             if todayStore.recentSessions.isEmpty {
                 Text("Your finished workouts will show up here.")
@@ -266,17 +312,120 @@ struct TodayView: View {
                     .appSurface(cornerRadius: AppCardMetrics.compactCornerRadius, shadow: false)
             } else {
                 ForEach(todayStore.recentSessions) { session in
-                    CompletedSessionSummaryCardView(session: session, detailSuffix: " logged")
+                    CompletedSessionSummaryCardView(session: session, detailSuffix: " logged", tone: .progress)
                 }
             }
         }
     }
+}
 
-    private func sectionLabel(_ title: String, systemImage: String) -> some View {
-        Label(title, systemImage: systemImage)
-            .font(.headline.weight(.semibold))
-            .foregroundStyle(AppColors.textPrimary)
-            .frame(maxWidth: .infinity, alignment: .leading)
+private struct TodaySpotlightCard<Content: View>: View {
+    let tone: AppToneStyle
+    let content: Content
+
+    init(tone: AppToneStyle, @ViewBuilder content: () -> Content) {
+        self.tone = tone
+        self.content = content()
+    }
+
+    var body: some View {
+        content
+            .padding(18)
+            .background {
+                ZStack {
+                    RoundedRectangle(cornerRadius: TodayViewMetrics.spotlightCornerRadius, style: .continuous)
+                        .fill(
+                            LinearGradient(
+                                colors: [
+                                    AppColors.chrome.opacity(0.94),
+                                    tone.softFill.opacity(0.95),
+                                ],
+                                startPoint: .topLeading,
+                                endPoint: .bottomTrailing
+                            )
+                        )
+
+                    RoundedRectangle(cornerRadius: TodayViewMetrics.spotlightCornerRadius, style: .continuous)
+                        .fill(.ultraThinMaterial)
+                        .opacity(0.2)
+                }
+            }
+            .overlay(
+                RoundedRectangle(cornerRadius: TodayViewMetrics.spotlightCornerRadius, style: .continuous)
+                    .stroke(tone.softBorder, lineWidth: 1)
+            )
+            .shadow(color: .black.opacity(0.18), radius: 16, x: 0, y: 10)
+    }
+}
+
+private struct TodayQuickStartTile: View {
+    let reference: TemplateReference
+
+    private var visibleWeekdays: [Weekday] {
+        Array(reference.scheduledWeekdays.prefix(4))
+    }
+
+    var body: some View {
+        TodaySpotlightCard(tone: .plans) {
+            VStack(alignment: .leading, spacing: 14) {
+                HStack(alignment: .top) {
+                    AppStatePill(title: "Quick Start", systemImage: "bolt.fill", tone: .today)
+
+                    Spacer()
+
+                    Image(systemName: "play.circle.fill")
+                        .font(.system(size: 28, weight: .semibold))
+                        .foregroundStyle(AppToneStyle.today.accent)
+                }
+
+                VStack(alignment: .leading, spacing: 6) {
+                    Text(reference.templateName)
+                        .font(.system(.title3, design: .rounded).weight(.bold))
+                        .foregroundStyle(AppColors.textPrimary)
+                        .lineLimit(2)
+
+                    Text(reference.planName)
+                        .font(.subheadline)
+                        .foregroundStyle(AppColors.textSecondary)
+                        .lineLimit(1)
+                }
+
+                Spacer(minLength: 0)
+
+                if visibleWeekdays.isEmpty {
+                    Text("Ready any day")
+                        .font(.caption.weight(.semibold))
+                        .foregroundStyle(AppToneStyle.plans.accent)
+                } else {
+                    HStack(spacing: 6) {
+                        ForEach(visibleWeekdays) { weekday in
+                            Text(weekday.shortLabel)
+                                .font(.caption.weight(.semibold))
+                                .foregroundStyle(AppToneStyle.plans.accent)
+                                .padding(.horizontal, 8)
+                                .padding(.vertical, 5)
+                                .appInsetCard(
+                                    cornerRadius: 999,
+                                    fill: AppToneStyle.plans.softFill.opacity(0.78),
+                                    border: AppToneStyle.plans.softBorder
+                                )
+                        }
+                    }
+                }
+
+                if let lastStartedAt = reference.lastStartedAt {
+                    Text("Last started \(lastStartedAt.formatted(date: .abbreviated, time: .omitted))")
+                        .font(.caption)
+                        .foregroundStyle(AppColors.textSecondary)
+                } else {
+                    Text("Fresh template ready to launch")
+                        .font(.caption)
+                        .foregroundStyle(AppColors.textSecondary)
+                }
+            }
+            .frame(width: TodayViewMetrics.quickStartCardWidth, alignment: .leading)
+            .frame(minHeight: 196, alignment: .leading)
+        }
     }
 }
 
@@ -310,7 +459,8 @@ struct PlansView: View {
                             AppEmptyStateCard(
                                 systemImage: "list.bullet.rectangle",
                                 title: "No plans yet",
-                                message: "Create a custom plan or install one of the preset packs."
+                                message: "Create a custom plan or install one of the preset packs.",
+                                tone: .plans
                             )
                             .appReveal(delay: 0.03)
                         } else {
@@ -423,7 +573,8 @@ struct PlansView: View {
                     value: "\(plansStore.profiles.count)",
                     systemImage: "slider.horizontal.3"
                 ),
-            ]
+            ],
+            tone: .plans
         )
     }
 
@@ -448,7 +599,8 @@ struct PlansView: View {
                     Label("Add Template", systemImage: "plus")
                 }
                 .buttonStyle(.bordered)
-                .tint(AppColors.accent)
+                .buttonBorderShape(.roundedRectangle(radius: 14))
+                .tint(AppToneStyle.plans.accent)
                 .accessibilityIdentifier("plans.addTemplateButton.\(plan.id.uuidString)")
 
                 Menu {
@@ -493,13 +645,14 @@ struct PlansView: View {
                         if plan.pinnedTemplateID == template.id {
                             Text("PINNED")
                                 .font(.caption2.weight(.bold))
-                                .foregroundStyle(AppColors.accent)
+                                .foregroundStyle(AppToneStyle.plans.accent)
                                 .padding(.horizontal, 6)
                                 .padding(.vertical, 4)
                                 .appInsetCard(
                                     cornerRadius: AppCardMetrics.chipCornerRadius,
                                     fillOpacity: 0.86,
-                                    borderOpacity: 0.8
+                                    borderOpacity: 0.8,
+                                    border: AppToneStyle.plans.softBorder
                                 )
                         }
                     }
@@ -519,13 +672,14 @@ struct PlansView: View {
                     ForEach(template.scheduledWeekdays) { weekday in
                         Text(weekday.shortLabel)
                             .font(.caption.weight(.semibold))
-                            .foregroundStyle(AppColors.accent)
+                            .foregroundStyle(AppToneStyle.plans.accent)
                             .padding(.horizontal, 7)
                             .padding(.vertical, 5)
                             .appInsetCard(
                                 cornerRadius: AppCardMetrics.chipCornerRadius,
                                 fillOpacity: 0.82,
-                                borderOpacity: 0.75
+                                borderOpacity: 0.75,
+                                border: AppToneStyle.plans.softBorder
                             )
                     }
                 }
@@ -546,7 +700,7 @@ struct PlansView: View {
                             if let supersetGroup = block.supersetGroup, !supersetGroup.isEmpty {
                                 Text("Superset \(supersetGroup)")
                                     .font(.caption2)
-                                    .foregroundStyle(AppColors.accent)
+                                    .foregroundStyle(AppToneStyle.plans.accent)
                             }
                         }
 
@@ -555,7 +709,8 @@ struct PlansView: View {
                         MetricBadge(
                             label: "Rule",
                             value: block.progressionRule.kind.displayLabel,
-                            systemImage: "arrow.up.right"
+                            systemImage: "arrow.up.right",
+                            tone: .progress
                         )
                     }
                     .appInsetContentCard(fillOpacity: 0.78)
@@ -570,7 +725,8 @@ struct PlansView: View {
                         .frame(maxWidth: .infinity)
                 }
                 .buttonStyle(.borderedProminent)
-                .tint(AppColors.accent)
+                .buttonBorderShape(.roundedRectangle(radius: 14))
+                .tint(AppToneStyle.today.accent)
                 .accessibilityIdentifier("plans.startTemplate.\(template.id.uuidString)")
 
                 Button {
@@ -580,7 +736,8 @@ struct PlansView: View {
                         .frame(maxWidth: .infinity)
                 }
                 .buttonStyle(.bordered)
-                .tint(AppColors.accent)
+                .buttonBorderShape(.roundedRectangle(radius: 14))
+                .tint(AppToneStyle.plans.accent)
 
                 Button(role: .destructive) {
                     appStore.deleteTemplate(planID: plan.id, templateID: template.id)

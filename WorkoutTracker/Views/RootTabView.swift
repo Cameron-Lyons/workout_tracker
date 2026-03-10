@@ -15,6 +15,11 @@ enum AppColors {
     static let textSecondary = Color(red: 0.76, green: 0.81, blue: 0.90)
     static let accent = Color(red: 0.48, green: 0.60, blue: 0.95)
     static let accentAlt = Color(red: 0.55, green: 0.64, blue: 0.89)
+    static let accentPlans = Color(red: 0.39, green: 0.82, blue: 0.75)
+    static let accentProgress = Color(red: 0.96, green: 0.74, blue: 0.35)
+    static let success = Color(red: 0.42, green: 0.85, blue: 0.57)
+    static let warning = Color(red: 0.98, green: 0.67, blue: 0.30)
+    static let danger = Color(red: 0.95, green: 0.42, blue: 0.43)
     static let input = Color(red: 0.03, green: 0.05, blue: 0.10)
 }
 
@@ -29,6 +34,58 @@ enum AppCardMetrics {
     static let chipCornerRadius: CGFloat = 8
     static let heroIconSize: CGFloat = 42
     static let emptyStateIconSize: CGFloat = 68
+}
+
+enum AppToneStyle: Equatable {
+    case base
+    case today
+    case plans
+    case progress
+    case success
+    case warning
+    case danger
+
+    var accent: Color {
+        switch self {
+        case .base, .today:
+            AppColors.accent
+        case .plans:
+            AppColors.accentPlans
+        case .progress:
+            AppColors.accentProgress
+        case .success:
+            AppColors.success
+        case .warning:
+            AppColors.warning
+        case .danger:
+            AppColors.danger
+        }
+    }
+
+    var accentSecondary: Color {
+        switch self {
+        case .base, .today:
+            AppColors.accentAlt
+        case .plans:
+            AppColors.accentPlans.opacity(0.82)
+        case .progress:
+            AppColors.accentProgress.opacity(0.84)
+        case .success:
+            AppColors.success.opacity(0.84)
+        case .warning:
+            AppColors.warning.opacity(0.84)
+        case .danger:
+            AppColors.danger.opacity(0.84)
+        }
+    }
+
+    var softFill: Color {
+        accent.opacity(0.16)
+    }
+
+    var softBorder: Color {
+        accent.opacity(0.42)
+    }
 }
 
 @MainActor
@@ -154,16 +211,18 @@ private struct AppInsetCardModifier: ViewModifier {
     let cornerRadius: CGFloat
     let fillOpacity: Double
     let borderOpacity: Double
+    let fill: Color?
+    let border: Color?
 
     func body(content: Content) -> some View {
         content
             .background(
                 RoundedRectangle(cornerRadius: cornerRadius, style: .continuous)
-                    .fill(AppColors.input.opacity(fillOpacity))
+                    .fill(fill ?? AppColors.input.opacity(fillOpacity))
             )
             .overlay(
                 RoundedRectangle(cornerRadius: cornerRadius, style: .continuous)
-                    .stroke(AppColors.stroke.opacity(borderOpacity), lineWidth: 1)
+                    .stroke(border ?? AppColors.stroke.opacity(borderOpacity), lineWidth: 1)
             )
     }
 }
@@ -198,6 +257,7 @@ struct AppHeroCard: View {
     let subtitle: String
     let systemImage: String
     let metrics: [AppHeroMetric]
+    var tone: AppToneStyle = .base
 
     var body: some View {
         VStack(alignment: .leading, spacing: 14) {
@@ -207,17 +267,20 @@ struct AppHeroCard: View {
                         .fill(
                             LinearGradient(
                                 colors: [
-                                    AppColors.accent.opacity(0.30),
-                                    AppColors.accentAlt.opacity(0.20),
+                                    tone.softFill.opacity(1.2),
+                                    tone.accentSecondary.opacity(0.22),
                                 ],
                                 startPoint: .topLeading,
                                 endPoint: .bottomTrailing
                             )
                         )
 
+                    Circle()
+                        .stroke(tone.softBorder, lineWidth: 1)
+
                     Image(systemName: systemImage)
                         .font(.system(size: 18, weight: .semibold))
-                        .foregroundStyle(AppColors.accent)
+                        .foregroundStyle(tone.accent)
                 }
                 .frame(width: AppCardMetrics.heroIconSize, height: AppCardMetrics.heroIconSize)
 
@@ -226,7 +289,7 @@ struct AppHeroCard: View {
                         Text(eyebrow.uppercased())
                             .font(.caption2.weight(.semibold))
                             .tracking(0.6)
-                            .foregroundStyle(AppColors.textSecondary)
+                            .foregroundStyle(tone.accent)
                     }
 
                     Text(title)
@@ -250,9 +313,16 @@ struct AppHeroCard: View {
                 ) {
                     ForEach(metrics) { metric in
                         VStack(alignment: .leading, spacing: 4) {
-                            Label(metric.label, systemImage: metric.systemImage)
-                                .font(.caption2.weight(.medium))
-                                .foregroundStyle(AppColors.textSecondary)
+                            HStack(spacing: 6) {
+                                Image(systemName: metric.systemImage)
+                                    .font(.caption.weight(.semibold))
+                                    .foregroundStyle(tone.accent)
+
+                                Text(metric.label.uppercased())
+                                    .font(.caption2.weight(.semibold))
+                                    .tracking(0.4)
+                                    .foregroundStyle(AppColors.textSecondary)
+                            }
 
                             Text(metric.value)
                                 .font(.system(size: 17, weight: .semibold, design: .rounded))
@@ -261,7 +331,12 @@ struct AppHeroCard: View {
                         .frame(maxWidth: .infinity, alignment: .leading)
                         .padding(.horizontal, 11)
                         .padding(.vertical, 9)
-                        .appInsetCard(cornerRadius: 11, fillOpacity: 0.78, borderOpacity: 0.65)
+                        .appInsetCard(
+                            cornerRadius: 11,
+                            fillOpacity: 0.78,
+                            borderOpacity: 0.65,
+                            border: tone.softBorder
+                        )
                     }
                 }
             }
@@ -274,25 +349,29 @@ struct AppEmptyStateCard: View {
     let systemImage: String
     let title: String
     let message: String
+    var tone: AppToneStyle = .base
 
     var body: some View {
         VStack(spacing: 12) {
             ZStack {
                 Circle()
                     .fill(
-                        LinearGradient(
-                            colors: [
-                                AppColors.accent.opacity(0.28),
-                                AppColors.accent.opacity(0.10),
-                            ],
-                            startPoint: .topLeading,
-                            endPoint: .bottomTrailing
+                            LinearGradient(
+                                colors: [
+                                    tone.softFill.opacity(1.4),
+                                    tone.softFill.opacity(0.45),
+                                ],
+                                startPoint: .topLeading,
+                                endPoint: .bottomTrailing
+                            )
                         )
-                    )
+
+                Circle()
+                    .stroke(tone.softBorder, lineWidth: 1)
 
                 Image(systemName: systemImage)
                     .font(.system(size: 36, weight: .semibold))
-                    .foregroundStyle(AppColors.accent)
+                    .foregroundStyle(tone.accent)
             }
             .frame(width: AppCardMetrics.emptyStateIconSize, height: AppCardMetrics.emptyStateIconSize)
 
@@ -311,22 +390,84 @@ struct AppEmptyStateCard: View {
     }
 }
 
+struct AppStatePill: View {
+    let title: String
+    let systemImage: String
+    var tone: AppToneStyle = .base
+
+    var body: some View {
+        Label(title, systemImage: systemImage)
+            .font(.caption.weight(.semibold))
+            .foregroundStyle(tone.accent)
+            .padding(.horizontal, 10)
+            .padding(.vertical, 7)
+            .appInsetCard(cornerRadius: 999, fill: tone.softFill.opacity(0.8), border: tone.softBorder)
+    }
+}
+
+struct AppSectionHeader: View {
+    let title: String
+    let systemImage: String
+    var subtitle: String? = nil
+    var trailing: String? = nil
+    var tone: AppToneStyle = .base
+
+    var body: some View {
+        HStack(alignment: .top, spacing: 12) {
+            VStack(alignment: .leading, spacing: 4) {
+                Label {
+                    Text(title)
+                } icon: {
+                    Image(systemName: systemImage)
+                        .foregroundStyle(tone.accent)
+                }
+                .font(.headline.weight(.semibold))
+                .foregroundStyle(AppColors.textPrimary)
+
+                if let subtitle, !subtitle.isEmpty {
+                    Text(subtitle)
+                        .font(.caption)
+                        .foregroundStyle(AppColors.textSecondary)
+                }
+            }
+
+            Spacer(minLength: 12)
+
+            if let trailing, !trailing.isEmpty {
+                Text(trailing)
+                    .font(.caption.weight(.semibold))
+                    .foregroundStyle(AppColors.textPrimary)
+                    .padding(.horizontal, 10)
+                    .padding(.vertical, 7)
+                    .appInsetCard(cornerRadius: 999, fill: tone.softFill.opacity(0.8), border: tone.softBorder)
+            }
+        }
+    }
+}
+
 struct MetricBadge: View {
     let label: String
     let value: String
     let systemImage: String
+    var tone: AppToneStyle = .base
 
     var body: some View {
-        Label {
-            Text("\(label): \(value)")
-        } icon: {
+        HStack(spacing: 6) {
             Image(systemName: systemImage)
+                .font(.caption.weight(.semibold))
+                .foregroundStyle(tone.accent)
+
+            Text(label)
+                .font(.caption.weight(.medium))
+                .foregroundStyle(AppColors.textSecondary)
+
+            Text(value)
+                .font(.caption.weight(.semibold))
+                .foregroundStyle(AppColors.textPrimary)
         }
-        .font(.caption.weight(.semibold))
-        .foregroundStyle(AppColors.textSecondary)
         .padding(.horizontal, 10)
         .padding(.vertical, 7)
-        .appInsetCard(cornerRadius: 10, fillOpacity: 0.75, borderOpacity: 0.6)
+        .appInsetCard(cornerRadius: 10, fillOpacity: 0.75, borderOpacity: 0.6, border: tone.softBorder)
     }
 }
 
@@ -427,7 +568,8 @@ struct SessionFinishSummaryView: View {
                             AppEmptyStateCard(
                                 systemImage: "bolt.badge.clock",
                                 title: "Session locked in",
-                                message: "No new PRs this time, but the log is saved and progression rules were advanced."
+                                message: "No new PRs this time, but the log is saved and progression rules were advanced.",
+                                tone: .success
                             )
                         } else {
                             SessionFinishRecordsSectionView(
@@ -493,7 +635,8 @@ private struct SessionFinishHeroCardView: View, Equatable {
                     value: summary.completedAt.formatted(date: .omitted, time: .shortened),
                     systemImage: "clock"
                 ),
-            ]
+            ],
+            tone: .success
         )
     }
 }
@@ -546,7 +689,7 @@ private struct SessionFinishRecordCardView: View, Equatable {
                 "Estimated 1RM \(WeightFormatter.displayString(record.estimatedOneRepMax, unit: weightUnit)) \(weightUnit.symbol)"
             )
             .font(.caption)
-            .foregroundStyle(AppColors.accent)
+            .foregroundStyle(AppColors.success)
         }
         .padding(AppCardMetrics.compactPadding)
         .frame(maxWidth: .infinity, alignment: .leading)
@@ -557,9 +700,16 @@ private struct SessionFinishRecordCardView: View, Equatable {
 struct PersonalRecordSummaryCardView: View, Equatable {
     let record: PersonalRecord
     let weightUnit: WeightUnit
+    let tone: AppToneStyle
+
+    init(record: PersonalRecord, weightUnit: WeightUnit, tone: AppToneStyle = .success) {
+        self.record = record
+        self.weightUnit = weightUnit
+        self.tone = tone
+    }
 
     nonisolated static func == (lhs: PersonalRecordSummaryCardView, rhs: PersonalRecordSummaryCardView) -> Bool {
-        lhs.record == rhs.record && lhs.weightUnit == rhs.weightUnit
+        lhs.record == rhs.record && lhs.weightUnit == rhs.weightUnit && lhs.tone == rhs.tone
     }
 
     var body: some View {
@@ -580,7 +730,7 @@ struct PersonalRecordSummaryCardView: View, Equatable {
 
             Text(record.achievedAt.formatted(date: .abbreviated, time: .omitted))
                 .font(.caption)
-                .foregroundStyle(AppColors.accent)
+                .foregroundStyle(tone.accent)
         }
         .padding(AppCardMetrics.compactPadding)
         .appSurface(cornerRadius: AppCardMetrics.compactCornerRadius, shadow: false)
@@ -590,14 +740,16 @@ struct PersonalRecordSummaryCardView: View, Equatable {
 struct CompletedSessionSummaryCardView: View, Equatable {
     let session: CompletedSession
     let detailSuffix: String
+    let tone: AppToneStyle
 
-    init(session: CompletedSession, detailSuffix: String = "") {
+    init(session: CompletedSession, detailSuffix: String = "", tone: AppToneStyle = .base) {
         self.session = session
         self.detailSuffix = detailSuffix
+        self.tone = tone
     }
 
     nonisolated static func == (lhs: CompletedSessionSummaryCardView, rhs: CompletedSessionSummaryCardView) -> Bool {
-        lhs.session == rhs.session && lhs.detailSuffix == rhs.detailSuffix
+        lhs.session == rhs.session && lhs.detailSuffix == rhs.detailSuffix && lhs.tone == rhs.tone
     }
 
     private var detailText: String {
@@ -616,7 +768,7 @@ struct CompletedSessionSummaryCardView: View, Equatable {
 
             Text(detailText)
                 .font(.caption)
-                .foregroundStyle(AppColors.accent)
+                .foregroundStyle(tone.accent)
         }
         .padding(AppCardMetrics.compactPadding)
         .frame(maxWidth: .infinity, alignment: .leading)
@@ -656,13 +808,17 @@ extension View {
     func appInsetCard(
         cornerRadius: CGFloat = 10,
         fillOpacity: Double = 0.85,
-        borderOpacity: Double = 0.55
+        borderOpacity: Double = 0.55,
+        fill: Color? = nil,
+        border: Color? = nil
     ) -> some View {
         modifier(
             AppInsetCardModifier(
                 cornerRadius: cornerRadius,
                 fillOpacity: fillOpacity,
-                borderOpacity: borderOpacity
+                borderOpacity: borderOpacity,
+                fill: fill,
+                border: border
             )
         )
     }
@@ -671,13 +827,17 @@ extension View {
         padding: CGFloat = AppCardMetrics.insetPadding,
         cornerRadius: CGFloat = AppCardMetrics.insetCornerRadius,
         fillOpacity: Double = 0.8,
-        borderOpacity: Double = 0.68
+        borderOpacity: Double = 0.68,
+        fill: Color? = nil,
+        border: Color? = nil
     ) -> some View {
         self.padding(padding)
             .appInsetCard(
                 cornerRadius: cornerRadius,
                 fillOpacity: fillOpacity,
-                borderOpacity: borderOpacity
+                borderOpacity: borderOpacity,
+                fill: fill,
+                border: border
             )
     }
 

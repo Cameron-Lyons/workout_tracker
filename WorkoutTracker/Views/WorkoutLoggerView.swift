@@ -8,6 +8,10 @@ private struct ActiveSessionHeaderState: Equatable {
     var restTimerEndsAt: Date?
 }
 
+private enum ActiveSessionViewMetrics {
+    static let statControlHeight: CGFloat = 104
+}
+
 struct ActiveSessionView: View {
     @Environment(AppStore.self) private var appStore
     @Environment(PlansStore.self) private var plansStore
@@ -54,7 +58,8 @@ struct ActiveSessionView: View {
                     AppEmptyStateCard(
                         systemImage: "figure.cooldown",
                         title: "No active session",
-                        message: "Start a workout from Today or Plans."
+                        message: "Start a workout from Today or Plans.",
+                        tone: .today
                     )
                 }
             }
@@ -109,7 +114,7 @@ private struct ActiveSessionContentView: View {
     let weightStep: Double
 
     var body: some View {
-        VStack(spacing: 14) {
+        VStack(spacing: 12) {
             ActiveSessionHeaderView(state: headerState)
                 .equatable()
 
@@ -132,7 +137,7 @@ private struct ActiveSessionContentView: View {
             }
             .scrollIndicators(.hidden)
 
-            ActiveSessionFooterView()
+            ActiveSessionFooterView(state: headerState)
         }
     }
 }
@@ -149,9 +154,12 @@ private struct ActiveSessionNotesCardView: View, Equatable {
 
     var body: some View {
         VStack(alignment: .leading, spacing: 10) {
-            Text("Session Notes")
-                .font(.headline.weight(.semibold))
-                .foregroundStyle(AppColors.textPrimary)
+            AppSectionHeader(
+                title: "Session Notes",
+                systemImage: "note.text",
+                subtitle: "Capture anything you want to remember before you finish.",
+                tone: .plans
+            )
 
             TextField(
                 "How did the session feel?",
@@ -177,6 +185,10 @@ private struct SessionBlockCardView: View, Equatable {
     let weightUnit: WeightUnit
     let weightStep: Double
 
+    private var completedSetCount: Int {
+        block.sets.filter { $0.log.isCompleted }.count
+    }
+
     nonisolated static func == (lhs: SessionBlockCardView, rhs: SessionBlockCardView) -> Bool {
         lhs.block == rhs.block
             && lhs.weightUnit == rhs.weightUnit
@@ -193,28 +205,44 @@ private struct SessionBlockCardView: View, Equatable {
 
                     HStack(spacing: 8) {
                         MetricBadge(
+                            label: "Sets",
+                            value: "\(block.sets.count)",
+                            systemImage: "number.square",
+                            tone: .today
+                        )
+
+                        MetricBadge(
                             label: "Rest",
                             value: "\(block.restSeconds)s",
-                            systemImage: "timer"
+                            systemImage: "timer",
+                            tone: .warning
                         )
 
                         if let supersetGroup = block.supersetGroup, !supersetGroup.isEmpty {
                             MetricBadge(
                                 label: "Superset",
                                 value: supersetGroup,
-                                systemImage: "link"
+                                systemImage: "link",
+                                tone: .plans
                             )
                         }
 
                         MetricBadge(
                             label: "Rule",
                             value: block.progressionRule.kind.displayLabel,
-                            systemImage: "arrow.up.right"
+                            systemImage: "arrow.up.right",
+                            tone: .progress
                         )
                     }
                 }
 
                 Spacer()
+
+                AppStatePill(
+                    title: "\(completedSetCount)/\(block.sets.count) done",
+                    systemImage: completedSetCount == block.sets.count ? "checkmark.circle.fill" : "circle.dotted",
+                    tone: completedSetCount == block.sets.count ? .success : .today
+                )
             }
 
             TextField(
@@ -247,7 +275,8 @@ private struct SessionBlockCardView: View, Equatable {
                         .frame(maxWidth: .infinity)
                 }
                 .buttonStyle(.bordered)
-                .tint(AppColors.accent)
+                .buttonBorderShape(.roundedRectangle(radius: 14))
+                .tint(AppToneStyle.today.accent)
 
                 Button {
                     appStore.copyLastSet(in: block.id)
@@ -256,7 +285,8 @@ private struct SessionBlockCardView: View, Equatable {
                         .frame(maxWidth: .infinity)
                 }
                 .buttonStyle(.bordered)
-                .tint(AppColors.accent)
+                .buttonBorderShape(.roundedRectangle(radius: 14))
+                .tint(AppToneStyle.plans.accent)
             }
         }
         .appSurfaceCard(
@@ -282,6 +312,14 @@ private struct SessionSetRowView: View, Equatable {
             && lhs.weightStep == rhs.weightStep
     }
 
+    private var isCompleted: Bool {
+        row.log.isCompleted
+    }
+
+    private var tone: AppToneStyle {
+        isCompleted ? .success : .today
+    }
+
     private var loadValue: String {
         let resolvedWeight = row.log.weight ?? row.target.targetWeight
         let displayValue = WeightFormatter.displayString(resolvedWeight, unit: weightUnit)
@@ -301,18 +339,31 @@ private struct SessionSetRowView: View, Equatable {
         return reps
     }
 
+    private var loadCaption: String {
+        guard let targetWeight = row.target.targetWeight else {
+            return "Adjust load"
+        }
+
+        return "Target \(WeightFormatter.displayString(targetWeight, unit: weightUnit)) \(weightUnit.symbol)"
+    }
+
+    private var repsCaption: String {
+        "Target \(row.target.repRange.displayLabel)"
+    }
+
     var body: some View {
-        VStack(alignment: .leading, spacing: 10) {
+        VStack(alignment: .leading, spacing: 12) {
             HStack {
-                Text(row.target.setKind.displayName)
-                    .font(.caption.weight(.semibold))
-                    .tracking(0.5)
-                    .foregroundStyle(AppColors.textSecondary)
+                AppStatePill(
+                    title: row.target.setKind.displayName,
+                    systemImage: isCompleted ? "checkmark.circle.fill" : "circle.dashed",
+                    tone: tone
+                )
 
                 Spacer()
 
                 Text(targetSummary)
-                    .font(.caption)
+                    .font(.caption.weight(.medium))
                     .foregroundStyle(AppColors.textSecondary)
             }
 
@@ -321,6 +372,8 @@ private struct SessionSetRowView: View, Equatable {
                     title: "Load",
                     value: loadValue,
                     unit: weightUnit.symbol,
+                    caption: loadCaption,
+                    tone: tone,
                     onDecrease: {
                         appStore.adjustSetWeight(
                             blockID: blockID,
@@ -341,6 +394,8 @@ private struct SessionSetRowView: View, Equatable {
                     title: "Reps",
                     value: repsValue,
                     unit: "",
+                    caption: repsCaption,
+                    tone: tone,
                     onDecrease: {
                         appStore.adjustSetReps(blockID: blockID, setID: row.id, delta: -1)
                     },
@@ -349,29 +404,22 @@ private struct SessionSetRowView: View, Equatable {
                     }
                 )
 
-                Button {
+                SessionCompletionButtonView(isCompleted: isCompleted) {
                     appStore.toggleSetCompletion(blockID: blockID, setID: row.id)
-                } label: {
-                    VStack(spacing: 4) {
-                        Image(systemName: row.log.isCompleted ? "checkmark.circle.fill" : "circle")
-                            .font(.system(size: 24, weight: .bold))
-                        Text(row.log.isCompleted ? "Done" : "Complete")
-                            .font(.caption.weight(.semibold))
-                    }
-                    .frame(maxWidth: .infinity, minHeight: 74)
                 }
-                .buttonStyle(.borderedProminent)
-                .tint(row.log.isCompleted ? AppColors.accent : AppColors.accent.opacity(0.78))
                 .accessibilityIdentifier("session.completeSet.\(blockID.uuidString).\(row.id.uuidString)")
             }
 
             if let note = row.target.note, !note.isEmpty {
                 Text(note)
                     .font(.caption)
-                    .foregroundStyle(AppColors.accent)
+                    .foregroundStyle(AppToneStyle.progress.accent)
             }
         }
-        .appInsetContentCard()
+        .appInsetContentCard(
+            fill: isCompleted ? AppColors.success.opacity(0.13) : nil,
+            border: isCompleted ? AppToneStyle.success.softBorder : nil
+        )
     }
 }
 
@@ -379,71 +427,191 @@ private struct SessionStatControlView: View {
     let title: String
     let value: String
     let unit: String
+    let caption: String?
+    let tone: AppToneStyle
     let onDecrease: () -> Void
     let onIncrease: () -> Void
 
     var body: some View {
-        VStack(spacing: 6) {
-            Text(title)
-                .font(.caption.weight(.semibold))
+        VStack(alignment: .leading, spacing: 8) {
+            Text(title.uppercased())
+                .font(.caption2.weight(.semibold))
+                .tracking(0.5)
                 .foregroundStyle(AppColors.textSecondary)
 
             Text(unit.isEmpty ? value : "\(value) \(unit)")
-                .font(.headline.weight(.semibold))
+                .font(.system(size: 20, weight: .bold, design: .rounded))
                 .foregroundStyle(AppColors.textPrimary)
                 .lineLimit(1)
                 .minimumScaleFactor(0.7)
 
-            HStack(spacing: 8) {
-                Button {
-                    onDecrease()
-                } label: {
-                    Image(systemName: "minus")
-                }
-                .buttonStyle(.bordered)
-                .tint(AppColors.accent)
+            if let caption, !caption.isEmpty {
+                Text(caption)
+                    .font(.caption2)
+                    .foregroundStyle(AppColors.textSecondary)
+                    .lineLimit(1)
+                    .minimumScaleFactor(0.7)
+            }
 
-                Button {
-                    onIncrease()
-                } label: {
-                    Image(systemName: "plus")
-                }
-                .buttonStyle(.bordered)
-                .tint(AppColors.accent)
+            HStack(spacing: 8) {
+                SessionAdjustButton(systemImage: "minus", tone: tone, action: onDecrease)
+                SessionAdjustButton(systemImage: "plus", tone: tone, action: onIncrease)
             }
         }
-        .frame(maxWidth: .infinity, minHeight: 74)
+        .frame(maxWidth: .infinity, minHeight: ActiveSessionViewMetrics.statControlHeight, alignment: .leading)
+        .padding(12)
+        .appInsetCard(cornerRadius: 14, fillOpacity: 0.82, borderOpacity: 0.74, border: tone.softBorder)
+    }
+}
+
+private struct SessionAdjustButton: View {
+    let systemImage: String
+    let tone: AppToneStyle
+    let action: () -> Void
+
+    var body: some View {
+        Button(action: action) {
+            Image(systemName: systemImage)
+                .font(.body.weight(.bold))
+                .foregroundStyle(AppColors.textPrimary)
+                .frame(width: 34, height: 34)
+                .background(
+                    Circle()
+                        .fill(tone.softFill.opacity(0.9))
+                )
+                .overlay(
+                    Circle()
+                        .stroke(tone.softBorder, lineWidth: 1)
+                )
+        }
+        .buttonStyle(.plain)
+    }
+}
+
+private struct SessionCompletionButtonView: View {
+    let isCompleted: Bool
+    let action: () -> Void
+
+    var body: some View {
+        Button(action: action) {
+            VStack(spacing: 6) {
+                Image(systemName: isCompleted ? "checkmark.circle.fill" : "circle")
+                    .font(.system(size: 28, weight: .bold))
+
+                Text(isCompleted ? "Logged" : "Complete")
+                    .font(.caption.weight(.semibold))
+
+                Text(isCompleted ? "Tap to edit" : "Tap when done")
+                    .font(.caption2)
+                    .foregroundStyle(AppColors.textSecondary)
+            }
+            .foregroundStyle(AppColors.textPrimary)
+            .frame(maxWidth: .infinity, minHeight: ActiveSessionViewMetrics.statControlHeight)
+        }
+        .buttonStyle(.plain)
+        .background {
+            RoundedRectangle(cornerRadius: 14, style: .continuous)
+                .fill(isCompleted ? AppColors.success.opacity(0.18) : AppToneStyle.today.softFill.opacity(0.8))
+        }
+        .overlay(
+            RoundedRectangle(cornerRadius: 14, style: .continuous)
+                .stroke(isCompleted ? AppToneStyle.success.softBorder : AppToneStyle.today.softBorder, lineWidth: 1)
+        )
     }
 }
 
 private struct ActiveSessionFooterView: View {
     @Environment(AppStore.self) private var appStore
     @Environment(\.dismiss) private var dismiss
+    let state: ActiveSessionHeaderState
 
     var body: some View {
-        HStack(spacing: 12) {
-            Button {
-                appStore.clearRestTimer()
-            } label: {
-                Label("Clear Rest", systemImage: "timer")
-                    .frame(maxWidth: .infinity)
-            }
-            .buttonStyle(.bordered)
-            .tint(AppColors.accent)
+        VStack(spacing: 12) {
+            HStack {
+                MetricBadge(
+                    label: "Logged",
+                    value: "\(state.completedSetCount)",
+                    systemImage: "checklist",
+                    tone: .success
+                )
 
-            Button {
-                appStore.finishActiveSession()
-                dismiss()
-            } label: {
-                Label("Finish Workout", systemImage: "checkmark.circle.fill")
-                    .frame(maxWidth: .infinity)
+                Spacer()
+
+                MetricBadge(
+                    label: "Rest",
+                    value: restTimerLabel(at: .now),
+                    systemImage: "timer",
+                    tone: restTone(at: .now)
+                )
             }
-            .buttonStyle(.borderedProminent)
-            .tint(AppColors.accent)
-            .accessibilityIdentifier("session.finishButton")
+
+            HStack(spacing: 12) {
+                Button {
+                    appStore.clearRestTimer()
+                } label: {
+                    Label("Clear Rest", systemImage: "timer")
+                        .frame(maxWidth: .infinity)
+                }
+                .buttonStyle(.bordered)
+                .buttonBorderShape(.roundedRectangle(radius: 16))
+                .tint(AppToneStyle.warning.accent)
+                .disabled(state.restTimerEndsAt == nil)
+
+                Button {
+                    appStore.finishActiveSession()
+                    dismiss()
+                } label: {
+                    Label("Finish Workout", systemImage: "checkmark.circle.fill")
+                        .frame(maxWidth: .infinity)
+                }
+                .buttonStyle(.borderedProminent)
+                .buttonBorderShape(.roundedRectangle(radius: 16))
+                .tint(AppToneStyle.success.accent)
+                .accessibilityIdentifier("session.finishButton")
+            }
         }
         .padding(.horizontal, 16)
+        .padding(.top, 12)
         .padding(.bottom, 12)
+        .background {
+            ZStack {
+                Rectangle()
+                    .fill(AppColors.chrome.opacity(0.94))
+
+                Rectangle()
+                    .fill(.ultraThinMaterial)
+                    .opacity(0.28)
+            }
+            .ignoresSafeArea(edges: .bottom)
+        }
+        .overlay(alignment: .top) {
+            Rectangle()
+                .fill(AppColors.stroke.opacity(0.72))
+                .frame(height: 1)
+        }
+    }
+
+    private func restTone(at now: Date) -> AppToneStyle {
+        guard let endDate = state.restTimerEndsAt else {
+            return .today
+        }
+
+        return endDate.timeIntervalSince(now) <= 0 ? .success : .warning
+    }
+
+    private func restTimerLabel(at now: Date) -> String {
+        guard let endDate = state.restTimerEndsAt else {
+            return "Off"
+        }
+
+        let remaining = max(0, Int(endDate.timeIntervalSince(now)))
+        if remaining == 0 {
+            return "Ready"
+        }
+
+        let minutes = remaining / 60
+        let seconds = remaining % 60
+        return "\(minutes):\(String(format: "%02d", seconds))"
     }
 }
 
@@ -453,7 +621,7 @@ private struct ActiveSessionHeaderView: View, Equatable {
     var body: some View {
         TimelineView(.periodic(from: .now, by: 1)) { context in
             AppHeroCard(
-                eyebrow: "Active Session",
+                eyebrow: headerEyebrow(at: context.date),
                 title: state.templateName,
                 subtitle: restTimerSubtitle(at: context.date),
                 systemImage: "figure.strengthtraining.traditional",
@@ -472,7 +640,7 @@ private struct ActiveSessionHeaderView: View, Equatable {
                     ),
                     AppHeroMetric(
                         id: "sets",
-                        label: "Completed",
+                        label: "Logged",
                         value: "\(state.completedSetCount)",
                         systemImage: "checklist"
                     ),
@@ -482,11 +650,28 @@ private struct ActiveSessionHeaderView: View, Equatable {
                         value: restTimerLabel(at: context.date),
                         systemImage: "timer"
                     ),
-                ]
+                ],
+                tone: headerTone(at: context.date)
             )
         }
         .padding(.horizontal, 16)
         .padding(.top, 14)
+    }
+
+    private func headerEyebrow(at now: Date) -> String {
+        guard let endDate = state.restTimerEndsAt else {
+            return "Active Session"
+        }
+
+        return endDate.timeIntervalSince(now) <= 0 ? "Next Set Ready" : "Rest Timer Live"
+    }
+
+    private func headerTone(at now: Date) -> AppToneStyle {
+        guard let endDate = state.restTimerEndsAt else {
+            return .today
+        }
+
+        return endDate.timeIntervalSince(now) <= 0 ? .success : .warning
     }
 
     private func restTimerLabel(at now: Date) -> String {

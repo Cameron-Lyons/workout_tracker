@@ -63,17 +63,61 @@ struct PlanEditorSheet: View {
 
     @State private var name = ""
 
+    private var planTitle: String {
+        name.nonEmptyTrimmed ?? existingPlan?.name ?? "Name your plan"
+    }
+
     var body: some View {
         NavigationStack {
             ZStack {
                 AppBackground()
-                VStack(spacing: 14) {
-                    TextField("Plan name", text: $name)
-                        .textInputAutocapitalization(.words)
-                        .foregroundStyle(AppColors.textPrimary)
-                        .appInputField()
+                ScrollView {
+                    LazyVStack(spacing: 18) {
+                        AppHeroCard(
+                            eyebrow: existingPlan == nil ? "New Plan" : "Edit Plan",
+                            title: planTitle,
+                            subtitle: "Plans keep related templates together so Today stays fast and organized.",
+                            systemImage: "list.bullet.rectangle",
+                            metrics: [
+                                AppHeroMetric(
+                                    id: "templates",
+                                    label: "Templates",
+                                    value: "\(existingPlan?.templates.count ?? 0)",
+                                    systemImage: "rectangle.stack"
+                                ),
+                                AppHeroMetric(
+                                    id: "pin",
+                                    label: "Pinned",
+                                    value: existingPlan?.pinnedTemplateID == nil ? "None" : "Set",
+                                    systemImage: "pin"
+                                ),
+                            ],
+                            tone: .plans
+                        )
+
+                        VStack(alignment: .leading, spacing: 12) {
+                            AppSectionHeader(
+                                title: "Plan Identity",
+                                systemImage: "textformat",
+                                subtitle: "Choose a short name you will recognize from Today and Plans.",
+                                tone: .plans
+                            )
+
+                            TextField("Plan name", text: $name)
+                                .textInputAutocapitalization(.words)
+                                .foregroundStyle(AppColors.textPrimary)
+                                .appInputField()
+
+                            Text("Examples: Upper / Lower, Garage Gym, Travel Split.")
+                                .font(.caption)
+                                .foregroundStyle(AppColors.textSecondary)
+                        }
+                        .appFeatureSurface()
+                    }
+                    .padding(.horizontal, 16)
+                    .padding(.vertical, 14)
                 }
-                .padding()
+                .scrollIndicators(.hidden)
             }
             .navigationTitle(existingPlan == nil ? "New Plan" : "Edit Plan")
             .toolbarBackground(AppColors.chrome, for: .navigationBar)
@@ -130,13 +174,68 @@ struct TemplateEditorSheet: View {
         appStore.settingsStore.weightUnit
     }
 
+    private var templateTitle: String {
+        templateName.nonEmptyTrimmed ?? existingTemplate?.name ?? "Build a template"
+    }
+
+    private var hasInvalidBlocks: Bool {
+        blocks.contains(where: { $0.exerciseID == nil })
+    }
+
+    private var unresolvedBlockCount: Int {
+        blocks.filter { $0.exerciseID == nil }.count
+    }
+
     var body: some View {
         NavigationStack {
             ZStack {
                 AppBackground()
                 ScrollView {
-                    LazyVStack(spacing: 16) {
-                        VStack(spacing: 12) {
+                    LazyVStack(spacing: 18) {
+                        AppHeroCard(
+                            eyebrow: existingTemplate == nil ? "New Template" : "Edit Template",
+                            title: templateTitle,
+                            subtitle: blocks.isEmpty
+                                ? "Start with the basics first, then open advanced settings only for the blocks that need them."
+                                : "Keep the main prescription up front and tuck progression details into each block as needed.",
+                            systemImage: "rectangle.stack.badge.plus",
+                            metrics: [
+                                AppHeroMetric(
+                                    id: "blocks",
+                                    label: "Blocks",
+                                    value: "\(blocks.count)",
+                                    systemImage: "square.grid.2x2"
+                                ),
+                                AppHeroMetric(
+                                    id: "schedule",
+                                    label: "Schedule",
+                                    value: selectedWeekdays.isEmpty ? "Flexible" : "\(selectedWeekdays.count) days",
+                                    systemImage: "calendar"
+                                ),
+                                AppHeroMetric(
+                                    id: "ready",
+                                    label: "Needs Setup",
+                                    value: "\(unresolvedBlockCount)",
+                                    systemImage: "exclamationmark.circle"
+                                ),
+                                AppHeroMetric(
+                                    id: "unit",
+                                    label: "Weight Unit",
+                                    value: weightUnit.symbol.uppercased(),
+                                    systemImage: "scalemass"
+                                ),
+                            ],
+                            tone: .plans
+                        )
+
+                        VStack(alignment: .leading, spacing: 12) {
+                            AppSectionHeader(
+                                title: "Overview",
+                                systemImage: "square.and.pencil",
+                                subtitle: "Name the template and leave a note for the next time you run it.",
+                                tone: .plans
+                            )
+
                             TextField("Template name", text: $templateName)
                                 .textInputAutocapitalization(.words)
                                 .foregroundStyle(AppColors.textPrimary)
@@ -147,12 +246,16 @@ struct TemplateEditorSheet: View {
                                 .lineLimit(2...4)
                                 .appInputField()
                         }
-                        .appSectionSurface()
+                        .appFeatureSurface()
 
-                        VStack(alignment: .leading, spacing: 10) {
-                            Text("Schedule")
-                                .font(.headline.weight(.semibold))
-                                .foregroundStyle(AppColors.textPrimary)
+                        VStack(alignment: .leading, spacing: 12) {
+                            AppSectionHeader(
+                                title: "Schedule",
+                                systemImage: "calendar.badge.clock",
+                                subtitle: "Pin recurring days now or leave the template flexible.",
+                                trailing: selectedWeekdays.isEmpty ? "Any day" : "\(selectedWeekdays.count) selected",
+                                tone: .plans
+                            )
 
                             LazyVGrid(
                                 columns: [GridItem(.adaptive(minimum: 72), spacing: 10)],
@@ -176,24 +279,30 @@ struct TemplateEditorSheet: View {
                                             .frame(maxWidth: .infinity)
                                             .padding(.vertical, 10)
                                             .appInsetCard(
-                                                cornerRadius: 10,
-                                                fillOpacity: selectedWeekdays.contains(weekday) ? 0.95 : 0.75,
-                                                borderOpacity: selectedWeekdays.contains(weekday) ? 0.95 : 0.55
+                                                cornerRadius: 12,
+                                                fill: selectedWeekdays.contains(weekday)
+                                                    ? AppToneStyle.plans.softFill.opacity(0.92)
+                                                    : nil,
+                                                border: selectedWeekdays.contains(weekday)
+                                                    ? AppToneStyle.plans.softBorder
+                                                    : nil
                                             )
                                     }
                                     .buttonStyle(.plain)
                                 }
                             }
                         }
-                        .appSectionSurface()
+                        .appFeatureSurface()
 
                         VStack(alignment: .leading, spacing: 12) {
-                            HStack {
-                                Text("Exercise Blocks")
-                                    .font(.headline.weight(.semibold))
-                                    .foregroundStyle(AppColors.textPrimary)
-
-                                Spacer()
+                            HStack(alignment: .top, spacing: 12) {
+                                AppSectionHeader(
+                                    title: "Exercise Blocks",
+                                    systemImage: "dumbbell",
+                                    subtitle: "Keep the default prescription simple, then expand a block for more control.",
+                                    trailing: blocks.isEmpty ? nil : "\(blocks.count)",
+                                    tone: .today
+                                )
 
                                 Button {
                                     blocks.append(TemplateDraftBlock())
@@ -201,14 +310,28 @@ struct TemplateEditorSheet: View {
                                     Label("Add Block", systemImage: "plus")
                                 }
                                 .buttonStyle(.borderedProminent)
-                                .tint(AppColors.accent)
+                                .buttonBorderShape(.roundedRectangle(radius: 14))
+                                .tint(AppToneStyle.today.accent)
                                 .accessibilityIdentifier("plans.template.addBlockButton")
                             }
 
                             if blocks.isEmpty {
-                                Text("Add at least one exercise block.")
-                                    .font(.subheadline)
-                                    .foregroundStyle(AppColors.textSecondary)
+                                VStack(alignment: .leading, spacing: 8) {
+                                    AppStatePill(title: "Start Here", systemImage: "sparkles", tone: .today)
+
+                                    Text("Add at least one exercise block.")
+                                        .font(.headline.weight(.semibold))
+                                        .foregroundStyle(AppColors.textPrimary)
+
+                                    Text("Each block holds the main prescription up front, with progression details hidden until you need them.")
+                                        .font(.subheadline)
+                                        .foregroundStyle(AppColors.textSecondary)
+                                }
+                                .frame(maxWidth: .infinity, alignment: .leading)
+                                .appInsetContentCard(
+                                    fill: AppToneStyle.today.softFill.opacity(0.55),
+                                    border: AppToneStyle.today.softBorder
+                                )
                             } else {
                                 LazyVStack(spacing: 12) {
                                     ForEach($blocks) { $block in
@@ -226,7 +349,7 @@ struct TemplateEditorSheet: View {
                                 }
                             }
                         }
-                        .appSectionSurface()
+                        .appFeatureSurface()
                     }
                     .padding(.horizontal, 16)
                     .padding(.vertical, 14)
@@ -247,7 +370,7 @@ struct TemplateEditorSheet: View {
                     Button("Save") {
                         saveTemplate()
                     }
-                    .disabled(templateName.nonEmptyTrimmed == nil || blocks.contains(where: { $0.exerciseID == nil }))
+                    .disabled(templateName.nonEmptyTrimmed == nil || hasInvalidBlocks)
                     .accessibilityIdentifier("plans.template.saveButton")
                 }
             }
@@ -453,27 +576,94 @@ private struct TemplateDraftBlockEditorView: View {
     let onPickExercise: (UUID) -> Void
     let onDelete: (UUID) -> Void
 
+    @State private var isShowingAdvancedSettings: Bool
+
+    init(
+        block: Binding<TemplateDraftBlock>,
+        weightUnit: WeightUnit,
+        onPickExercise: @escaping (UUID) -> Void,
+        onDelete: @escaping (UUID) -> Void
+    ) {
+        _block = block
+        self.weightUnit = weightUnit
+        self.onPickExercise = onPickExercise
+        self.onDelete = onDelete
+        _isShowingAdvancedSettings = State(initialValue: Self.shouldStartExpanded(for: block.wrappedValue))
+    }
+
+    private var exerciseTitle: String {
+        block.exerciseName.nonEmptyTrimmed ?? "Choose exercise"
+    }
+
+    private var tone: AppToneStyle {
+        block.exerciseID == nil ? .warning : .plans
+    }
+
+    private var prescriptionSummary: String {
+        "\(block.setCount) set\(block.setCount == 1 ? "" : "s") • \(block.repLower)-\(block.repUpper) reps"
+    }
+
+    private var advancedSummary: String {
+        var labels: [String] = []
+
+        if block.progressionKind != .manual {
+            labels.append(block.progressionKind.displayLabel)
+        }
+        if block.setKind != .working {
+            labels.append(block.setKind.rawValue.capitalized)
+        }
+        if block.supersetGroup.nonEmptyTrimmed != nil {
+            labels.append("Superset")
+        }
+        if !block.allowsAutoWarmups {
+            labels.append("Warmups Off")
+        }
+        if block.blockNote.nonEmptyTrimmed != nil {
+            labels.append("Notes")
+        }
+
+        return labels.isEmpty ? "Optional" : labels.joined(separator: " • ")
+    }
+
     var body: some View {
-        VStack(alignment: .leading, spacing: 12) {
-            HStack {
-                Text(block.exerciseName.nonEmptyTrimmed ?? "Choose exercise")
-                    .font(.headline.weight(.semibold))
-                    .foregroundStyle(AppColors.textPrimary)
+        VStack(alignment: .leading, spacing: 14) {
+            HStack(alignment: .top, spacing: 12) {
+                VStack(alignment: .leading, spacing: 8) {
+                    AppStatePill(
+                        title: block.exerciseID == nil ? "Needs Exercise" : prescriptionSummary,
+                        systemImage: block.exerciseID == nil ? "exclamationmark.triangle.fill" : "dumbbell.fill",
+                        tone: tone
+                    )
 
-                Spacer()
+                    Text(exerciseTitle)
+                        .font(.system(.title3, design: .rounded).weight(.bold))
+                        .foregroundStyle(AppColors.textPrimary)
 
-                Button("Pick") {
-                    onPickExercise(block.id)
+                    Text(block.exerciseID == nil
+                        ? "Pick the movement first, then set the working prescription."
+                        : "Keep the core prescription visible and hide the extra tuning below.")
+                        .font(.subheadline)
+                        .foregroundStyle(AppColors.textSecondary)
                 }
-                .buttonStyle(.bordered)
-                .tint(AppColors.accent)
 
-                Button(role: .destructive) {
-                    onDelete(block.id)
-                } label: {
-                    Image(systemName: "trash")
+                Spacer(minLength: 12)
+
+                VStack(spacing: 8) {
+                    Button("Pick") {
+                        onPickExercise(block.id)
+                    }
+                    .buttonStyle(.bordered)
+                    .buttonBorderShape(.roundedRectangle(radius: 12))
+                    .tint(AppToneStyle.plans.accent)
+
+                    Button(role: .destructive) {
+                        onDelete(block.id)
+                    } label: {
+                        Image(systemName: "trash")
+                    }
+                    .buttonStyle(.bordered)
+                    .buttonBorderShape(.roundedRectangle(radius: 12))
                 }
-                .buttonStyle(.bordered)
             }
 
             Picker("Progression", selection: $block.progressionKind) {
@@ -483,55 +673,136 @@ private struct TemplateDraftBlockEditorView: View {
             }
             .pickerStyle(.segmented)
 
-            HStack(spacing: 10) {
-                NumericInputField(title: "Sets", text: $block.setCountTextBinding, keyboardType: .numberPad)
-                NumericInputField(title: "Rep Min", text: $block.repLowerTextBinding, keyboardType: .numberPad)
-                NumericInputField(title: "Rep Max", text: $block.repUpperTextBinding, keyboardType: .numberPad)
-            }
+            VStack(alignment: .leading, spacing: 10) {
+                AppSectionHeader(
+                    title: "Prescription",
+                    systemImage: "figure.strengthtraining.traditional",
+                    subtitle: "Set the default workload you want this block to start with.",
+                    tone: .today
+                )
 
-            HStack(spacing: 10) {
-                NumericInputField(title: "Target Weight (\(weightUnit.symbol))", text: $block.targetWeightText)
-                NumericInputField(title: "Rest (sec)", text: $block.restSecondsTextBinding, keyboardType: .numberPad)
-            }
-
-            if block.progressionKind != .manual {
-                HStack(spacing: 10) {
-                    NumericInputField(title: "Increment (\(weightUnit.symbol))", text: $block.incrementText)
-                    NumericInputField(title: "TM / Profile Weight (\(weightUnit.symbol))", text: $block.trainingMaxText)
+                LazyVGrid(
+                    columns: [
+                        GridItem(.flexible(minimum: 70), spacing: 10),
+                        GridItem(.flexible(minimum: 70), spacing: 10),
+                        GridItem(.flexible(minimum: 70), spacing: 10),
+                    ],
+                    spacing: 10
+                ) {
+                    NumericInputField(title: "Sets", text: $block.setCountTextBinding, keyboardType: .numberPad)
+                    NumericInputField(title: "Rep Min", text: $block.repLowerTextBinding, keyboardType: .numberPad)
+                    NumericInputField(title: "Rep Max", text: $block.repUpperTextBinding, keyboardType: .numberPad)
                 }
 
-                NumericInputField(
-                    title: "Preferred Increment Override (\(weightUnit.symbol))",
-                    text: $block.preferredIncrementText
+                LazyVGrid(
+                    columns: [
+                        GridItem(.flexible(minimum: 120), spacing: 10),
+                        GridItem(.flexible(minimum: 120), spacing: 10),
+                    ],
+                    spacing: 10
+                ) {
+                    NumericInputField(title: "Target Weight (\(weightUnit.symbol))", text: $block.targetWeightText)
+                    NumericInputField(title: "Rest (sec)", text: $block.restSecondsTextBinding, keyboardType: .numberPad)
+                }
+            }
+
+            DisclosureGroup(isExpanded: $isShowingAdvancedSettings) {
+                VStack(alignment: .leading, spacing: 12) {
+                    if block.progressionKind != .manual {
+                        VStack(alignment: .leading, spacing: 10) {
+                            AppSectionHeader(
+                                title: "Progression Details",
+                                systemImage: "arrow.up.right",
+                                subtitle: "Fine-tune increments and profile values for this block.",
+                                tone: .progress
+                            )
+
+                            LazyVGrid(
+                                columns: [
+                                    GridItem(.flexible(minimum: 120), spacing: 10),
+                                    GridItem(.flexible(minimum: 120), spacing: 10),
+                                ],
+                                spacing: 10
+                            ) {
+                                NumericInputField(title: "Increment (\(weightUnit.symbol))", text: $block.incrementText)
+                                NumericInputField(title: "TM / Profile Weight (\(weightUnit.symbol))", text: $block.trainingMaxText)
+                            }
+
+                            NumericInputField(
+                                title: "Preferred Increment Override (\(weightUnit.symbol))",
+                                text: $block.preferredIncrementText
+                            )
+                        }
+                        .appInsetContentCard(
+                            fill: AppToneStyle.progress.softFill.opacity(0.45),
+                            border: AppToneStyle.progress.softBorder
+                        )
+                    }
+
+                    LazyVGrid(
+                        columns: [
+                            GridItem(.flexible(minimum: 120), spacing: 10),
+                            GridItem(.flexible(minimum: 120), spacing: 10),
+                        ],
+                        spacing: 10
+                    ) {
+                        VStack(alignment: .leading, spacing: 6) {
+                            Text("Superset")
+                                .font(.caption.weight(.semibold))
+                                .foregroundStyle(AppColors.textSecondary)
+
+                            TextField("Superset group", text: $block.supersetGroup)
+                                .textInputAutocapitalization(.characters)
+                                .foregroundStyle(AppColors.textPrimary)
+                                .appInputField()
+                        }
+
+                        VStack(alignment: .leading, spacing: 6) {
+                            Text("Set Type")
+                                .font(.caption.weight(.semibold))
+                                .foregroundStyle(AppColors.textSecondary)
+
+                            Picker("Set Type", selection: $block.setKind) {
+                                Text("Working").tag(SetKind.working)
+                                Text("Dropset").tag(SetKind.dropSet)
+                                Text("Warmup").tag(SetKind.warmup)
+                            }
+                            .pickerStyle(.menu)
+                            .tint(AppColors.textPrimary)
+                            .frame(maxWidth: .infinity, alignment: .leading)
+                            .appInputField()
+                        }
+                    }
+
+                    Toggle("Auto warmups", isOn: $block.allowsAutoWarmups)
+                        .tint(AppToneStyle.plans.accent)
+
+                    TextField("Block note", text: $block.blockNote, axis: .vertical)
+                        .foregroundStyle(AppColors.textPrimary)
+                        .lineLimit(2...3)
+                        .appInputField()
+                }
+                .padding(.top, 10)
+            } label: {
+                AppSectionHeader(
+                    title: "Advanced Settings",
+                    systemImage: "slider.horizontal.3",
+                    subtitle: "Superset, set type, notes, and progression overrides.",
+                    trailing: advancedSummary,
+                    tone: .progress
                 )
             }
-
-            HStack(spacing: 10) {
-                TextField("Superset group", text: $block.supersetGroup)
-                    .textInputAutocapitalization(.characters)
-                    .foregroundStyle(AppColors.textPrimary)
-                    .appInputField()
-
-                Picker("Set Type", selection: $block.setKind) {
-                    Text("Working").tag(SetKind.working)
-                    Text("Dropset").tag(SetKind.dropSet)
-                    Text("Warmup").tag(SetKind.warmup)
-                }
-                .pickerStyle(.menu)
-                .tint(AppColors.textPrimary)
-                .frame(maxWidth: .infinity)
-                .appInputField()
-            }
-
-            Toggle("Auto warmups", isOn: $block.allowsAutoWarmups)
-                .tint(AppColors.accent)
-
-            TextField("Block note", text: $block.blockNote, axis: .vertical)
-                .foregroundStyle(AppColors.textPrimary)
-                .lineLimit(2...3)
-                .appInputField()
+            .tint(AppToneStyle.progress.accent)
         }
-        .appEditorInsetCard()
+        .appEditorInsetCard(borderOpacity: 0.78)
+    }
+
+    private static func shouldStartExpanded(for block: TemplateDraftBlock) -> Bool {
+        block.progressionKind != .manual
+            || block.supersetGroup.nonEmptyTrimmed != nil
+            || block.setKind != .working
+            || !block.allowsAutoWarmups
+            || block.blockNote.nonEmptyTrimmed != nil
     }
 }
 
