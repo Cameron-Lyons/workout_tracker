@@ -4,8 +4,8 @@ import SwiftData
 @MainActor
 enum PersistenceMigrationCoordinator {
     private enum Compatibility {
-        static let storageVersion = 4
-        static let storageVersionKey = "workout_tracker_storage_version_v4"
+        static let storageVersion = 5
+        static let storageVersionKey = "workout_tracker_storage_version_v5"
     }
 
     private static let decoder = JSONDecoder()

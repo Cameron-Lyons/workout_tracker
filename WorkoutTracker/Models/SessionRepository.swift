@@ -189,7 +189,6 @@ final class SessionRepository {
                 let record = StoredActiveSessionBlock(
                     id: snapshot.id,
                     orderIndex: snapshot.orderIndex,
-                    sourceBlockID: nil,
                     exerciseID: snapshot.exerciseID,
                     exerciseNameSnapshot: snapshot.exerciseNameSnapshot,
                     blockNote: snapshot.blockNote,

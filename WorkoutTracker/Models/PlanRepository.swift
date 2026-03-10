@@ -33,9 +33,7 @@ final class PlanRepository {
                     id: item.id,
                     name: item.name,
                     aliasesData: emptyArrayData,
-                    categoryRaw: item.category.rawValue,
-                    equipment: nil,
-                    isCustom: false
+                    categoryRaw: item.category.rawValue
                 )
                 modelContext.insert(record)
             }
@@ -65,8 +63,7 @@ final class PlanRepository {
                     id: plan.id,
                     name: plan.name,
                     createdAt: plan.createdAt,
-                    pinnedTemplateID: plan.pinnedTemplateID,
-                    presetPackID: nil
+                    pinnedTemplateID: plan.pinnedTemplateID
                 )
                 modelContext.insert(record)
             }
@@ -96,8 +93,7 @@ final class PlanRepository {
                     id: profile.id,
                     exerciseID: profile.exerciseID,
                     trainingMax: profile.trainingMax,
-                    preferredIncrement: profile.preferredIncrement,
-                    notes: ""
+                    preferredIncrement: profile.preferredIncrement
                 )
                 modelContext.insert(record)
             }
