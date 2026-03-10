@@ -44,41 +44,24 @@ struct AnalyticsRepository: Sendable {
         }
     }
 
+    private struct BlockAnalysis {
+        var payload: SessionExercisePayload?
+        var newRecords: [PersonalRecord]
+    }
+
     func finishSummary(
         for session: CompletedSession,
         previousBestByExerciseID: [UUID: Double],
         catalogByID: [UUID: ExerciseCatalogItem]
     ) -> SessionFinishSummary {
         var bestOneRepMaxByExerciseID = previousBestByExerciseID
-        var newRecords: [PersonalRecord] = []
-
-        for block in session.blocks {
-            for row in block.sets {
-                guard let weight = row.log.weight,
-                      let reps = row.log.reps,
-                      reps > 0 else {
-                    continue
-                }
-
-                let estimatedOneRepMax = estimateOneRepMax(weight: weight, reps: reps)
-                let previousBest = bestOneRepMaxByExerciseID[block.exerciseID] ?? .zero
-                guard estimatedOneRepMax > previousBest else {
-                    continue
-                }
-
-                bestOneRepMaxByExerciseID[block.exerciseID] = estimatedOneRepMax
-                newRecords.append(
-                    PersonalRecord(
-                        sessionID: session.id,
-                        exerciseID: block.exerciseID,
-                        displayName: catalogByID[block.exerciseID]?.name ?? block.exerciseNameSnapshot,
-                        weight: weight,
-                        reps: reps,
-                        estimatedOneRepMax: estimatedOneRepMax,
-                        achievedAt: session.completedAt
-                    )
-                )
-            }
+        let newRecords = session.blocks.flatMap { block in
+            analyze(
+                block,
+                in: session,
+                displayName: catalogByID[block.exerciseID]?.name ?? block.exerciseNameSnapshot,
+                bestOneRepMaxByExerciseID: &bestOneRepMaxByExerciseID
+            ).newRecords
         }
 
         return SessionFinishSummary(
@@ -132,60 +115,13 @@ struct AnalyticsRepository: Sendable {
 
             for block in session.blocks {
                 let displayName = catalogByID[block.exerciseID]?.name ?? block.exerciseNameSnapshot
-                var blockVolume = 0.0
-                var topWeight = 0.0
-                var topReps = 0
-                var hasWeightedRow = false
-
-                for row in block.sets {
-                    guard let weight = row.log.weight,
-                          let reps = row.log.reps,
-                          reps > 0,
-                          weight > 0 else {
-                        continue
-                    }
-
-                    let rowVolume = weight * Double(reps)
-                    sessionVolume += rowVolume
-                    blockVolume += rowVolume
-
-                    if !hasWeightedRow || weight > topWeight {
-                        topWeight = weight
-                        topReps = reps
-                        hasWeightedRow = true
-                    }
-
-                    let estimatedOneRepMax = estimateOneRepMax(weight: weight, reps: reps)
-                    let previousBest = bestOneRepMaxByExerciseID[block.exerciseID] ?? .zero
-
-                    if estimatedOneRepMax > previousBest {
-                        let record = PersonalRecord(
-                            sessionID: session.id,
-                            exerciseID: block.exerciseID,
-                            displayName: displayName,
-                            weight: weight,
-                            reps: reps,
-                            estimatedOneRepMax: estimatedOneRepMax,
-                            achievedAt: session.completedAt
-                        )
-
-                        bestOneRepMaxByExerciseID[block.exerciseID] = estimatedOneRepMax
-                        personalRecords.append(record)
-
-                        var accumulator = exerciseAccumulatorsByID[block.exerciseID]
-                            ?? ExerciseAnalyticsAccumulator(
-                                exerciseID: block.exerciseID,
-                                fallbackDisplayName: block.exerciseNameSnapshot
-                            )
-                        accumulator.currentPR = record
-                        accumulator.fallbackDisplayName = block.exerciseNameSnapshot
-                        exerciseAccumulatorsByID[block.exerciseID] = accumulator
-                    }
-                }
-
-                guard hasWeightedRow else {
-                    continue
-                }
+                let blockAnalysis = analyze(
+                    block,
+                    in: session,
+                    displayName: displayName,
+                    bestOneRepMaxByExerciseID: &bestOneRepMaxByExerciseID
+                )
+                personalRecords.append(contentsOf: blockAnalysis.newRecords)
 
                 var accumulator = exerciseAccumulatorsByID[block.exerciseID]
                     ?? ExerciseAnalyticsAccumulator(
@@ -193,16 +129,22 @@ struct AnalyticsRepository: Sendable {
                         fallbackDisplayName: block.exerciseNameSnapshot
                     )
                 accumulator.fallbackDisplayName = block.exerciseNameSnapshot
-                accumulator.totalVolume += blockVolume
-                accumulator.points.append(
-                    ProgressPoint(
-                        sessionID: session.id,
-                        date: session.completedAt,
-                        topWeight: topWeight,
-                        estimatedOneRepMax: estimateOneRepMax(weight: topWeight, reps: topReps),
-                        volume: blockVolume
+                for record in blockAnalysis.newRecords {
+                    accumulator.currentPR = record
+                }
+                if let payload = blockAnalysis.payload {
+                    sessionVolume += payload.volume
+                    accumulator.totalVolume += payload.volume
+                    accumulator.points.append(
+                        ProgressPoint(
+                            sessionID: payload.sessionID,
+                            date: payload.date,
+                            topWeight: payload.topWeight,
+                            estimatedOneRepMax: payload.estimatedOneRepMax,
+                            volume: payload.volume
+                        )
                     )
-                )
+                }
                 exerciseAccumulatorsByID[block.exerciseID] = accumulator
             }
 
@@ -299,13 +241,7 @@ struct AnalyticsRepository: Sendable {
     }
 
     func volume(for session: CompletedSession) -> Double {
-        session.blocks.reduce(0) { partialResult, block in
-            partialResult + block.sets.reduce(0) { total, row in
-                let weight = row.log.weight ?? 0
-                let reps = row.log.reps ?? 0
-                return total + weight * Double(reps)
-            }
-        }
+        sessionExercisePayloads(from: session).reduce(0) { $0 + $1.volume }
     }
 
     func completedSetCount(for session: CompletedSession) -> Int {
@@ -319,35 +255,83 @@ struct AnalyticsRepository: Sendable {
             return weight
         }
 
-        return weight * (1 + Double(reps) / 30)
+        return weight * (1 + Double(reps) / AnalyticsDefaults.oneRepMaxDivisor)
     }
 
     func sessionExercisePayloads(from session: CompletedSession) -> [SessionExercisePayload] {
-        session.blocks.compactMap { block in
-            let weightedRows = block.sets.filter {
-                ($0.log.weight ?? 0) > 0 && ($0.log.reps ?? 0) > 0
-            }
-
-            guard let topRow = weightedRows.max(by: { ($0.log.weight ?? 0) < ($1.log.weight ?? 0) }) else {
-                return nil
-            }
-
-            let topWeight = topRow.log.weight ?? 0
-            let reps = topRow.log.reps ?? 0
-            let volume = weightedRows.reduce(0) { total, row in
-                total + (row.log.weight ?? 0) * Double(row.log.reps ?? 0)
-            }
-
-            return SessionExercisePayload(
-                sessionID: session.id,
-                exerciseID: block.exerciseID,
+        var bestOneRepMaxByExerciseID: [UUID: Double] = [:]
+        return session.blocks.compactMap { block in
+            analyze(
+                block,
+                in: session,
                 displayName: block.exerciseNameSnapshot,
-                date: session.completedAt,
-                topWeight: topWeight,
-                estimatedOneRepMax: estimateOneRepMax(weight: topWeight, reps: reps),
-                volume: volume
-            )
+                bestOneRepMaxByExerciseID: &bestOneRepMaxByExerciseID
+            ).payload
         }
+    }
+
+    private func analyze(
+        _ block: CompletedSessionBlock,
+        in session: CompletedSession,
+        displayName: String,
+        bestOneRepMaxByExerciseID: inout [UUID: Double]
+    ) -> BlockAnalysis {
+        var blockVolume = 0.0
+        var topWeight = 0.0
+        var topReps = 0
+        var hasWeightedRow = false
+        var newRecords: [PersonalRecord] = []
+
+        for row in block.sets {
+            guard let weight = row.log.weight,
+                  let reps = row.log.reps,
+                  reps > 0 else {
+                continue
+            }
+
+            let estimatedOneRepMax = estimateOneRepMax(weight: weight, reps: reps)
+            let previousBest = bestOneRepMaxByExerciseID[block.exerciseID] ?? .zero
+
+            if estimatedOneRepMax > previousBest {
+                bestOneRepMaxByExerciseID[block.exerciseID] = estimatedOneRepMax
+                newRecords.append(
+                    PersonalRecord(
+                        sessionID: session.id,
+                        exerciseID: block.exerciseID,
+                        displayName: displayName,
+                        weight: weight,
+                        reps: reps,
+                        estimatedOneRepMax: estimatedOneRepMax,
+                        achievedAt: session.completedAt
+                    )
+                )
+            }
+
+            guard weight > 0 else {
+                continue
+            }
+
+            let rowVolume = weight * Double(reps)
+            blockVolume += rowVolume
+
+            if !hasWeightedRow || weight > topWeight {
+                topWeight = weight
+                topReps = reps
+                hasWeightedRow = true
+            }
+        }
+
+        let payload = hasWeightedRow ? SessionExercisePayload(
+            sessionID: session.id,
+            exerciseID: block.exerciseID,
+            displayName: displayName,
+            date: session.completedAt,
+            topWeight: topWeight,
+            estimatedOneRepMax: estimateOneRepMax(weight: topWeight, reps: topReps),
+            volume: blockVolume
+        ) : nil
+
+        return BlockAnalysis(payload: payload, newRecords: newRecords)
     }
 
 }

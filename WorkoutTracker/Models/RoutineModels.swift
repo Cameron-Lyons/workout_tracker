@@ -17,6 +17,7 @@ enum AnalyticsDefaults {
     static let recentActivityLimit = 5
     static let quickStartLimit = 4
     static let secondsPerWeek: TimeInterval = 60 * 60 * 24 * 7
+    static let oneRepMaxDivisor = 30.0
 
     static func rollingWindowStart(from startOfToday: Date, calendar: Calendar) -> Date {
         calendar.date(byAdding: .day, value: -rollingWindowDays, to: startOfToday) ?? startOfToday

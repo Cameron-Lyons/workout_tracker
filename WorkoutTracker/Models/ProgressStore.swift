@@ -7,12 +7,14 @@ struct ExerciseChartSeries: Equatable, Sendable {
     var isSampled: Bool
 }
 
+private enum ExerciseChartDefaults {
+    static let maxTrendPointCount = 160
+    static let maxMarkerPointCount = 24
+}
+
 @MainActor
 @Observable
 final class ProgressStore {
-    private static let maxTrendPointCount = 160
-    private static let maxMarkerPointCount = 24
-
     @ObservationIgnored private let calendar = Calendar.autoupdatingCurrent
     @ObservationIgnored private var allSessionsDescending: [CompletedSession] = []
     @ObservationIgnored private var sessionsByDay: [Date: [CompletedSession]] = [:]
@@ -240,10 +242,10 @@ final class ProgressStore {
     }
 
     private static func makeChartSeries(from points: [ProgressPoint]) -> ExerciseChartSeries {
-        let trendPoints = sampledPoints(from: points, maxCount: maxTrendPointCount)
+        let trendPoints = sampledPoints(from: points, maxCount: ExerciseChartDefaults.maxTrendPointCount)
         return ExerciseChartSeries(
             trendPoints: trendPoints,
-            markerPoints: sampledPoints(from: trendPoints, maxCount: maxMarkerPointCount),
+            markerPoints: sampledPoints(from: trendPoints, maxCount: ExerciseChartDefaults.maxMarkerPointCount),
             isSampled: trendPoints.count != points.count
         )
     }

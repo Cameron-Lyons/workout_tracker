@@ -1,6 +1,14 @@
 import Charts
 import SwiftUI
 
+private enum ProgressDashboardMetrics {
+    static let recentRecordLimit = 6
+    static let trendChartHeight: CGFloat = 220
+    static let trendAxisMarkCount = 4
+    static let calendarWorkoutIndicatorSize: CGFloat = 6
+    static let calendarCellHeight: CGFloat = 42
+}
+
 struct ProgressDashboardView: View {
     @Environment(ProgressStore.self) private var progressStore
 
@@ -91,7 +99,7 @@ private struct ProgressRecordsSectionView: View {
                 .font(.headline.weight(.semibold))
                 .foregroundStyle(AppColors.textPrimary)
 
-            ForEach(Array(progressStore.personalRecords.prefix(6))) { record in
+            ForEach(Array(progressStore.personalRecords.prefix(ProgressDashboardMetrics.recentRecordLimit))) { record in
                 PersonalRecordSummaryCardView(record: record, weightUnit: settingsStore.weightUnit)
             }
         }
@@ -159,9 +167,9 @@ private struct ProgressChartSectionView: View {
                             .foregroundStyle(AppColors.accent)
                         }
                     }
-                    .frame(height: 220)
+                    .frame(height: ProgressDashboardMetrics.trendChartHeight)
                     .chartXAxis {
-                        AxisMarks(values: .automatic(desiredCount: 4))
+                        AxisMarks(values: .automatic(desiredCount: ProgressDashboardMetrics.trendAxisMarkCount))
                     }
                     .chartYAxis {
                         AxisMarks(position: .leading)
@@ -188,8 +196,8 @@ private struct ProgressChartSectionView: View {
                 }
             }
         }
-        .padding(14)
-        .appSurface(cornerRadius: 14, shadow: false)
+        .padding(AppCardMetrics.compactPadding)
+        .appSurface(cornerRadius: AppCardMetrics.compactCornerRadius, shadow: false)
     }
 }
 
@@ -213,8 +221,8 @@ private struct ProgressCalendarSectionView: View {
                 )
             )
         }
-        .padding(14)
-        .appSurface(cornerRadius: 14, shadow: false)
+        .padding(AppCardMetrics.compactPadding)
+        .appSurface(cornerRadius: AppCardMetrics.compactCornerRadius, shadow: false)
     }
 }
 
@@ -288,7 +296,7 @@ struct AppCalendarMonthLayout: Equatable {
             )
         }
 
-        let normalizedLeading = max(0, firstWeekday - calendar.firstWeekday)
+        let normalizedLeading = (firstWeekday - calendar.firstWeekday + 7) % 7
         var dayEntries: [DayEntry] = []
         dayEntries.reserveCapacity(normalizedLeading + dayRange.count)
 
@@ -348,9 +356,12 @@ private struct AppCalendarDayCellView: View, Equatable {
 
                         Circle()
                             .fill(entry.hasWorkout ? AppColors.accent : .clear)
-                            .frame(width: 6, height: 6)
+                            .frame(
+                                width: ProgressDashboardMetrics.calendarWorkoutIndicatorSize,
+                                height: ProgressDashboardMetrics.calendarWorkoutIndicatorSize
+                            )
                     }
-                    .frame(maxWidth: .infinity, minHeight: 42)
+                    .frame(maxWidth: .infinity, minHeight: ProgressDashboardMetrics.calendarCellHeight)
                     .background(
                         RoundedRectangle(cornerRadius: 8)
                             .fill(
@@ -365,7 +376,7 @@ private struct AppCalendarDayCellView: View, Equatable {
                 .accessibilityIdentifier("progress.calendar.day.\(date.formatted(.iso8601.year().month().day()))")
             } else {
                 Color.clear
-                    .frame(height: 42)
+                    .frame(height: ProgressDashboardMetrics.calendarCellHeight)
             }
         }
     }

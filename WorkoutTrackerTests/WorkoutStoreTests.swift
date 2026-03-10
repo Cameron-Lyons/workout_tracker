@@ -827,6 +827,26 @@ final class WorkoutStoreTests: XCTestCase {
         XCTAssertEqual(layout.dayEntries.last?.dayNumber, 31)
     }
 
+    func testCalendarMonthLayoutWrapsLeadingDaysForMondayFirstCalendars() throws {
+        var calendar = Calendar(identifier: .gregorian)
+        calendar.timeZone = try XCTUnwrap(TimeZone(secondsFromGMT: 0))
+        calendar.firstWeekday = 2
+
+        let displayedMonth = try XCTUnwrap(
+            calendar.date(from: DateComponents(year: 2026, month: 3, day: 15))
+        )
+
+        let layout = AppCalendarMonthLayout.make(
+            for: displayedMonth,
+            workoutDays: [],
+            calendar: calendar
+        )
+
+        XCTAssertEqual(layout.dayEntries.count, 37)
+        XCTAssertEqual(layout.dayEntries.prefix(6).compactMap(\.dayNumber), [])
+        XCTAssertEqual(layout.dayEntries[6].dayNumber, 1)
+    }
+
     @MainActor
     func testFinishSessionIncrementallyUpdatesTodayAndProgressStores() async throws {
         let store = makeStore()
