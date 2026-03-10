@@ -1,5 +1,7 @@
 # WorkoutTracker (iPhone)
 
+[![Quality](https://github.com/Cameron-Lyons/workout_tracker/actions/workflows/quality.yml/badge.svg?branch=main)](https://github.com/Cameron-Lyons/workout_tracker/actions/workflows/quality.yml)
+
 Native SwiftUI iPhone app for logging workouts with routines.
 
 ## Features
