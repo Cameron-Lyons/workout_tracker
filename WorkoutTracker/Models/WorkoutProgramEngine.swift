@@ -172,6 +172,7 @@ enum SessionEngine {
             )
 
             return SessionBlock(
+                id: block.id,
                 exerciseID: block.exerciseID,
                 exerciseNameSnapshot: block.exerciseNameSnapshot,
                 blockNote: block.blockNote,
@@ -357,16 +358,15 @@ enum SessionEngine {
             startedAt: draft.startedAt,
             completedAt: completedAt,
             notes: draft.notes,
-            blocks: draft.blocks.map {
+            blocks: draft.blocks.map { block in
                 CompletedSessionBlock(
-                    id: $0.id,
-                    exerciseID: $0.exerciseID,
-                    exerciseNameSnapshot: $0.exerciseNameSnapshot,
-                    blockNote: $0.blockNote,
-                    restSeconds: $0.restSeconds,
-                    supersetGroup: $0.supersetGroup,
-                    progressionRule: $0.progressionRule,
-                    sets: $0.sets
+                    exerciseID: block.exerciseID,
+                    exerciseNameSnapshot: block.exerciseNameSnapshot,
+                    blockNote: block.blockNote,
+                    restSeconds: block.restSeconds,
+                    supersetGroup: block.supersetGroup,
+                    progressionRule: block.progressionRule,
+                    sets: block.sets
                 )
             }
         )

@@ -12,6 +12,13 @@ private enum ActiveSessionViewMetrics {
     static let statControlHeight: CGFloat = 104
 }
 
+enum ActiveSessionWeightStep {
+    @MainActor
+    static func resolve(for block: SessionBlock, settings: SettingsStore) -> Double {
+        settings.preferredIncrement(for: block.exerciseNameSnapshot)
+    }
+}
+
 struct ActiveSessionView: View {
     @Environment(AppStore.self) private var appStore
     @Environment(PlansStore.self) private var plansStore
@@ -52,7 +59,12 @@ struct ActiveSessionView: View {
                         notes: draft.notes,
                         blocks: draft.blocks,
                         weightUnit: settingsStore.weightUnit,
-                        weightStep: settingsStore.upperBodyIncrement
+                        weightStepsByBlockID: Dictionary(
+                            uniqueKeysWithValues: draft.blocks.map {
+                                ($0.id, ActiveSessionWeightStep.resolve(for: $0, settings: settingsStore))
+                            }
+                        ),
+                        defaultWeightStep: settingsStore.upperBodyIncrement
                     )
                 } else {
                     AppEmptyStateCard(
@@ -111,7 +123,8 @@ private struct ActiveSessionContentView: View {
     let notes: String
     let blocks: [SessionBlock]
     let weightUnit: WeightUnit
-    let weightStep: Double
+    let weightStepsByBlockID: [UUID: Double]
+    let defaultWeightStep: Double
 
     var body: some View {
         VStack(spacing: 12) {
@@ -127,7 +140,7 @@ private struct ActiveSessionContentView: View {
                         SessionBlockCardView(
                             block: block,
                             weightUnit: weightUnit,
-                            weightStep: weightStep
+                            weightStep: weightStepsByBlockID[block.id] ?? defaultWeightStep
                         )
                         .equatable()
                     }

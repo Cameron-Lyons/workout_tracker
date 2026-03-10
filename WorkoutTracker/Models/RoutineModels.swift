@@ -862,22 +862,30 @@ enum TemplateReferenceSelection {
     static func pinnedTemplate(
         from plans: [Plan],
         references: [TemplateReference],
+        sessions: [CompletedSession] = [],
         now: Date,
         calendar: Calendar = .autoupdatingCurrent
     ) -> TemplateReference? {
         let referencesByTemplateID = Dictionary(uniqueKeysWithValues: references.map { ($0.templateID, $0) })
         let weekday = Weekday(rawValue: calendar.component(.weekday, from: now))
 
-        if let weekday,
-            let scheduledToday = references.first(where: { $0.scheduledWeekdays.contains(weekday) })
-        {
-            return scheduledToday
+        for plan in plans {
+            if let scheduledToday = scheduledTemplate(
+                for: plan,
+                referencesByTemplateID: referencesByTemplateID,
+                sessions: sessions,
+                weekday: weekday
+            ) {
+                return scheduledToday
+            }
         }
 
         for plan in plans {
-            if let pinnedTemplateID = plan.pinnedTemplateID,
-                let pinned = referencesByTemplateID[pinnedTemplateID]
-            {
+            if let pinned = preferredPinnedTemplate(
+                for: plan,
+                referencesByTemplateID: referencesByTemplateID,
+                sessions: sessions
+            ) {
                 return pinned
             }
         }
@@ -885,6 +893,29 @@ enum TemplateReferenceSelection {
         return references.max(by: {
             ($0.lastStartedAt ?? .distantPast) < ($1.lastStartedAt ?? .distantPast)
         }) ?? references.first
+    }
+
+    static func isStartingStrengthPlan(_ plan: Plan?) -> Bool {
+        guard let plan else {
+            return false
+        }
+
+        return startingStrengthTemplatePair(in: plan) != nil
+    }
+
+    static func nextStartingStrengthTemplateID(in plan: Plan, after completedTemplateID: UUID) -> UUID? {
+        guard let pair = startingStrengthTemplatePair(in: plan) else {
+            return nil
+        }
+
+        switch completedTemplateID {
+        case pair.dayA.id:
+            return pair.dayB.id
+        case pair.dayB.id:
+            return pair.dayA.id
+        default:
+            return nil
+        }
     }
 
     static func quickStarts(
@@ -918,6 +949,100 @@ enum TemplateReferenceSelection {
         }
 
         return resolved
+    }
+
+    private static func scheduledTemplate(
+        for plan: Plan,
+        referencesByTemplateID: [UUID: TemplateReference],
+        sessions: [CompletedSession],
+        weekday: Weekday?
+    ) -> TemplateReference? {
+        guard let weekday else {
+            return nil
+        }
+
+        if isStartingStrengthPlan(plan) {
+            guard plan.templates.contains(where: { $0.scheduledWeekdays.contains(weekday) }) else {
+                return nil
+            }
+
+            guard let templateID = nextStartingStrengthTemplateID(in: plan, sessions: sessions) else {
+                return nil
+            }
+
+            return referencesByTemplateID[templateID]
+        }
+
+        guard let template = plan.templates.first(where: { $0.scheduledWeekdays.contains(weekday) }) else {
+            return nil
+        }
+
+        return referencesByTemplateID[template.id]
+    }
+
+    private static func preferredPinnedTemplate(
+        for plan: Plan,
+        referencesByTemplateID: [UUID: TemplateReference],
+        sessions: [CompletedSession]
+    ) -> TemplateReference? {
+        if let templateID = nextStartingStrengthTemplateID(in: plan, sessions: sessions) {
+            return referencesByTemplateID[templateID]
+        }
+
+        guard let pinnedTemplateID = plan.pinnedTemplateID else {
+            return nil
+        }
+
+        return referencesByTemplateID[pinnedTemplateID]
+    }
+
+    private static func nextStartingStrengthTemplateID(in plan: Plan, sessions: [CompletedSession]) -> UUID? {
+        guard let pair = startingStrengthTemplatePair(in: plan) else {
+            return nil
+        }
+
+        let lastCompletedTemplateID =
+            sessions
+            .filter { $0.planID == plan.id }
+            .max(by: { $0.completedAt < $1.completedAt })?
+            .templateID
+
+        switch lastCompletedTemplateID {
+        case pair.dayA.id:
+            return pair.dayB.id
+        case pair.dayB.id:
+            return pair.dayA.id
+        default:
+            if let pinnedTemplateID = plan.pinnedTemplateID,
+                pinnedTemplateID == pair.dayA.id || pinnedTemplateID == pair.dayB.id
+            {
+                return pinnedTemplateID
+            }
+
+            return pair.dayA.id
+        }
+    }
+
+    private static func startingStrengthTemplatePair(in plan: Plan) -> (dayA: WorkoutTemplate, dayB: WorkoutTemplate)? {
+        guard let dayA = plan.templates.first(where: isStartingStrengthDayA),
+            let dayB = plan.templates.first(where: isStartingStrengthDayB)
+        else {
+            return nil
+        }
+
+        return (dayA, dayB)
+    }
+
+    private static func isStartingStrengthDayA(_ template: WorkoutTemplate) -> Bool {
+        let exerciseIDs = Set(template.blocks.map(\.exerciseID))
+        let requiredExerciseIDs: Set<UUID> = [CatalogSeed.backSquat, CatalogSeed.benchPress, CatalogSeed.deadlift]
+        return requiredExerciseIDs.isSubset(of: exerciseIDs)
+    }
+
+    private static func isStartingStrengthDayB(_ template: WorkoutTemplate) -> Bool {
+        let exerciseIDs = Set(template.blocks.map(\.exerciseID))
+        let requiredExerciseIDs: Set<UUID> = [CatalogSeed.backSquat, CatalogSeed.overheadPress, CatalogSeed.powerClean]
+        return requiredExerciseIDs.isSubset(of: exerciseIDs)
     }
 }
 

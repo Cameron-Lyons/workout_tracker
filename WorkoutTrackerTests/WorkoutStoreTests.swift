@@ -166,6 +166,64 @@ final class WorkoutStoreTests: XCTestCase {
         XCTAssertEqual(summary.totalVolume, 3_660)
     }
 
+    func testAnalyticsAggregateDuplicateExerciseBlocksIntoSingleProgressPointPerSession() throws {
+        let analytics = AnalyticsRepository()
+        let completedAt = Date(timeIntervalSince1970: 1_741_478_400)
+        let session = CompletedSession(
+            planID: UUID(),
+            templateID: UUID(),
+            templateNameSnapshot: "BBB Bench Day",
+            startedAt: completedAt.addingTimeInterval(-3_600),
+            completedAt: completedAt,
+            blocks: [
+                CompletedSessionBlock(
+                    exerciseID: CatalogSeed.benchPress,
+                    exerciseNameSnapshot: "Bench Press",
+                    blockNote: "Main work",
+                    restSeconds: 180,
+                    supersetGroup: nil,
+                    progressionRule: .manual,
+                    sets: [makeRow(kind: .working, weight: 225, reps: 5)]
+                ),
+                CompletedSessionBlock(
+                    exerciseID: CatalogSeed.benchPress,
+                    exerciseNameSnapshot: "Bench Press",
+                    blockNote: "Supplemental",
+                    restSeconds: 120,
+                    supersetGroup: nil,
+                    progressionRule: .manual,
+                    sets: [makeRow(kind: .working, weight: 185, reps: 10)]
+                ),
+            ]
+        )
+
+        let payloads = analytics.sessionExercisePayloads(from: session)
+        let payload = try XCTUnwrap(payloads.first)
+        let snapshot = analytics.makeSessionAnalyticsSnapshot(
+            sessions: [session],
+            catalogByID: [
+                CatalogSeed.benchPress: ExerciseCatalogItem(
+                    id: CatalogSeed.benchPress,
+                    name: "Bench Press",
+                    category: .chest
+                )
+            ],
+            now: completedAt
+        )
+        let summary = try XCTUnwrap(
+            snapshot.exerciseSummaries.first(where: { $0.exerciseID == CatalogSeed.benchPress })
+        )
+
+        XCTAssertEqual(payloads.count, 1)
+        XCTAssertEqual(payload.topWeight, 225)
+        XCTAssertEqual(payload.volume, 2_975)
+        XCTAssertEqual(summary.pointCount, 1)
+        XCTAssertEqual(summary.points.count, 1)
+        XCTAssertEqual(summary.points.first?.topWeight, 225)
+        XCTAssertEqual(summary.points.first?.volume, 2_975)
+        XCTAssertEqual(summary.totalVolume, 2_975)
+    }
+
     func testDerivedStoreSnapshotMatchesStandaloneTodayAndProgressSnapshots() {
         let analytics = AnalyticsRepository()
         let now = Date(timeIntervalSince1970: 1_741_478_400)
@@ -322,6 +380,44 @@ final class WorkoutStoreTests: XCTestCase {
         XCTAssertEqual(combined.progress.selectedExerciseID, progress.selectedExerciseID)
         XCTAssertEqual(combined.progress.personalRecords.map(recordSignature), progress.personalRecords.map(recordSignature))
         XCTAssertEqual(combined.progress.exerciseSummaries.map(summarySignature), progress.exerciseSummaries.map(summarySignature))
+    }
+
+    func testPinnedTemplateUsesStartingStrengthRotationInsteadOfStaticWeekdaySchedule() throws {
+        var calendar = Calendar(identifier: .gregorian)
+        calendar.timeZone = try XCTUnwrap(TimeZone(secondsFromGMT: 0))
+        let monday = try XCTUnwrap(
+            calendar.date(from: DateComponents(year: 2026, month: 3, day: 9))
+        )
+        let completedAt = try XCTUnwrap(
+            calendar.date(from: DateComponents(year: 2026, month: 3, day: 6))
+        )
+
+        let plan = makeStartingStrengthPlan()
+        let references = plan.templates.map { template in
+            makeReference(plan: plan, template: template)
+        }
+        let sessions = [
+            CompletedSession(
+                planID: plan.id,
+                templateID: try XCTUnwrap(plan.templates.first(where: { $0.name == "Workout A" })?.id),
+                templateNameSnapshot: "Workout A",
+                startedAt: completedAt.addingTimeInterval(-5_400),
+                completedAt: completedAt,
+                blocks: []
+            )
+        ]
+
+        let pinned = try XCTUnwrap(
+            TemplateReferenceSelection.pinnedTemplate(
+                from: [plan],
+                references: references,
+                sessions: sessions,
+                now: monday,
+                calendar: calendar
+            )
+        )
+
+        XCTAssertEqual(pinned.templateName, "Workout B")
     }
 
     @MainActor
@@ -956,6 +1052,75 @@ final class WorkoutStoreTests: XCTestCase {
     }
 
     @MainActor
+    func testDuplicateExerciseBlocksOnlyAdvanceMatchedTemplateProgressionOnce() async throws {
+        let store = makeStore()
+        await store.hydrateIfNeeded()
+        store.completeOnboarding(with: nil)
+
+        var plan = store.makePlan(name: "Duplicate Bench")
+        let template = WorkoutTemplate(
+            name: "Bench Day",
+            blocks: [
+                ExerciseBlock(
+                    exerciseID: CatalogSeed.benchPress,
+                    exerciseNameSnapshot: "Bench Press",
+                    progressionRule: ProgressionRule(
+                        kind: .percentageWave,
+                        percentageWave: PercentageWaveRule.fiveThreeOne(trainingMax: 200, cycleIncrement: 5)
+                    ),
+                    targets: []
+                ),
+                ExerciseBlock(
+                    exerciseID: CatalogSeed.benchPress,
+                    exerciseNameSnapshot: "Bench Press",
+                    progressionRule: .manual,
+                    targets: [
+                        SetTarget(targetWeight: 185, repRange: RepRange(10, 10))
+                    ],
+                    allowsAutoWarmups: false
+                ),
+            ]
+        )
+        plan.templates = [template]
+        plan.pinnedTemplateID = template.id
+        store.savePlan(plan)
+
+        store.startSession(planID: plan.id, templateID: template.id)
+        store.finishActiveSession()
+
+        let updatedTemplate = try XCTUnwrap(store.plansStore.plan(for: plan.id)?.templates.first)
+        let mainBlock = try XCTUnwrap(updatedTemplate.blocks.first)
+        let supplementalBlock = try XCTUnwrap(updatedTemplate.blocks.dropFirst().first)
+
+        XCTAssertEqual(mainBlock.progressionRule.percentageWave?.currentWeekIndex, 1)
+        XCTAssertEqual(mainBlock.progressionRule.percentageWave?.cycle, 1)
+        XCTAssertEqual(supplementalBlock.progressionRule.kind, .manual)
+        XCTAssertEqual(supplementalBlock.targets.first?.targetWeight, 185)
+    }
+
+    @MainActor
+    func testFinishingStartingStrengthSessionPinsTheAlternateWorkout() async throws {
+        let store = makeStore()
+        await store.hydrateIfNeeded()
+        store.completeOnboarding(with: .startingStrength)
+
+        let initialPinned = try XCTUnwrap(store.todayStore.pinnedTemplate)
+        XCTAssertEqual(initialPinned.templateName, "Workout A")
+
+        store.startSession(planID: initialPinned.planID, templateID: initialPinned.templateID)
+        let block = try XCTUnwrap(store.sessionStore.activeDraft?.blocks.first)
+        let row = try XCTUnwrap(block.sets.first(where: { $0.target.setKind == .working }))
+        store.toggleSetCompletion(blockID: block.id, setID: row.id)
+        store.finishActiveSession()
+
+        let rotatedPinned = try XCTUnwrap(store.todayStore.pinnedTemplate)
+        let updatedPlan = try XCTUnwrap(store.plansStore.plan(for: initialPinned.planID))
+
+        XCTAssertEqual(rotatedPinned.templateName, "Workout B")
+        XCTAssertEqual(updatedPlan.pinnedTemplateID, rotatedPinned.templateID)
+    }
+
+    @MainActor
     func testQuickStartsStayDeduplicatedAfterRepeatedTemplateCompletion() async throws {
         let store = makeStore()
         await store.hydrateIfNeeded()
@@ -1010,6 +1175,54 @@ final class WorkoutStoreTests: XCTestCase {
         plan.templates = [template]
         plan.pinnedTemplateID = template.id
         return plan
+    }
+
+    private func makeStartingStrengthPlan() -> Plan {
+        let dayA = WorkoutTemplate(
+            name: "Workout A",
+            scheduledWeekdays: [.monday, .friday],
+            blocks: [
+                makeStartingStrengthBlock(id: CatalogSeed.backSquat, name: "Back Squat"),
+                makeStartingStrengthBlock(id: CatalogSeed.benchPress, name: "Bench Press"),
+                makeStartingStrengthBlock(id: CatalogSeed.deadlift, name: "Deadlift"),
+            ]
+        )
+        let dayB = WorkoutTemplate(
+            name: "Workout B",
+            scheduledWeekdays: [.wednesday],
+            blocks: [
+                makeStartingStrengthBlock(id: CatalogSeed.backSquat, name: "Back Squat"),
+                makeStartingStrengthBlock(id: CatalogSeed.overheadPress, name: "Overhead Press"),
+                makeStartingStrengthBlock(id: CatalogSeed.powerClean, name: "Power Clean"),
+            ]
+        )
+
+        return Plan(
+            name: PresetPack.startingStrength.displayName,
+            pinnedTemplateID: dayA.id,
+            templates: [dayA, dayB]
+        )
+    }
+
+    private func makeStartingStrengthBlock(id: UUID, name: String) -> ExerciseBlock {
+        ExerciseBlock(
+            exerciseID: id,
+            exerciseNameSnapshot: name,
+            restSeconds: 90,
+            progressionRule: .manual,
+            targets: []
+        )
+    }
+
+    private func makeReference(plan: Plan, template: WorkoutTemplate) -> TemplateReference {
+        TemplateReference(
+            planID: plan.id,
+            planName: plan.name,
+            templateID: template.id,
+            templateName: template.name,
+            scheduledWeekdays: template.scheduledWeekdays,
+            lastStartedAt: template.lastStartedAt
+        )
     }
 
     private func makeCompletedSession(

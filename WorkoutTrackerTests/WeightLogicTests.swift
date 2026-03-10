@@ -50,4 +50,35 @@ final class WeightLogicTests: XCTestCase {
         XCTAssertTrue(ExerciseClassification.isLowerBody("Romanian Deadlift"))
         XCTAssertFalse(ExerciseClassification.isLowerBody("Bench Press"))
     }
+
+    @MainActor
+    func testActiveSessionWeightStepUsesExerciseSpecificIncrement() throws {
+        let suiteName = "WeightLogicTests.ActiveSessionWeightStep.\(UUID().uuidString)"
+        let defaults = try XCTUnwrap(UserDefaults(suiteName: suiteName))
+        defer {
+            defaults.removePersistentDomain(forName: suiteName)
+        }
+
+        let settings = SettingsStore(defaults: defaults)
+        settings.upperBodyIncrement = 5
+        settings.lowerBodyIncrement = 10
+
+        let benchBlock = SessionBlock(
+            exerciseID: CatalogSeed.benchPress,
+            exerciseNameSnapshot: "Bench Press",
+            restSeconds: 90,
+            progressionRule: .manual,
+            sets: []
+        )
+        let squatBlock = SessionBlock(
+            exerciseID: CatalogSeed.backSquat,
+            exerciseNameSnapshot: "Back Squat",
+            restSeconds: 120,
+            progressionRule: .manual,
+            sets: []
+        )
+
+        XCTAssertEqual(ActiveSessionWeightStep.resolve(for: benchBlock, settings: settings), 5)
+        XCTAssertEqual(ActiveSessionWeightStep.resolve(for: squatBlock, settings: settings), 10)
+    }
 }

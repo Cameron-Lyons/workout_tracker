@@ -481,6 +481,7 @@ final class AppSessionCoordinator {
 
     func finishActiveSession() {
         let catalogByID = plansStore.catalogByID
+        let finishedBlocks = sessionStore.activeDraft?.blocks
         guard let completedSession = sessionStore.completeSession() else {
             return
         }
@@ -491,11 +492,13 @@ final class AppSessionCoordinator {
         )
         sessionStore.lastFinishedSummary = finishSummary
 
-        if let planID = completedSession.planID {
+        if let planID = completedSession.planID,
+            let finishedBlocks
+        {
             plansStore.updatePlanProgression(
                 planID: planID,
                 templateID: completedSession.templateID,
-                completedSession: completedSession,
+                finishedBlocks: finishedBlocks,
                 settings: settingsStore
             )
         }

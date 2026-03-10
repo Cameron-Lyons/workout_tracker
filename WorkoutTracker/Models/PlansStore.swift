@@ -240,7 +240,7 @@ final class PlansStore {
     func updatePlanProgression(
         planID: UUID,
         templateID: UUID,
-        completedSession: CompletedSession,
+        finishedBlocks: [SessionBlock],
         settings: SettingsStore
     ) {
         guard var plan = plan(for: planID),
@@ -252,21 +252,18 @@ final class PlansStore {
         var template = plan.templates[templateIndex]
         var updatedProfiles: [ExerciseProfile] = []
 
-        for completedBlock in completedSession.blocks {
-            guard
-                let blockIndex = template.blocks.firstIndex(where: {
-                    $0.exerciseID == completedBlock.exerciseID && $0.exerciseNameSnapshot == completedBlock.exerciseNameSnapshot
-                })
-            else {
+        for finishedBlock in finishedBlocks {
+            guard let blockIndex = templateBlockIndex(in: template, matching: finishedBlock) else {
                 continue
             }
 
+            let completedBlock = completedSnapshot(from: finishedBlock)
             let block = template.blocks[blockIndex]
-            let increment = settings.preferredIncrement(for: completedBlock.exerciseNameSnapshot)
+            let increment = settings.preferredIncrement(for: finishedBlock.exerciseNameSnapshot)
             let updated = ProgressionEngine.applyCompletion(
                 to: block,
                 using: completedBlock,
-                profile: profile(for: completedBlock.exerciseID),
+                profile: profile(for: finishedBlock.exerciseID),
                 fallbackIncrement: increment
             )
             template.blocks[blockIndex] = updated.block
@@ -279,7 +276,38 @@ final class PlansStore {
         }
 
         saveProfiles(updatedProfiles)
+
+        if let nextStartingStrengthTemplateID = TemplateReferenceSelection.nextStartingStrengthTemplateID(
+            in: plan,
+            after: templateID
+        ) {
+            plan.pinnedTemplateID = nextStartingStrengthTemplateID
+        }
+
         plan.templates[templateIndex] = template
         savePlan(plan)
+    }
+
+    private func templateBlockIndex(in template: WorkoutTemplate, matching finishedBlock: SessionBlock) -> Int? {
+        if let blockIndex = template.blocks.firstIndex(where: { $0.id == finishedBlock.id }) {
+            return blockIndex
+        }
+
+        return template.blocks.firstIndex(where: {
+            $0.exerciseID == finishedBlock.exerciseID && $0.exerciseNameSnapshot == finishedBlock.exerciseNameSnapshot
+        })
+    }
+
+    private func completedSnapshot(from finishedBlock: SessionBlock) -> CompletedSessionBlock {
+        CompletedSessionBlock(
+            id: finishedBlock.id,
+            exerciseID: finishedBlock.exerciseID,
+            exerciseNameSnapshot: finishedBlock.exerciseNameSnapshot,
+            blockNote: finishedBlock.blockNote,
+            restSeconds: finishedBlock.restSeconds,
+            supersetGroup: finishedBlock.supersetGroup,
+            progressionRule: finishedBlock.progressionRule,
+            sets: finishedBlock.sets
+        )
     }
 }

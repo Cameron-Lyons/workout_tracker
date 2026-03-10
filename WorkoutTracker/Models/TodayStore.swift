@@ -37,6 +37,7 @@ final class TodayStore {
         pinnedTemplate = TemplateReferenceSelection.pinnedTemplate(
             from: plans,
             references: references,
+            sessions: allSessions,
             now: now
         )
         quickStartTemplates = TemplateReferenceSelection.quickStarts(

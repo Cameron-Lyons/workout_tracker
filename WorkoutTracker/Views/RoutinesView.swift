@@ -167,7 +167,11 @@ struct TodayView: View {
     }
 
     private func pinnedTemplateCard(_ reference: TemplateReference) -> some View {
-        TodaySpotlightCard(tone: .plans) {
+        let usesStartingStrengthRotation = TemplateReferenceSelection.isStartingStrengthPlan(
+            plansStore.plan(for: reference.planID)
+        )
+
+        return TodaySpotlightCard(tone: .plans) {
             VStack(alignment: .leading, spacing: 16) {
                 HStack(alignment: .top, spacing: 12) {
                     VStack(alignment: .leading, spacing: 8) {
@@ -191,7 +195,11 @@ struct TodayView: View {
                         .appInsetCard(cornerRadius: 16, fill: AppToneStyle.plans.softFill, border: AppToneStyle.plans.softBorder)
                 }
 
-                if reference.scheduledWeekdays.isEmpty {
+                if usesStartingStrengthRotation {
+                    Text("A/B rotation keeps this aligned with the last Starting Strength session you finished.")
+                        .font(.subheadline)
+                        .foregroundStyle(AppColors.textSecondary)
+                } else if reference.scheduledWeekdays.isEmpty {
                     Text("No weekday pin yet. Keep this as your default whenever you want a fast start.")
                         .font(.subheadline)
                         .foregroundStyle(AppColors.textSecondary)

@@ -136,18 +136,24 @@ struct AnalyticsRepository: Sendable {
                 }
                 sessionVolume += blockAnalysis.volume
                 accumulator.totalVolume += blockAnalysis.volume
-                if let payload = blockAnalysis.payload {
-                    accumulator.points.append(
-                        ProgressPoint(
-                            sessionID: payload.sessionID,
-                            date: payload.date,
-                            topWeight: payload.topWeight,
-                            estimatedOneRepMax: payload.estimatedOneRepMax,
-                            volume: payload.volume
-                        )
-                    )
-                }
                 exerciseAccumulatorsByID[block.exerciseID] = accumulator
+            }
+
+            for payload in sessionExercisePayloads(from: session) {
+                guard var accumulator = exerciseAccumulatorsByID[payload.exerciseID] else {
+                    continue
+                }
+
+                accumulator.points.append(
+                    ProgressPoint(
+                        sessionID: payload.sessionID,
+                        date: payload.date,
+                        topWeight: payload.topWeight,
+                        estimatedOneRepMax: payload.estimatedOneRepMax,
+                        volume: payload.volume
+                    )
+                )
+                exerciseAccumulatorsByID[payload.exerciseID] = accumulator
             }
 
             totalVolume += sessionVolume
@@ -216,6 +222,7 @@ struct AnalyticsRepository: Sendable {
             pinnedTemplate: TemplateReferenceSelection.pinnedTemplate(
                 from: plans,
                 references: references,
+                sessions: sessions,
                 now: now
             ),
             quickStartTemplates: TemplateReferenceSelection.quickStarts(
@@ -262,14 +269,30 @@ struct AnalyticsRepository: Sendable {
 
     func sessionExercisePayloads(from session: CompletedSession) -> [SessionExercisePayload] {
         var bestOneRepMaxByExerciseID: [UUID: Double] = [:]
-        return session.blocks.compactMap { block in
-            analyze(
+        var payloadsByExerciseID: [UUID: SessionExercisePayload] = [:]
+        var orderedExerciseIDs: [UUID] = []
+
+        for block in session.blocks {
+            let blockAnalysis = analyze(
                 block,
                 in: session,
                 displayName: block.exerciseNameSnapshot,
                 bestOneRepMaxByExerciseID: &bestOneRepMaxByExerciseID
-            ).payload
+            )
+
+            guard let payload = blockAnalysis.payload else {
+                continue
+            }
+
+            if let existingPayload = payloadsByExerciseID[payload.exerciseID] {
+                payloadsByExerciseID[payload.exerciseID] = mergedSessionPayload(existingPayload, with: payload)
+            } else {
+                payloadsByExerciseID[payload.exerciseID] = payload
+                orderedExerciseIDs.append(payload.exerciseID)
+            }
         }
+
+        return orderedExerciseIDs.compactMap { payloadsByExerciseID[$0] }
     }
 
     private func analyze(
@@ -342,6 +365,26 @@ struct AnalyticsRepository: Sendable {
             ) : nil
 
         return BlockAnalysis(volume: blockVolume, payload: payload, newRecords: newRecords)
+    }
+
+    private func mergedSessionPayload(
+        _ currentPayload: SessionExercisePayload,
+        with nextPayload: SessionExercisePayload
+    ) -> SessionExercisePayload {
+        let preferredPayload: SessionExercisePayload
+        if nextPayload.topWeight > currentPayload.topWeight {
+            preferredPayload = nextPayload
+        } else if nextPayload.topWeight == currentPayload.topWeight,
+            nextPayload.estimatedOneRepMax > currentPayload.estimatedOneRepMax
+        {
+            preferredPayload = nextPayload
+        } else {
+            preferredPayload = currentPayload
+        }
+
+        var mergedPayload = preferredPayload
+        mergedPayload.volume = currentPayload.volume + nextPayload.volume
+        return mergedPayload
     }
 
 }
