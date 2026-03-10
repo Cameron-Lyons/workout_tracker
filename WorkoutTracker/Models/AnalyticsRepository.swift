@@ -44,114 +44,6 @@ struct AnalyticsRepository: Sendable {
         }
     }
 
-    func buildOverview(from sessions: [CompletedSession]) -> ProgressOverview {
-        guard !sessions.isEmpty else {
-            return .empty
-        }
-
-        let calendar = Calendar.autoupdatingCurrent
-        let startOfToday = calendar.startOfDay(for: .now)
-        let startOfWeek = calendar.dateInterval(of: .weekOfYear, for: startOfToday)?.start ?? startOfToday
-        let last30Days = AnalyticsDefaults.rollingWindowStart(from: startOfToday, calendar: calendar)
-        let totalVolume = sessions.reduce(0) { $0 + volume(for: $1) }
-        let sessionsThisWeek = sessions.filter { $0.completedAt >= startOfWeek }.count
-        let sessionsLast30Days = sessions.filter { $0.completedAt >= last30Days }.count
-        let firstSessionDate = sessions.first?.completedAt ?? startOfToday
-        let weeksSpan = AnalyticsDefaults.weeksSpan(from: firstSessionDate, to: startOfToday)
-
-        return ProgressOverview(
-            totalSessions: sessions.count,
-            sessionsThisWeek: sessionsThisWeek,
-            sessionsLast30Days: sessionsLast30Days,
-            totalVolume: totalVolume,
-            averageSessionsPerWeek: Double(sessions.count) / weeksSpan
-        )
-    }
-
-    func personalRecords(
-        from sessions: [CompletedSession],
-        catalogByID: [UUID: ExerciseCatalogItem]
-    ) -> [PersonalRecord] {
-        var bestOneRepMaxByExerciseID: [UUID: Double] = [:]
-        var records: [PersonalRecord] = []
-
-        for session in sessions.sorted(by: { $0.completedAt < $1.completedAt }) {
-            for block in session.blocks {
-                for row in block.sets {
-                    guard let weight = row.log.weight,
-                          let reps = row.log.reps,
-                          reps > 0 else {
-                        continue
-                    }
-
-                    let estimatedOneRepMax = estimateOneRepMax(weight: weight, reps: reps)
-                    let previousBest = bestOneRepMaxByExerciseID[block.exerciseID] ?? .zero
-
-                    if estimatedOneRepMax > previousBest {
-                        bestOneRepMaxByExerciseID[block.exerciseID] = estimatedOneRepMax
-                        records.append(
-                            PersonalRecord(
-                                sessionID: session.id,
-                                exerciseID: block.exerciseID,
-                                displayName: catalogByID[block.exerciseID]?.name ?? block.exerciseNameSnapshot,
-                                weight: weight,
-                                reps: reps,
-                                estimatedOneRepMax: estimatedOneRepMax,
-                                achievedAt: session.completedAt
-                            )
-                        )
-                    }
-                }
-            }
-        }
-
-        return records
-    }
-
-    func recentPersonalRecords(
-        from sessions: [CompletedSession],
-        catalogByID: [UUID: ExerciseCatalogItem],
-        limit: Int = AnalyticsDefaults.recentActivityLimit
-    ) -> [PersonalRecord] {
-        Array(personalRecords(from: sessions, catalogByID: catalogByID).suffix(limit).reversed())
-    }
-
-    func exerciseSummaries(
-        from sessions: [CompletedSession],
-        catalogByID: [UUID: ExerciseCatalogItem]
-    ) -> [ExerciseAnalyticsSummary] {
-        let grouped = Dictionary(grouping: sessions.flatMap(sessionExercisePayloads), by: \.exerciseID)
-        let records = personalRecords(from: sessions, catalogByID: catalogByID)
-        let recordByExerciseID = Dictionary(grouping: records, by: \.exerciseID)
-
-        return grouped.map { exerciseID, payloads in
-            let points = payloads.map {
-                ProgressPoint(
-                    sessionID: $0.sessionID,
-                    date: $0.date,
-                    topWeight: $0.topWeight,
-                    estimatedOneRepMax: $0.estimatedOneRepMax,
-                    volume: $0.volume
-                )
-            }
-            .sorted(by: { $0.date < $1.date })
-
-            let currentPR = recordByExerciseID[exerciseID]?.max(by: {
-                $0.estimatedOneRepMax < $1.estimatedOneRepMax
-            })
-
-            return ExerciseAnalyticsSummary(
-                exerciseID: exerciseID,
-                displayName: catalogByID[exerciseID]?.name ?? payloads.last?.displayName ?? "Unknown Exercise",
-                pointCount: points.count,
-                totalVolume: payloads.reduce(0) { $0 + $1.volume },
-                currentPR: currentPR,
-                points: points
-            )
-        }
-        .sorted(by: { $0.displayName < $1.displayName })
-    }
-
     func finishSummary(
         for session: CompletedSession,
         previousBestByExerciseID: [UUID: Double],
@@ -350,30 +242,6 @@ struct AnalyticsRepository: Sendable {
         plans: [Plan],
         references: [TemplateReference],
         sessions: [CompletedSession],
-        catalogByID: [UUID: ExerciseCatalogItem],
-        selectedExerciseID: UUID?,
-        now: Date = .now
-    ) -> DerivedStoreSnapshot {
-        let sessionAnalytics = makeSessionAnalyticsSnapshot(
-            sessions: sessions,
-            catalogByID: catalogByID,
-            now: now
-        )
-
-        return makeDerivedStoreSnapshot(
-            plans: plans,
-            references: references,
-            sessions: sessions,
-            sessionAnalytics: sessionAnalytics,
-            selectedExerciseID: selectedExerciseID,
-            now: now
-        )
-    }
-
-    func makeDerivedStoreSnapshot(
-        plans: [Plan],
-        references: [TemplateReference],
-        sessions: [CompletedSession],
         sessionAnalytics: SessionAnalyticsSnapshot,
         selectedExerciseID: UUID?,
         now: Date = .now
@@ -427,42 +295,6 @@ struct AnalyticsRepository: Sendable {
                 selectedExerciseID,
                 summaries: sessionAnalytics.exerciseSummaries
             )
-        )
-    }
-
-    func makeTodaySnapshot(
-        plans: [Plan],
-        references: [TemplateReference],
-        sessions: [CompletedSession],
-        catalogByID: [UUID: ExerciseCatalogItem],
-        now: Date = .now
-    ) -> TodaySnapshot {
-        makeTodaySnapshot(
-            plans: plans,
-            references: references,
-            sessions: sessions,
-            sessionAnalytics: makeSessionAnalyticsSnapshot(
-                sessions: sessions,
-                catalogByID: catalogByID,
-                now: now
-            ),
-            now: now
-        )
-    }
-
-    func makeProgressSnapshot(
-        sessions: [CompletedSession],
-        catalogByID: [UUID: ExerciseCatalogItem],
-        selectedExerciseID: UUID?,
-        now: Date = .now
-    ) -> ProgressSnapshot {
-        makeProgressSnapshot(
-            sessionAnalytics: makeSessionAnalyticsSnapshot(
-                sessions: sessions,
-                catalogByID: catalogByID,
-                now: now
-            ),
-            selectedExerciseID: selectedExerciseID
         )
     }
 

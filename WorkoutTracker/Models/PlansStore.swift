@@ -91,10 +91,6 @@ final class PlansStore {
         plansByID[planID]
     }
 
-    func template(planID: UUID, templateID: UUID) -> WorkoutTemplate? {
-        plan(for: planID)?.templates.first(where: { $0.id == templateID })
-    }
-
     func templateReferences() -> [TemplateReference] {
         cachedTemplateReferences
     }
@@ -150,10 +146,6 @@ final class PlansStore {
         profilesByExerciseID[exerciseID]
     }
 
-    func saveProfile(_ profile: ExerciseProfile) {
-        saveProfiles([profile])
-    }
-
     func saveProfiles(_ updatedProfiles: [ExerciseProfile]) {
         guard !updatedProfiles.isEmpty else {
             return
@@ -196,9 +188,7 @@ final class PlansStore {
         let item = ExerciseCatalogItem(
             name: name,
             aliases: [],
-            category: category,
-            equipment: nil,
-            isCustom: true
+            category: category
         )
         catalog.append(item)
         catalog.sort(by: { $0.name < $1.name })

@@ -164,10 +164,6 @@ final class AppStore {
         planCoordinator.deleteTemplate(planID: planID, templateID: templateID)
     }
 
-    func saveProfile(_ profile: ExerciseProfile) {
-        planCoordinator.saveProfile(profile)
-    }
-
     func saveProfiles(_ profiles: [ExerciseProfile]) {
         planCoordinator.saveProfiles(profiles)
     }
@@ -190,53 +186,6 @@ final class AppStore {
         Plan(name: name, templates: [])
     }
 
-    func makeTemplate(
-        name: String,
-        note: String = "",
-        scheduledWeekdays: [Weekday] = [],
-        blocks: [ExerciseBlock]
-    ) -> WorkoutTemplate {
-        WorkoutTemplate(
-            name: name,
-            note: note,
-            scheduledWeekdays: scheduledWeekdays,
-            blocks: blocks
-        )
-    }
-
-    func makeBlock(
-        exerciseID: UUID,
-        setCount: Int,
-        repRange: RepRange,
-        targetWeight: Double?,
-        restSeconds: Int,
-        progressionRule: ProgressionRule,
-        setKind: SetKind = .working,
-        supersetGroup: String? = nil,
-        note: String = ""
-    ) -> ExerciseBlock {
-        let name = plansStore.exerciseName(for: exerciseID)
-        let targets = (0..<setCount).map { _ in
-            SetTarget(
-                setKind: setKind,
-                targetWeight: targetWeight,
-                repRange: repRange,
-                restSeconds: restSeconds
-            )
-        }
-
-        return ExerciseBlock(
-            exerciseID: exerciseID,
-            exerciseNameSnapshot: name,
-            blockNote: note,
-            restSeconds: restSeconds,
-            supersetGroup: supersetGroup,
-            progressionRule: progressionRule,
-            targets: targets,
-            allowsAutoWarmups: setKind == .working
-        )
-    }
-
     func refreshDerivedStores() async {
         await derivedStateController.refreshDerivedStores(
             plansStore: plansStore,
@@ -246,10 +195,6 @@ final class AppStore {
 
     func refreshTodayStore() {
         derivedStateController.refreshToday(plansStore: plansStore, sessionStore: sessionStore)
-    }
-
-    func refreshProgressStore() async {
-        await derivedStateController.refreshProgress(plansStore: plansStore, sessionStore: sessionStore)
     }
 
     func flushPendingSessionPersistence() {

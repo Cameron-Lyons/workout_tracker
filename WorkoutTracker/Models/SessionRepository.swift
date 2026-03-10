@@ -118,39 +118,13 @@ final class SessionRepository {
     private func activeBlock(from record: StoredActiveSessionBlock) -> SessionBlock? {
         SessionBlock(
             id: record.id,
-            sourceBlockID: record.sourceBlockID,
             exerciseID: record.exerciseID,
             exerciseNameSnapshot: record.exerciseNameSnapshot,
             blockNote: record.blockNote,
             restSeconds: record.restSeconds,
             supersetGroup: record.supersetGroup,
             progressionRule: decode(ProgressionRule.self, from: record.progressionRuleData) ?? .manual,
-            sets: record.rows
-                .sorted(by: { $0.orderIndex < $1.orderIndex })
-                .compactMap(activeRow(from:))
-        )
-    }
-
-    private func activeRow(from record: StoredActiveSessionRow) -> SessionSetRow? {
-        SessionSetRow(
-            id: record.id,
-            target: SetTarget(
-                id: record.targetID,
-                setKind: SetKind(rawValue: record.targetSetKindRaw) ?? .working,
-                targetWeight: record.targetWeight,
-                repRange: RepRange(record.targetRepLower, record.targetRepUpper),
-                rir: record.targetRir,
-                restSeconds: record.targetRestSeconds,
-                note: record.targetNote
-            ),
-            log: SetLog(
-                id: record.logID,
-                setTargetID: record.targetID,
-                weight: record.logWeight,
-                reps: record.logReps,
-                rir: record.logRir,
-                completedAt: record.logCompletedAt
-            )
+            sets: orderedSessionRows(from: record.rows)
         )
     }
 
@@ -178,13 +152,222 @@ final class SessionRepository {
             restSeconds: record.restSeconds,
             supersetGroup: record.supersetGroup,
             progressionRule: decode(ProgressionRule.self, from: record.progressionRuleData) ?? .manual,
-            sets: record.rows
-                .sorted(by: { $0.orderIndex < $1.orderIndex })
-                .compactMap(completedRow(from:))
+            sets: orderedSessionRows(from: record.rows)
         )
     }
 
-    private func completedRow(from record: StoredCompletedSessionRow) -> SessionSetRow? {
+    private func apply(_ draft: SessionDraft, to record: StoredActiveSession) {
+        applySessionFields(
+            id: draft.id,
+            planID: draft.planID,
+            templateID: draft.templateID,
+            templateNameSnapshot: draft.templateNameSnapshot,
+            startedAt: draft.startedAt,
+            notes: draft.notes,
+            to: record
+        )
+
+        if record.lastUpdatedAt != draft.lastUpdatedAt {
+            record.lastUpdatedAt = draft.lastUpdatedAt
+        }
+
+        if record.restTimerEndsAt != draft.restTimerEndsAt {
+            record.restTimerEndsAt = draft.restTimerEndsAt
+        }
+    }
+
+    private func syncActiveBlocks(of sessionRecord: StoredActiveSession, with blocks: [SessionBlock]) {
+        syncBlocks(
+            existingBlocks: sessionRecord.blocks,
+            with: blocks,
+            create: { block, index in
+                let snapshot = StoredSessionBlockSnapshot(
+                    block: block,
+                    orderIndex: index,
+                    progressionRuleData: encode(block.progressionRule) ?? Data()
+                )
+                let record = StoredActiveSessionBlock(
+                    id: snapshot.id,
+                    orderIndex: snapshot.orderIndex,
+                    sourceBlockID: nil,
+                    exerciseID: snapshot.exerciseID,
+                    exerciseNameSnapshot: snapshot.exerciseNameSnapshot,
+                    blockNote: snapshot.blockNote,
+                    restSeconds: snapshot.restSeconds,
+                    supersetGroup: snapshot.supersetGroup,
+                    progressionRuleData: snapshot.progressionRuleData
+                )
+                modelContext.insert(record)
+                return record
+            },
+            attach: { record in
+                if record.session?.id != sessionRecord.id {
+                    record.session = sessionRecord
+                }
+            },
+            syncRows: { record, rows in
+                syncActiveRows(of: record, with: rows)
+            },
+            assign: { orderedRecords in
+                if sessionRecord.blocks.map(\.id) != orderedRecords.map(\.id) {
+                    sessionRecord.blocks = orderedRecords
+                }
+            }
+        )
+    }
+
+    private func syncActiveRows(of blockRecord: StoredActiveSessionBlock, with rows: [SessionSetRow]) {
+        syncRows(
+            existingRows: blockRecord.rows,
+            with: rows,
+            create: { row, index in
+                let snapshot = StoredSessionRowSnapshot(row: row, orderIndex: index)
+                let record = StoredActiveSessionRow(
+                    id: snapshot.id,
+                    orderIndex: snapshot.orderIndex,
+                    targetID: snapshot.targetID,
+                    targetSetKindRaw: snapshot.targetSetKindRaw,
+                    targetWeight: snapshot.targetWeight,
+                    targetRepLower: snapshot.targetRepLower,
+                    targetRepUpper: snapshot.targetRepUpper,
+                    targetRir: snapshot.targetRir,
+                    targetRestSeconds: snapshot.targetRestSeconds,
+                    targetNote: snapshot.targetNote,
+                    logID: snapshot.logID,
+                    logWeight: snapshot.logWeight,
+                    logReps: snapshot.logReps,
+                    logRir: snapshot.logRir,
+                    logCompletedAt: snapshot.logCompletedAt
+                )
+                modelContext.insert(record)
+                return record
+            },
+            attach: { record in
+                if record.block?.id != blockRecord.id {
+                    record.block = blockRecord
+                }
+            },
+            assign: { orderedRecords in
+                if blockRecord.rows.map(\.id) != orderedRecords.map(\.id) {
+                    blockRecord.rows = orderedRecords
+                }
+            }
+        )
+    }
+
+    private func makeCompletedSessionRecord(from session: CompletedSession) -> StoredCompletedSession {
+        StoredCompletedSession(
+            id: session.id,
+            planID: session.planID,
+            templateID: session.templateID,
+            templateNameSnapshot: session.templateNameSnapshot,
+            startedAt: session.startedAt,
+            completedAt: session.completedAt,
+            notes: session.notes
+        )
+    }
+
+    private func apply(_ session: CompletedSession, to record: StoredCompletedSession) {
+        applySessionFields(
+            id: session.id,
+            planID: session.planID,
+            templateID: session.templateID,
+            templateNameSnapshot: session.templateNameSnapshot,
+            startedAt: session.startedAt,
+            notes: session.notes,
+            to: record
+        )
+
+        if record.completedAt != session.completedAt {
+            record.completedAt = session.completedAt
+        }
+    }
+
+    private func syncCompletedBlocks(of sessionRecord: StoredCompletedSession, with blocks: [CompletedSessionBlock]) {
+        syncBlocks(
+            existingBlocks: sessionRecord.blocks,
+            with: blocks,
+            create: { block, index in
+                let snapshot = StoredSessionBlockSnapshot(
+                    block: block,
+                    orderIndex: index,
+                    progressionRuleData: encode(block.progressionRule) ?? Data()
+                )
+                let record = StoredCompletedSessionBlock(
+                    id: snapshot.id,
+                    orderIndex: snapshot.orderIndex,
+                    exerciseID: snapshot.exerciseID,
+                    exerciseNameSnapshot: snapshot.exerciseNameSnapshot,
+                    blockNote: snapshot.blockNote,
+                    restSeconds: snapshot.restSeconds,
+                    supersetGroup: snapshot.supersetGroup,
+                    progressionRuleData: snapshot.progressionRuleData
+                )
+                modelContext.insert(record)
+                return record
+            },
+            attach: { record in
+                if record.session?.id != sessionRecord.id {
+                    record.session = sessionRecord
+                }
+            },
+            syncRows: { record, rows in
+                syncCompletedRows(of: record, with: rows)
+            },
+            assign: { orderedRecords in
+                if sessionRecord.blocks.map(\.id) != orderedRecords.map(\.id) {
+                    sessionRecord.blocks = orderedRecords
+                }
+            }
+        )
+    }
+
+    private func syncCompletedRows(of blockRecord: StoredCompletedSessionBlock, with rows: [SessionSetRow]) {
+        syncRows(
+            existingRows: blockRecord.rows,
+            with: rows,
+            create: { row, index in
+                let snapshot = StoredSessionRowSnapshot(row: row, orderIndex: index)
+                let record = StoredCompletedSessionRow(
+                    id: snapshot.id,
+                    orderIndex: snapshot.orderIndex,
+                    targetID: snapshot.targetID,
+                    targetSetKindRaw: snapshot.targetSetKindRaw,
+                    targetWeight: snapshot.targetWeight,
+                    targetRepLower: snapshot.targetRepLower,
+                    targetRepUpper: snapshot.targetRepUpper,
+                    targetRir: snapshot.targetRir,
+                    targetRestSeconds: snapshot.targetRestSeconds,
+                    targetNote: snapshot.targetNote,
+                    logID: snapshot.logID,
+                    logWeight: snapshot.logWeight,
+                    logReps: snapshot.logReps,
+                    logRir: snapshot.logRir,
+                    logCompletedAt: snapshot.logCompletedAt
+                )
+                modelContext.insert(record)
+                return record
+            },
+            attach: { record in
+                if record.block?.id != blockRecord.id {
+                    record.block = blockRecord
+                }
+            },
+            assign: { orderedRecords in
+                if blockRecord.rows.map(\.id) != orderedRecords.map(\.id) {
+                    blockRecord.rows = orderedRecords
+                }
+            }
+        )
+    }
+
+    private func orderedSessionRows<Record: StoredSessionRowRecord>(from records: [Record]) -> [SessionSetRow] {
+        records
+            .sorted(by: { $0.orderIndex < $1.orderIndex })
+            .map(sessionSetRow(from:))
+    }
+
+    private func sessionSetRow<Record: StoredSessionRowRecord>(from record: Record) -> SessionSetRow {
         SessionSetRow(
             id: record.id,
             target: SetTarget(
@@ -207,89 +390,74 @@ final class SessionRepository {
         )
     }
 
-    private func apply(_ draft: SessionDraft, to record: StoredActiveSession) {
-        if record.id != draft.id {
-            record.id = draft.id
+    private func applySessionFields<Record: StoredSessionRecord>(
+        id: UUID,
+        planID: UUID?,
+        templateID: UUID,
+        templateNameSnapshot: String,
+        startedAt: Date,
+        notes: String,
+        to record: Record
+    ) {
+        if record.id != id {
+            record.id = id
         }
 
-        if record.planID != draft.planID {
-            record.planID = draft.planID
+        if record.planID != planID {
+            record.planID = planID
         }
 
-        if record.templateID != draft.templateID {
-            record.templateID = draft.templateID
+        if record.templateID != templateID {
+            record.templateID = templateID
         }
 
-        if record.templateNameSnapshot != draft.templateNameSnapshot {
-            record.templateNameSnapshot = draft.templateNameSnapshot
+        if record.templateNameSnapshot != templateNameSnapshot {
+            record.templateNameSnapshot = templateNameSnapshot
         }
 
-        if record.startedAt != draft.startedAt {
-            record.startedAt = draft.startedAt
+        if record.startedAt != startedAt {
+            record.startedAt = startedAt
         }
 
-        if record.lastUpdatedAt != draft.lastUpdatedAt {
-            record.lastUpdatedAt = draft.lastUpdatedAt
-        }
-
-        if record.notes != draft.notes {
-            record.notes = draft.notes
-        }
-
-        if record.restTimerEndsAt != draft.restTimerEndsAt {
-            record.restTimerEndsAt = draft.restTimerEndsAt
+        if record.notes != notes {
+            record.notes = notes
         }
     }
 
-    private func syncActiveBlocks(of sessionRecord: StoredActiveSession, with blocks: [SessionBlock]) {
-        var existingByID = Dictionary(uniqueKeysWithValues: sessionRecord.blocks.map { ($0.id, $0) })
-        var orderedRecords: [StoredActiveSessionBlock] = []
+    private func syncBlocks<Record: StoredSessionBlockRecord, Block: SessionBlockSnapshot>(
+        existingBlocks: [Record],
+        with blocks: [Block],
+        create: (Block, Int) -> Record,
+        attach: (Record) -> Void,
+        syncRows: (Record, [SessionSetRow]) -> Void,
+        assign: ([Record]) -> Void
+    ) {
+        var existingByID = Dictionary(uniqueKeysWithValues: existingBlocks.map { ($0.id, $0) })
+        var orderedRecords: [Record] = []
 
         for (index, block) in blocks.enumerated() {
-            let record: StoredActiveSessionBlock
-            if let existing = existingByID.removeValue(forKey: block.id) {
-                record = existing
-            } else {
-                record = StoredActiveSessionBlock(
-                    id: block.id,
-                    orderIndex: index,
-                    sourceBlockID: block.sourceBlockID,
-                    exerciseID: block.exerciseID,
-                    exerciseNameSnapshot: block.exerciseNameSnapshot,
-                    blockNote: block.blockNote,
-                    restSeconds: block.restSeconds,
-                    supersetGroup: block.supersetGroup,
-                    progressionRuleData: encode(block.progressionRule) ?? Data()
-                )
-                modelContext.insert(record)
-            }
-
-            if record.session?.id != sessionRecord.id {
-                record.session = sessionRecord
-            }
-
-            apply(block, to: record, orderIndex: index)
-            syncActiveRows(of: record, with: block.sets)
+            let record = existingByID.removeValue(forKey: block.id) ?? create(block, index)
+            attach(record)
+            applyBlockFields(block, to: record, orderIndex: index)
+            syncRows(record, block.sets)
             orderedRecords.append(record)
         }
 
         existingByID.values.forEach(modelContext.delete)
-        if sessionRecord.blocks.map(\.id) != orderedRecords.map(\.id) {
-            sessionRecord.blocks = orderedRecords
-        }
+        assign(orderedRecords)
     }
 
-    private func apply(_ block: SessionBlock, to record: StoredActiveSessionBlock, orderIndex: Int) {
+    private func applyBlockFields<Record: StoredSessionBlockRecord, Block: SessionBlockSnapshot>(
+        _ block: Block,
+        to record: Record,
+        orderIndex: Int
+    ) {
         if record.id != block.id {
             record.id = block.id
         }
 
         if record.orderIndex != orderIndex {
             record.orderIndex = orderIndex
-        }
-
-        if record.sourceBlockID != block.sourceBlockID {
-            record.sourceBlockID = block.sourceBlockID
         }
 
         if record.exerciseID != block.exerciseID {
@@ -318,269 +486,32 @@ final class SessionRepository {
         }
     }
 
-    private func syncActiveRows(of blockRecord: StoredActiveSessionBlock, with rows: [SessionSetRow]) {
-        var existingByID = Dictionary(uniqueKeysWithValues: blockRecord.rows.map { ($0.id, $0) })
-        var orderedRecords: [StoredActiveSessionRow] = []
+    private func syncRows<Record: StoredSessionRowRecord>(
+        existingRows: [Record],
+        with rows: [SessionSetRow],
+        create: (SessionSetRow, Int) -> Record,
+        attach: (Record) -> Void,
+        assign: ([Record]) -> Void
+    ) {
+        var existingByID = Dictionary(uniqueKeysWithValues: existingRows.map { ($0.id, $0) })
+        var orderedRecords: [Record] = []
 
         for (index, row) in rows.enumerated() {
-            let record: StoredActiveSessionRow
-            if let existing = existingByID.removeValue(forKey: row.id) {
-                record = existing
-            } else {
-                record = StoredActiveSessionRow(
-                    id: row.id,
-                    orderIndex: index,
-                    targetID: row.target.id,
-                    targetSetKindRaw: row.target.setKind.rawValue,
-                    targetWeight: row.target.targetWeight,
-                    targetRepLower: row.target.repRange.lowerBound,
-                    targetRepUpper: row.target.repRange.upperBound,
-                    targetRir: row.target.rir,
-                    targetRestSeconds: row.target.restSeconds,
-                    targetNote: row.target.note,
-                    logID: row.log.id,
-                    logWeight: row.log.weight,
-                    logReps: row.log.reps,
-                    logRir: row.log.rir,
-                    logCompletedAt: row.log.completedAt
-                )
-                modelContext.insert(record)
-            }
-
-            if record.block?.id != blockRecord.id {
-                record.block = blockRecord
-            }
-
+            let record = existingByID.removeValue(forKey: row.id) ?? create(row, index)
+            attach(record)
             apply(row, to: record, orderIndex: index)
             orderedRecords.append(record)
         }
 
         existingByID.values.forEach(modelContext.delete)
-        if blockRecord.rows.map(\.id) != orderedRecords.map(\.id) {
-            blockRecord.rows = orderedRecords
-        }
+        assign(orderedRecords)
     }
 
-    private func apply(_ row: SessionSetRow, to record: StoredActiveSessionRow, orderIndex: Int) {
-        if record.id != row.id {
-            record.id = row.id
-        }
-
-        if record.orderIndex != orderIndex {
-            record.orderIndex = orderIndex
-        }
-
-        if record.targetID != row.target.id {
-            record.targetID = row.target.id
-        }
-
-        if record.targetSetKindRaw != row.target.setKind.rawValue {
-            record.targetSetKindRaw = row.target.setKind.rawValue
-        }
-
-        if record.targetWeight != row.target.targetWeight {
-            record.targetWeight = row.target.targetWeight
-        }
-
-        if record.targetRepLower != row.target.repRange.lowerBound {
-            record.targetRepLower = row.target.repRange.lowerBound
-        }
-
-        if record.targetRepUpper != row.target.repRange.upperBound {
-            record.targetRepUpper = row.target.repRange.upperBound
-        }
-
-        if record.targetRir != row.target.rir {
-            record.targetRir = row.target.rir
-        }
-
-        if record.targetRestSeconds != row.target.restSeconds {
-            record.targetRestSeconds = row.target.restSeconds
-        }
-
-        if record.targetNote != row.target.note {
-            record.targetNote = row.target.note
-        }
-
-        if record.logID != row.log.id {
-            record.logID = row.log.id
-        }
-
-        if record.logWeight != row.log.weight {
-            record.logWeight = row.log.weight
-        }
-
-        if record.logReps != row.log.reps {
-            record.logReps = row.log.reps
-        }
-
-        if record.logRir != row.log.rir {
-            record.logRir = row.log.rir
-        }
-
-        if record.logCompletedAt != row.log.completedAt {
-            record.logCompletedAt = row.log.completedAt
-        }
-    }
-
-    private func makeCompletedSessionRecord(from session: CompletedSession) -> StoredCompletedSession {
-        StoredCompletedSession(
-            id: session.id,
-            planID: session.planID,
-            templateID: session.templateID,
-            templateNameSnapshot: session.templateNameSnapshot,
-            startedAt: session.startedAt,
-            completedAt: session.completedAt,
-            notes: session.notes
-        )
-    }
-
-    private func apply(_ session: CompletedSession, to record: StoredCompletedSession) {
-        if record.id != session.id {
-            record.id = session.id
-        }
-
-        if record.planID != session.planID {
-            record.planID = session.planID
-        }
-
-        if record.templateID != session.templateID {
-            record.templateID = session.templateID
-        }
-
-        if record.templateNameSnapshot != session.templateNameSnapshot {
-            record.templateNameSnapshot = session.templateNameSnapshot
-        }
-
-        if record.startedAt != session.startedAt {
-            record.startedAt = session.startedAt
-        }
-
-        if record.completedAt != session.completedAt {
-            record.completedAt = session.completedAt
-        }
-
-        if record.notes != session.notes {
-            record.notes = session.notes
-        }
-    }
-
-    private func syncCompletedBlocks(of sessionRecord: StoredCompletedSession, with blocks: [CompletedSessionBlock]) {
-        var existingByID = Dictionary(uniqueKeysWithValues: sessionRecord.blocks.map { ($0.id, $0) })
-        var orderedRecords: [StoredCompletedSessionBlock] = []
-
-        for (index, block) in blocks.enumerated() {
-            let record: StoredCompletedSessionBlock
-            if let existing = existingByID.removeValue(forKey: block.id) {
-                record = existing
-            } else {
-                record = StoredCompletedSessionBlock(
-                    id: block.id,
-                    orderIndex: index,
-                    exerciseID: block.exerciseID,
-                    exerciseNameSnapshot: block.exerciseNameSnapshot,
-                    blockNote: block.blockNote,
-                    restSeconds: block.restSeconds,
-                    supersetGroup: block.supersetGroup,
-                    progressionRuleData: encode(block.progressionRule) ?? Data()
-                )
-                modelContext.insert(record)
-            }
-
-            if record.session?.id != sessionRecord.id {
-                record.session = sessionRecord
-            }
-
-            apply(block, to: record, orderIndex: index)
-            syncCompletedRows(of: record, with: block.sets)
-            orderedRecords.append(record)
-        }
-
-        existingByID.values.forEach(modelContext.delete)
-        if sessionRecord.blocks.map(\.id) != orderedRecords.map(\.id) {
-            sessionRecord.blocks = orderedRecords
-        }
-    }
-
-    private func apply(_ block: CompletedSessionBlock, to record: StoredCompletedSessionBlock, orderIndex: Int) {
-        if record.id != block.id {
-            record.id = block.id
-        }
-
-        if record.orderIndex != orderIndex {
-            record.orderIndex = orderIndex
-        }
-
-        if record.exerciseID != block.exerciseID {
-            record.exerciseID = block.exerciseID
-        }
-
-        if record.exerciseNameSnapshot != block.exerciseNameSnapshot {
-            record.exerciseNameSnapshot = block.exerciseNameSnapshot
-        }
-
-        if record.blockNote != block.blockNote {
-            record.blockNote = block.blockNote
-        }
-
-        if record.restSeconds != block.restSeconds {
-            record.restSeconds = block.restSeconds
-        }
-
-        if record.supersetGroup != block.supersetGroup {
-            record.supersetGroup = block.supersetGroup
-        }
-
-        let progressionRuleData = encode(block.progressionRule) ?? Data()
-        if record.progressionRuleData != progressionRuleData {
-            record.progressionRuleData = progressionRuleData
-        }
-    }
-
-    private func syncCompletedRows(of blockRecord: StoredCompletedSessionBlock, with rows: [SessionSetRow]) {
-        var existingByID = Dictionary(uniqueKeysWithValues: blockRecord.rows.map { ($0.id, $0) })
-        var orderedRecords: [StoredCompletedSessionRow] = []
-
-        for (index, row) in rows.enumerated() {
-            let record: StoredCompletedSessionRow
-            if let existing = existingByID.removeValue(forKey: row.id) {
-                record = existing
-            } else {
-                record = StoredCompletedSessionRow(
-                    id: row.id,
-                    orderIndex: index,
-                    targetID: row.target.id,
-                    targetSetKindRaw: row.target.setKind.rawValue,
-                    targetWeight: row.target.targetWeight,
-                    targetRepLower: row.target.repRange.lowerBound,
-                    targetRepUpper: row.target.repRange.upperBound,
-                    targetRir: row.target.rir,
-                    targetRestSeconds: row.target.restSeconds,
-                    targetNote: row.target.note,
-                    logID: row.log.id,
-                    logWeight: row.log.weight,
-                    logReps: row.log.reps,
-                    logRir: row.log.rir,
-                    logCompletedAt: row.log.completedAt
-                )
-                modelContext.insert(record)
-            }
-
-            if record.block?.id != blockRecord.id {
-                record.block = blockRecord
-            }
-
-            apply(row, toCompletedRecord: record, orderIndex: index)
-            orderedRecords.append(record)
-        }
-
-        existingByID.values.forEach(modelContext.delete)
-        if blockRecord.rows.map(\.id) != orderedRecords.map(\.id) {
-            blockRecord.rows = orderedRecords
-        }
-    }
-
-    private func apply(_ row: SessionSetRow, toCompletedRecord record: StoredCompletedSessionRow, orderIndex: Int) {
+    private func apply<Record: StoredSessionRowRecord>(
+        _ row: SessionSetRow,
+        to record: Record,
+        orderIndex: Int
+    ) {
         if record.id != row.id {
             record.id = row.id
         }
@@ -674,3 +605,128 @@ final class SessionRepository {
         try? modelContext.save()
     }
 }
+
+private protocol StoredSessionRecord: AnyObject {
+    associatedtype BlockRecord: StoredSessionBlockRecord
+
+    var id: UUID { get set }
+    var planID: UUID? { get set }
+    var templateID: UUID { get set }
+    var templateNameSnapshot: String { get set }
+    var startedAt: Date { get set }
+    var notes: String { get set }
+    var blocks: [BlockRecord] { get set }
+}
+
+private protocol StoredSessionBlockRecord: PersistentModel {
+    associatedtype RowRecord: StoredSessionRowRecord
+
+    var id: UUID { get set }
+    var orderIndex: Int { get set }
+    var exerciseID: UUID { get set }
+    var exerciseNameSnapshot: String { get set }
+    var blockNote: String { get set }
+    var restSeconds: Int { get set }
+    var supersetGroup: String? { get set }
+    var progressionRuleData: Data { get set }
+    var rows: [RowRecord] { get set }
+}
+
+private protocol StoredSessionRowRecord: PersistentModel {
+    var id: UUID { get set }
+    var orderIndex: Int { get set }
+    var targetID: UUID { get set }
+    var targetSetKindRaw: String { get set }
+    var targetWeight: Double? { get set }
+    var targetRepLower: Int { get set }
+    var targetRepUpper: Int { get set }
+    var targetRir: Int? { get set }
+    var targetRestSeconds: Int? { get set }
+    var targetNote: String? { get set }
+    var logID: UUID { get set }
+    var logWeight: Double? { get set }
+    var logReps: Int? { get set }
+    var logRir: Int? { get set }
+    var logCompletedAt: Date? { get set }
+}
+
+private protocol SessionBlockSnapshot {
+    var id: UUID { get }
+    var exerciseID: UUID { get }
+    var exerciseNameSnapshot: String { get }
+    var blockNote: String { get }
+    var restSeconds: Int { get }
+    var supersetGroup: String? { get }
+    var progressionRule: ProgressionRule { get }
+    var sets: [SessionSetRow] { get }
+}
+
+private struct StoredSessionBlockSnapshot {
+    let id: UUID
+    let orderIndex: Int
+    let exerciseID: UUID
+    let exerciseNameSnapshot: String
+    let blockNote: String
+    let restSeconds: Int
+    let supersetGroup: String?
+    let progressionRuleData: Data
+
+    init<Block: SessionBlockSnapshot>(block: Block, orderIndex: Int, progressionRuleData: Data) {
+        self.id = block.id
+        self.orderIndex = orderIndex
+        self.exerciseID = block.exerciseID
+        self.exerciseNameSnapshot = block.exerciseNameSnapshot
+        self.blockNote = block.blockNote
+        self.restSeconds = block.restSeconds
+        self.supersetGroup = block.supersetGroup
+        self.progressionRuleData = progressionRuleData
+    }
+}
+
+private struct StoredSessionRowSnapshot {
+    let id: UUID
+    let orderIndex: Int
+    let targetID: UUID
+    let targetSetKindRaw: String
+    let targetWeight: Double?
+    let targetRepLower: Int
+    let targetRepUpper: Int
+    let targetRir: Int?
+    let targetRestSeconds: Int?
+    let targetNote: String?
+    let logID: UUID
+    let logWeight: Double?
+    let logReps: Int?
+    let logRir: Int?
+    let logCompletedAt: Date?
+
+    init(row: SessionSetRow, orderIndex: Int) {
+        id = row.id
+        self.orderIndex = orderIndex
+        targetID = row.target.id
+        targetSetKindRaw = row.target.setKind.rawValue
+        targetWeight = row.target.targetWeight
+        targetRepLower = row.target.repRange.lowerBound
+        targetRepUpper = row.target.repRange.upperBound
+        targetRir = row.target.rir
+        targetRestSeconds = row.target.restSeconds
+        targetNote = row.target.note
+        logID = row.log.id
+        logWeight = row.log.weight
+        logReps = row.log.reps
+        logRir = row.log.rir
+        logCompletedAt = row.log.completedAt
+    }
+}
+
+extension StoredActiveSession: StoredSessionRecord {}
+extension StoredCompletedSession: StoredSessionRecord {}
+
+extension StoredActiveSessionBlock: StoredSessionBlockRecord {}
+extension StoredCompletedSessionBlock: StoredSessionBlockRecord {}
+
+extension StoredActiveSessionRow: StoredSessionRowRecord {}
+extension StoredCompletedSessionRow: StoredSessionRowRecord {}
+
+extension SessionBlock: SessionBlockSnapshot {}
+extension CompletedSessionBlock: SessionBlockSnapshot {}

@@ -34,8 +34,8 @@ final class PlanRepository {
                     name: item.name,
                     aliasesData: emptyArrayData,
                     categoryRaw: item.category.rawValue,
-                    equipment: item.equipment,
-                    isCustom: item.isCustom
+                    equipment: nil,
+                    isCustom: false
                 )
                 modelContext.insert(record)
             }
@@ -66,7 +66,7 @@ final class PlanRepository {
                     name: plan.name,
                     createdAt: plan.createdAt,
                     pinnedTemplateID: plan.pinnedTemplateID,
-                    presetPackID: plan.presetPackID
+                    presetPackID: nil
                 )
                 modelContext.insert(record)
             }
@@ -97,7 +97,7 @@ final class PlanRepository {
                     exerciseID: profile.exerciseID,
                     trainingMax: profile.trainingMax,
                     preferredIncrement: profile.preferredIncrement,
-                    notes: profile.notes
+                    notes: ""
                 )
                 modelContext.insert(record)
             }
@@ -124,9 +124,7 @@ final class PlanRepository {
             id: record.id,
             name: record.name,
             aliases: decode([String].self, from: record.aliasesData) ?? [],
-            category: ExerciseCategory(rawValue: record.categoryRaw) ?? .custom,
-            equipment: record.equipment,
-            isCustom: record.isCustom
+            category: ExerciseCategory(rawValue: record.categoryRaw) ?? .custom
         )
     }
 
@@ -136,7 +134,6 @@ final class PlanRepository {
             name: record.name,
             createdAt: record.createdAt,
             pinnedTemplateID: record.pinnedTemplateID,
-            presetPackID: record.presetPackID,
             templates: record.templates
                 .sorted(by: { $0.orderIndex < $1.orderIndex })
                 .compactMap(template(from:))
@@ -189,8 +186,7 @@ final class PlanRepository {
             id: record.id,
             exerciseID: record.exerciseID,
             trainingMax: record.trainingMax,
-            preferredIncrement: record.preferredIncrement,
-            notes: record.notes
+            preferredIncrement: record.preferredIncrement
         )
     }
 
@@ -207,14 +203,6 @@ final class PlanRepository {
         if record.categoryRaw != item.category.rawValue {
             record.categoryRaw = item.category.rawValue
         }
-
-        if record.equipment != item.equipment {
-            record.equipment = item.equipment
-        }
-
-        if record.isCustom != item.isCustom {
-            record.isCustom = item.isCustom
-        }
     }
 
     private func apply(_ plan: Plan, to record: StoredPlan) {
@@ -228,10 +216,6 @@ final class PlanRepository {
 
         if record.pinnedTemplateID != plan.pinnedTemplateID {
             record.pinnedTemplateID = plan.pinnedTemplateID
-        }
-
-        if record.presetPackID != plan.presetPackID {
-            record.presetPackID = plan.presetPackID
         }
     }
 
@@ -448,10 +432,6 @@ final class PlanRepository {
 
         if record.preferredIncrement != profile.preferredIncrement {
             record.preferredIncrement = profile.preferredIncrement
-        }
-
-        if record.notes != profile.notes {
-            record.notes = profile.notes
         }
     }
 

@@ -166,7 +166,6 @@ enum SessionEngine {
             )
 
             return SessionBlock(
-                sourceBlockID: block.id,
                 exerciseID: block.exerciseID,
                 exerciseNameSnapshot: block.exerciseNameSnapshot,
                 blockNote: block.blockNote,

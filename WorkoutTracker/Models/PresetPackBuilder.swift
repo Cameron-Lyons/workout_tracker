@@ -172,7 +172,6 @@ enum PresetPackBuilder {
         return Plan(
             name: "General Gym",
             pinnedTemplateID: upperA.id,
-            presetPackID: PresetPack.generalGym.rawValue,
             templates: [upperA, lowerA, upperB, lowerB]
         )
     }
@@ -249,7 +248,6 @@ enum PresetPackBuilder {
         return Plan(
             name: "Starting Strength",
             pinnedTemplateID: dayA.id,
-            presetPackID: PresetPack.startingStrength.rawValue,
             templates: [dayA, dayB]
         )
     }
@@ -295,7 +293,6 @@ enum PresetPackBuilder {
         return Plan(
             name: "5/3/1",
             pinnedTemplateID: squatDay.id,
-            presetPackID: PresetPack.fiveThreeOne.rawValue,
             templates: [squatDay, benchDay, deadliftDay, pressDay]
         )
     }
@@ -333,7 +330,6 @@ enum PresetPackBuilder {
         return Plan(
             name: "Boring But Big",
             pinnedTemplateID: squatDay.id,
-            presetPackID: PresetPack.boringButBig.rawValue,
             templates: [squatDay, benchDay, deadliftDay, pressDay]
         )
     }

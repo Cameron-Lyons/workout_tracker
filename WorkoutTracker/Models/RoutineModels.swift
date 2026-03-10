@@ -284,23 +284,17 @@ struct ExerciseCatalogItem: Identifiable, Codable, Equatable, Hashable, Sendable
     var name: String
     var aliases: [String]
     var category: ExerciseCategory
-    var equipment: String?
-    var isCustom: Bool
 
     init(
         id: UUID = UUID(),
         name: String,
         aliases: [String] = [],
-        category: ExerciseCategory,
-        equipment: String? = nil,
-        isCustom: Bool = false
+        category: ExerciseCategory
     ) {
         self.id = id
         self.name = name
         self.aliases = aliases
         self.category = category
-        self.equipment = equipment
-        self.isCustom = isCustom
     }
 }
 
@@ -309,20 +303,17 @@ struct ExerciseProfile: Identifiable, Codable, Equatable, Sendable {
     var exerciseID: UUID
     var trainingMax: Double?
     var preferredIncrement: Double?
-    var notes: String
 
     init(
         id: UUID = UUID(),
         exerciseID: UUID,
         trainingMax: Double? = nil,
-        preferredIncrement: Double? = nil,
-        notes: String = ""
+        preferredIncrement: Double? = nil
     ) {
         self.id = id
         self.exerciseID = exerciseID
         self.trainingMax = trainingMax
         self.preferredIncrement = preferredIncrement
-        self.notes = notes
     }
 }
 
@@ -592,7 +583,6 @@ struct Plan: Identifiable, Codable, Equatable, Sendable {
     var name: String
     var createdAt: Date
     var pinnedTemplateID: UUID?
-    var presetPackID: String?
     var templates: [WorkoutTemplate]
 
     init(
@@ -600,21 +590,18 @@ struct Plan: Identifiable, Codable, Equatable, Sendable {
         name: String,
         createdAt: Date = .now,
         pinnedTemplateID: UUID? = nil,
-        presetPackID: String? = nil,
         templates: [WorkoutTemplate]
     ) {
         self.id = id
         self.name = name
         self.createdAt = createdAt
         self.pinnedTemplateID = pinnedTemplateID
-        self.presetPackID = presetPackID
         self.templates = templates
     }
 }
 
 struct SessionBlock: Identifiable, Codable, Equatable, Sendable {
     var id: UUID
-    var sourceBlockID: UUID?
     var exerciseID: UUID
     var exerciseNameSnapshot: String
     var blockNote: String
@@ -625,7 +612,6 @@ struct SessionBlock: Identifiable, Codable, Equatable, Sendable {
 
     init(
         id: UUID = UUID(),
-        sourceBlockID: UUID? = nil,
         exerciseID: UUID,
         exerciseNameSnapshot: String,
         blockNote: String = "",
@@ -635,7 +621,6 @@ struct SessionBlock: Identifiable, Codable, Equatable, Sendable {
         sets: [SessionSetRow]
     ) {
         self.id = id
-        self.sourceBlockID = sourceBlockID
         self.exerciseID = exerciseID
         self.exerciseNameSnapshot = exerciseNameSnapshot
         self.blockNote = blockNote
@@ -1040,37 +1025,37 @@ enum CatalogSeed {
 
     static func defaultCatalog() -> [ExerciseCatalogItem] {
         [
-            ExerciseCatalogItem(id: benchPress, name: "Bench Press", category: .chest, equipment: "Barbell"),
-            ExerciseCatalogItem(id: inclineBenchPress, name: "Incline Bench Press", category: .chest, equipment: "Barbell"),
-            ExerciseCatalogItem(id: dumbbellFly, name: "Dumbbell Fly", category: .chest, equipment: "Dumbbell"),
-            ExerciseCatalogItem(id: backSquat, name: "Back Squat", category: .legs, equipment: "Barbell"),
-            ExerciseCatalogItem(id: frontSquat, name: "Front Squat", category: .legs, equipment: "Barbell"),
-            ExerciseCatalogItem(id: deadlift, name: "Deadlift", category: .legs, equipment: "Barbell"),
-            ExerciseCatalogItem(id: romanianDeadlift, name: "Romanian Deadlift", category: .legs, equipment: "Barbell"),
-            ExerciseCatalogItem(id: overheadPress, name: "Overhead Press", category: .shoulders, equipment: "Barbell"),
-            ExerciseCatalogItem(id: dumbbellShoulderPress, name: "Dumbbell Shoulder Press", category: .shoulders, equipment: "Dumbbell"),
-            ExerciseCatalogItem(id: powerClean, name: "Power Clean", category: .fullBody, equipment: "Barbell"),
-            ExerciseCatalogItem(id: barbellRow, name: "Barbell Row", category: .back, equipment: "Barbell"),
-            ExerciseCatalogItem(id: pullUp, name: "Pull Up", category: .back, equipment: "Bodyweight"),
-            ExerciseCatalogItem(id: weightedPullUp, name: "Weighted Pull Up", aliases: ["Pull Up"], category: .back, equipment: "Bodyweight"),
-            ExerciseCatalogItem(id: latPulldown, name: "Lat Pulldown", category: .back, equipment: "Cable"),
-            ExerciseCatalogItem(id: seatedCableRow, name: "Seated Cable Row", category: .back, equipment: "Cable"),
-            ExerciseCatalogItem(id: dips, name: "Dips", category: .chest, equipment: "Bodyweight"),
-            ExerciseCatalogItem(id: lateralRaise, name: "Lateral Raise", category: .shoulders, equipment: "Dumbbell"),
-            ExerciseCatalogItem(id: facePull, name: "Face Pull", category: .shoulders, equipment: "Cable"),
-            ExerciseCatalogItem(id: rearDeltFly, name: "Rear Delt Fly", category: .shoulders, equipment: "Dumbbell"),
-            ExerciseCatalogItem(id: tricepsPushdown, name: "Triceps Pushdown", category: .arms, equipment: "Cable"),
-            ExerciseCatalogItem(id: skullCrusher, name: "Skull Crusher", category: .arms, equipment: "EZ Bar"),
-            ExerciseCatalogItem(id: barbellCurl, name: "Barbell Curl", category: .arms, equipment: "Barbell"),
-            ExerciseCatalogItem(id: hammerCurl, name: "Hammer Curl", category: .arms, equipment: "Dumbbell"),
-            ExerciseCatalogItem(id: legPress, name: "Leg Press", category: .legs, equipment: "Machine"),
-            ExerciseCatalogItem(id: legCurl, name: "Leg Curl", category: .legs, equipment: "Machine"),
-            ExerciseCatalogItem(id: legExtension, name: "Leg Extension", category: .legs, equipment: "Machine"),
-            ExerciseCatalogItem(id: walkingLunge, name: "Walking Lunge", category: .legs, equipment: "Dumbbell"),
-            ExerciseCatalogItem(id: bulgarianSplitSquat, name: "Bulgarian Split Squat", category: .legs, equipment: "Dumbbell"),
-            ExerciseCatalogItem(id: hipThrust, name: "Hip Thrust", category: .legs, equipment: "Barbell"),
-            ExerciseCatalogItem(id: standingCalfRaise, name: "Standing Calf Raise", category: .legs, equipment: "Machine"),
-            ExerciseCatalogItem(id: seatedCalfRaise, name: "Seated Calf Raise", category: .legs, equipment: "Machine")
+            ExerciseCatalogItem(id: benchPress, name: "Bench Press", category: .chest),
+            ExerciseCatalogItem(id: inclineBenchPress, name: "Incline Bench Press", category: .chest),
+            ExerciseCatalogItem(id: dumbbellFly, name: "Dumbbell Fly", category: .chest),
+            ExerciseCatalogItem(id: backSquat, name: "Back Squat", category: .legs),
+            ExerciseCatalogItem(id: frontSquat, name: "Front Squat", category: .legs),
+            ExerciseCatalogItem(id: deadlift, name: "Deadlift", category: .legs),
+            ExerciseCatalogItem(id: romanianDeadlift, name: "Romanian Deadlift", category: .legs),
+            ExerciseCatalogItem(id: overheadPress, name: "Overhead Press", category: .shoulders),
+            ExerciseCatalogItem(id: dumbbellShoulderPress, name: "Dumbbell Shoulder Press", category: .shoulders),
+            ExerciseCatalogItem(id: powerClean, name: "Power Clean", category: .fullBody),
+            ExerciseCatalogItem(id: barbellRow, name: "Barbell Row", category: .back),
+            ExerciseCatalogItem(id: pullUp, name: "Pull Up", category: .back),
+            ExerciseCatalogItem(id: weightedPullUp, name: "Weighted Pull Up", aliases: ["Pull Up"], category: .back),
+            ExerciseCatalogItem(id: latPulldown, name: "Lat Pulldown", category: .back),
+            ExerciseCatalogItem(id: seatedCableRow, name: "Seated Cable Row", category: .back),
+            ExerciseCatalogItem(id: dips, name: "Dips", category: .chest),
+            ExerciseCatalogItem(id: lateralRaise, name: "Lateral Raise", category: .shoulders),
+            ExerciseCatalogItem(id: facePull, name: "Face Pull", category: .shoulders),
+            ExerciseCatalogItem(id: rearDeltFly, name: "Rear Delt Fly", category: .shoulders),
+            ExerciseCatalogItem(id: tricepsPushdown, name: "Triceps Pushdown", category: .arms),
+            ExerciseCatalogItem(id: skullCrusher, name: "Skull Crusher", category: .arms),
+            ExerciseCatalogItem(id: barbellCurl, name: "Barbell Curl", category: .arms),
+            ExerciseCatalogItem(id: hammerCurl, name: "Hammer Curl", category: .arms),
+            ExerciseCatalogItem(id: legPress, name: "Leg Press", category: .legs),
+            ExerciseCatalogItem(id: legCurl, name: "Leg Curl", category: .legs),
+            ExerciseCatalogItem(id: legExtension, name: "Leg Extension", category: .legs),
+            ExerciseCatalogItem(id: walkingLunge, name: "Walking Lunge", category: .legs),
+            ExerciseCatalogItem(id: bulgarianSplitSquat, name: "Bulgarian Split Squat", category: .legs),
+            ExerciseCatalogItem(id: hipThrust, name: "Hip Thrust", category: .legs),
+            ExerciseCatalogItem(id: standingCalfRaise, name: "Standing Calf Raise", category: .legs),
+            ExerciseCatalogItem(id: seatedCalfRaise, name: "Seated Calf Raise", category: .legs)
         ]
     }
 }

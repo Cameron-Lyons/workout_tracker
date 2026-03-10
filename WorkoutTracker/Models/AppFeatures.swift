@@ -348,10 +348,6 @@ final class AppPlanCoordinator {
         derivedStateController.refreshToday(plansStore: plansStore, sessionStore: sessionStore)
     }
 
-    func saveProfile(_ profile: ExerciseProfile) {
-        plansStore.saveProfile(profile)
-    }
-
     func saveProfiles(_ profiles: [ExerciseProfile]) {
         plansStore.saveProfiles(profiles)
     }

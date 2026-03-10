@@ -98,7 +98,6 @@ struct PlanEditorSheet: View {
                                 name: trimmedName,
                                 createdAt: existingPlan?.createdAt ?? .now,
                                 pinnedTemplateID: existingPlan?.pinnedTemplateID,
-                                presetPackID: existingPlan?.presetPackID,
                                 templates: existingPlan?.templates ?? []
                             )
                         )
@@ -386,8 +385,7 @@ struct TemplateEditorSheet: View {
                 id: appStore.plansStore.profile(for: exerciseID)?.id ?? UUID(),
                 exerciseID: exerciseID,
                 trainingMax: profileTrainingMax,
-                preferredIncrement: preferredIncrement,
-                notes: appStore.plansStore.profile(for: exerciseID)?.notes ?? ""
+                preferredIncrement: preferredIncrement
             )
             savedProfiles.append(profile)
 

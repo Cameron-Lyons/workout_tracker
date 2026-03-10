@@ -102,9 +102,10 @@ final class WorkoutStoreTests: XCTestCase {
             )
         ]
 
-        let overview = analytics.buildOverview(from: sessions)
-        let summaries = analytics.exerciseSummaries(from: sessions, catalogByID: catalog)
-        let records = analytics.personalRecords(from: sessions, catalogByID: catalog)
+        let snapshot = analytics.makeSessionAnalyticsSnapshot(sessions: sessions, catalogByID: catalog)
+        let overview = snapshot.overview
+        let summaries = snapshot.exerciseSummaries
+        let records = snapshot.personalRecords
 
         XCTAssertEqual(overview.totalSessions, 2)
         XCTAssertGreaterThan(overview.totalVolume, 0)
@@ -204,11 +205,16 @@ final class WorkoutStoreTests: XCTestCase {
             CatalogSeed.backSquat: ExerciseCatalogItem(id: CatalogSeed.backSquat, name: "Back Squat", category: .legs)
         ]
 
+        let sessionAnalytics = analytics.makeSessionAnalyticsSnapshot(
+            sessions: sessions,
+            catalogByID: catalog,
+            now: now
+        )
         let combined = analytics.makeDerivedStoreSnapshot(
             plans: [plan],
             references: references,
             sessions: sessions,
-            catalogByID: catalog,
+            sessionAnalytics: sessionAnalytics,
             selectedExerciseID: CatalogSeed.backSquat,
             now: now
         )
@@ -216,14 +222,12 @@ final class WorkoutStoreTests: XCTestCase {
             plans: [plan],
             references: references,
             sessions: sessions,
-            catalogByID: catalog,
+            sessionAnalytics: sessionAnalytics,
             now: now
         )
         let progress = analytics.makeProgressSnapshot(
-            sessions: sessions,
-            catalogByID: catalog,
+            sessionAnalytics: sessionAnalytics,
             selectedExerciseID: CatalogSeed.backSquat,
-            now: now
         )
 
         let recordSignature: (PersonalRecord) -> String = {
@@ -294,14 +298,12 @@ final class WorkoutStoreTests: XCTestCase {
         let migratedCatalogItem = ExerciseCatalogItem(
             id: CatalogSeed.benchPress,
             name: "Bench Press",
-            category: .chest,
-            equipment: "Barbell"
+            category: .chest
         )
         let migratedProfile = ExerciseProfile(
             exerciseID: CatalogSeed.benchPress,
             trainingMax: 225,
-            preferredIncrement: 5,
-            notes: "legacy"
+            preferredIncrement: 5
         )
         let migratedDraft = SessionDraft(
             planID: migratedPlan.id,
@@ -472,12 +474,16 @@ final class WorkoutStoreTests: XCTestCase {
             )
         ]
 
+        let sessionAnalytics = analytics.makeSessionAnalyticsSnapshot(
+            sessions: sessions,
+            catalogByID: [:],
+            now: dayTwo
+        )
+
         progressStore.apply(
             analytics.makeProgressSnapshot(
-                sessions: sessions,
-                catalogByID: [:],
-                selectedExerciseID: nil,
-                now: dayTwo
+                sessionAnalytics: sessionAnalytics,
+                selectedExerciseID: nil
             ),
             completedSessions: sessions
         )
@@ -505,7 +511,7 @@ final class WorkoutStoreTests: XCTestCase {
                 rows: [makeRow(kind: .working, weight: Double(135 + index), reps: 5)]
             )
         }
-        let snapshot = analytics.makeProgressSnapshot(
+        let sessionAnalytics = analytics.makeSessionAnalyticsSnapshot(
             sessions: sessions,
             catalogByID: [
                 CatalogSeed.benchPress: ExerciseCatalogItem(
@@ -514,8 +520,11 @@ final class WorkoutStoreTests: XCTestCase {
                     category: .chest
                 )
             ],
-            selectedExerciseID: CatalogSeed.benchPress,
             now: start.addingTimeInterval(Double(sessions.count) * 86_400)
+        )
+        let snapshot = analytics.makeProgressSnapshot(
+            sessionAnalytics: sessionAnalytics,
+            selectedExerciseID: CatalogSeed.benchPress
         )
 
         progressStore.apply(snapshot, completedSessions: sessions)
@@ -646,15 +655,21 @@ final class WorkoutStoreTests: XCTestCase {
         weight: Double
     ) -> Plan {
         var plan = store.makePlan(name: name)
-        let block = store.makeBlock(
+        let block = ExerciseBlock(
             exerciseID: CatalogSeed.benchPress,
-            setCount: 1,
-            repRange: RepRange(5, 5),
-            targetWeight: weight,
+            exerciseNameSnapshot: store.plansStore.exerciseName(for: CatalogSeed.benchPress),
             restSeconds: 90,
-            progressionRule: .manual
+            progressionRule: .manual,
+            targets: [
+                SetTarget(
+                    setKind: .working,
+                    targetWeight: weight,
+                    repRange: RepRange(5, 5),
+                    restSeconds: 90
+                )
+            ]
         )
-        let template = store.makeTemplate(name: templateName, blocks: [block])
+        let template = WorkoutTemplate(name: templateName, blocks: [block])
         plan.templates = [template]
         plan.pinnedTemplateID = template.id
         return plan
