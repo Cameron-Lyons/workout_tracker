@@ -21,6 +21,14 @@ enum AppColors {
 enum AppCardMetrics {
     static let compactPadding: CGFloat = 14
     static let compactCornerRadius: CGFloat = 14
+    static let featurePadding: CGFloat = 16
+    static let featureCornerRadius: CGFloat = 18
+    static let panelCornerRadius: CGFloat = 16
+    static let insetPadding: CGFloat = 12
+    static let insetCornerRadius: CGFloat = 12
+    static let chipCornerRadius: CGFloat = 8
+    static let heroIconSize: CGFloat = 42
+    static let emptyStateIconSize: CGFloat = 68
 }
 
 @MainActor
@@ -211,7 +219,7 @@ struct AppHeroCard: View {
                         .font(.system(size: 18, weight: .semibold))
                         .foregroundStyle(AppColors.accent)
                 }
-                .frame(width: 42, height: 42)
+                .frame(width: AppCardMetrics.heroIconSize, height: AppCardMetrics.heroIconSize)
 
                 VStack(alignment: .leading, spacing: 5) {
                     if let eyebrow, !eyebrow.isEmpty {
@@ -258,8 +266,7 @@ struct AppHeroCard: View {
                 }
             }
         }
-        .padding(16)
-        .appSurface(cornerRadius: 18, shadow: false)
+        .appFeatureSurface()
     }
 }
 
@@ -287,7 +294,7 @@ struct AppEmptyStateCard: View {
                     .font(.system(size: 36, weight: .semibold))
                     .foregroundStyle(AppColors.accent)
             }
-            .frame(width: 68, height: 68)
+            .frame(width: AppCardMetrics.emptyStateIconSize, height: AppCardMetrics.emptyStateIconSize)
 
             Text(title)
                 .font(.system(size: 28, weight: .bold, design: .rounded))
@@ -622,9 +629,24 @@ extension View {
         modifier(AppSurfaceModifier(cornerRadius: cornerRadius, shadowOpacity: shadow ? 0.24 : 0))
     }
 
+    func appSurfaceCard(
+        padding: CGFloat = AppCardMetrics.compactPadding,
+        cornerRadius: CGFloat = AppCardMetrics.compactCornerRadius,
+        shadow: Bool = false
+    ) -> some View {
+        self.padding(padding)
+            .appSurface(cornerRadius: cornerRadius, shadow: shadow)
+    }
+
     func appSectionSurface() -> some View {
-        padding(AppCardMetrics.compactPadding)
-            .appSurface(cornerRadius: AppCardMetrics.compactCornerRadius, shadow: false)
+        appSurfaceCard()
+    }
+
+    func appFeatureSurface() -> some View {
+        appSurfaceCard(
+            padding: AppCardMetrics.featurePadding,
+            cornerRadius: AppCardMetrics.featureCornerRadius
+        )
     }
 
     func appInputField() -> some View {
@@ -645,13 +667,27 @@ extension View {
         )
     }
 
-    func appEditorInsetCard(fillOpacity: Double = 0.82, borderOpacity: Double = 0.7) -> some View {
-        padding(AppCardMetrics.compactPadding)
+    func appInsetContentCard(
+        padding: CGFloat = AppCardMetrics.insetPadding,
+        cornerRadius: CGFloat = AppCardMetrics.insetCornerRadius,
+        fillOpacity: Double = 0.8,
+        borderOpacity: Double = 0.68
+    ) -> some View {
+        self.padding(padding)
             .appInsetCard(
-                cornerRadius: AppCardMetrics.compactCornerRadius,
+                cornerRadius: cornerRadius,
                 fillOpacity: fillOpacity,
                 borderOpacity: borderOpacity
             )
+    }
+
+    func appEditorInsetCard(fillOpacity: Double = 0.82, borderOpacity: Double = 0.7) -> some View {
+        appInsetContentCard(
+            padding: AppCardMetrics.compactPadding,
+            cornerRadius: AppCardMetrics.compactCornerRadius,
+            fillOpacity: fillOpacity,
+            borderOpacity: borderOpacity
+        )
     }
 
     func appReveal(delay: Double = 0) -> some View {

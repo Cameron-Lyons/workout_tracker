@@ -259,8 +259,10 @@ private struct SessionBlockCardView: View, Equatable {
                 .tint(AppColors.accent)
             }
         }
-        .padding(14)
-        .appSurface(cornerRadius: 16, shadow: false)
+        .appSurfaceCard(
+            padding: AppCardMetrics.compactPadding,
+            cornerRadius: AppCardMetrics.panelCornerRadius
+        )
     }
 }
 
@@ -369,8 +371,7 @@ private struct SessionSetRowView: View, Equatable {
                     .foregroundStyle(AppColors.accent)
             }
         }
-        .padding(12)
-        .appInsetCard(cornerRadius: 12, fillOpacity: 0.8, borderOpacity: 0.68)
+        .appInsetContentCard()
     }
 }
 

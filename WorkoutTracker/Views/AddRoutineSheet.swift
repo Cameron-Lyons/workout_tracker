@@ -98,9 +98,11 @@ struct OnboardingView: View {
                                     .foregroundStyle(AppColors.textSecondary)
                                     .frame(maxWidth: .infinity, alignment: .leading)
                             }
-                            .padding(16)
                             .frame(maxWidth: .infinity, alignment: .leading)
-                            .appSurface(cornerRadius: 16, shadow: false)
+                            .appSurfaceCard(
+                                padding: AppCardMetrics.featurePadding,
+                                cornerRadius: AppCardMetrics.panelCornerRadius
+                            )
                         }
                         .buttonStyle(.plain)
                         .accessibilityIdentifier("onboarding.preset.\(pack.rawValue)")
@@ -205,9 +207,8 @@ struct ExercisePickerSheet: View {
                                             .foregroundStyle(AppColors.textSecondary)
                                             .frame(maxWidth: .infinity, alignment: .leading)
                                     }
-                                    .padding(14)
                                     .frame(maxWidth: .infinity, alignment: .leading)
-                                    .appSurface(cornerRadius: 14, shadow: false)
+                                    .appSectionSurface()
                                 }
                                 .buttonStyle(.plain)
                                 .accessibilityElement(children: .combine)

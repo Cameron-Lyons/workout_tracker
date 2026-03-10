@@ -139,8 +139,7 @@ struct TodayView: View {
             .tint(AppColors.accent)
             .accessibilityIdentifier("today.resumeSessionButton")
         }
-        .padding(16)
-        .appSurface(cornerRadius: 18, shadow: false)
+        .appFeatureSurface()
     }
 
     private func pinnedTemplateCard(_ reference: TemplateReference) -> some View {
@@ -160,12 +159,16 @@ struct TodayView: View {
 
             HStack(spacing: 8) {
                 ForEach(reference.scheduledWeekdays) { weekday in
-                    Text(weekday.shortLabel)
-                        .font(.caption.weight(.semibold))
-                        .foregroundStyle(AppColors.accent)
-                        .padding(.horizontal, 8)
-                        .padding(.vertical, 5)
-                        .appInsetCard(cornerRadius: 8, fillOpacity: 0.8, borderOpacity: 0.65)
+                        Text(weekday.shortLabel)
+                            .font(.caption.weight(.semibold))
+                            .foregroundStyle(AppColors.accent)
+                            .padding(.horizontal, 8)
+                            .padding(.vertical, 5)
+                            .appInsetCard(
+                                cornerRadius: AppCardMetrics.chipCornerRadius,
+                                fillOpacity: 0.8,
+                                borderOpacity: 0.65
+                            )
                 }
             }
 
@@ -180,8 +183,7 @@ struct TodayView: View {
             .tint(AppColors.accent)
             .accessibilityIdentifier("today.pinnedStartButton")
         }
-        .padding(16)
-        .appSurface(cornerRadius: 18, shadow: false)
+        .appFeatureSurface()
     }
 
     private var quickStartSection: some View {
@@ -192,9 +194,8 @@ struct TodayView: View {
                 Text("Templates you start most often will show up here.")
                     .font(.subheadline)
                     .foregroundStyle(AppColors.textSecondary)
-                    .padding(14)
                     .frame(maxWidth: .infinity, alignment: .leading)
-                    .appSurface(cornerRadius: 14, shadow: false)
+                    .appSectionSurface()
             } else {
                 LazyVGrid(
                     columns: [GridItem(.flexible(), spacing: 12), GridItem(.flexible(), spacing: 12)],
@@ -222,9 +223,8 @@ struct TodayView: View {
                                         .frame(maxWidth: .infinity, alignment: .leading)
                                 }
                             }
-                            .padding(14)
                             .frame(maxWidth: .infinity, alignment: .leading)
-                            .appSurface(cornerRadius: 14, shadow: false)
+                            .appSectionSurface()
                         }
                         .buttonStyle(.plain)
                         .accessibilityIdentifier("today.quickStart.\(reference.templateID.uuidString)")
@@ -467,9 +467,8 @@ struct PlansView: View {
                 Text("This plan has no templates yet.")
                     .font(.subheadline)
                     .foregroundStyle(AppColors.textSecondary)
-                    .padding(12)
                     .frame(maxWidth: .infinity, alignment: .leading)
-                    .appInsetCard(cornerRadius: 12, fillOpacity: 0.8, borderOpacity: 0.65)
+                    .appInsetContentCard(borderOpacity: 0.65)
             } else {
                 LazyVStack(spacing: 12) {
                     ForEach(plan.templates) { template in
@@ -478,8 +477,7 @@ struct PlansView: View {
                 }
             }
         }
-        .padding(16)
-        .appSurface(cornerRadius: 18, shadow: false)
+        .appFeatureSurface()
     }
 
     private func templateCard(plan: Plan, template: WorkoutTemplate) -> some View {
@@ -492,12 +490,16 @@ struct PlansView: View {
                             .foregroundStyle(AppColors.textPrimary)
 
                         if plan.pinnedTemplateID == template.id {
-                            Text("PINNED")
-                                .font(.caption2.weight(.bold))
-                                .foregroundStyle(AppColors.accent)
-                                .padding(.horizontal, 6)
-                                .padding(.vertical, 4)
-                                .appInsetCard(cornerRadius: 8, fillOpacity: 0.86, borderOpacity: 0.8)
+                                Text("PINNED")
+                                    .font(.caption2.weight(.bold))
+                                    .foregroundStyle(AppColors.accent)
+                                    .padding(.horizontal, 6)
+                                    .padding(.vertical, 4)
+                                    .appInsetCard(
+                                        cornerRadius: AppCardMetrics.chipCornerRadius,
+                                        fillOpacity: 0.86,
+                                        borderOpacity: 0.8
+                                    )
                         }
                     }
 
@@ -519,7 +521,11 @@ struct PlansView: View {
                             .foregroundStyle(AppColors.accent)
                             .padding(.horizontal, 7)
                             .padding(.vertical, 5)
-                            .appInsetCard(cornerRadius: 8, fillOpacity: 0.82, borderOpacity: 0.75)
+                            .appInsetCard(
+                                cornerRadius: AppCardMetrics.chipCornerRadius,
+                                fillOpacity: 0.82,
+                                borderOpacity: 0.75
+                            )
                     }
                 }
             }
@@ -551,8 +557,7 @@ struct PlansView: View {
                             systemImage: "arrow.up.right"
                         )
                     }
-                    .padding(12)
-                    .appInsetCard(cornerRadius: 12, fillOpacity: 0.78, borderOpacity: 0.68)
+                    .appInsetContentCard(fillOpacity: 0.78)
                 }
             }
 
