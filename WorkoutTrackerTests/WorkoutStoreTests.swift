@@ -14,10 +14,10 @@ final class WorkoutStoreTests: XCTestCase {
     }
 
     @MainActor
-    func testSessionDraftPersistsAcrossStoreRehydration() throws {
+    func testSessionDraftPersistsAcrossStoreRehydration() async throws {
         let container = WorkoutModelContainerFactory.makeContainer(isStoredInMemoryOnly: true)
         let firstStore = makeStore(container: container)
-        firstStore.hydrateIfNeeded()
+        await firstStore.hydrateIfNeeded()
         firstStore.completeOnboarding(with: nil)
 
         let plan = makeSingleTemplatePlan(
@@ -30,16 +30,16 @@ final class WorkoutStoreTests: XCTestCase {
         firstStore.startSession(planID: plan.id, templateID: try XCTUnwrap(plan.templates.first?.id))
 
         let rehydratedStore = makeStore(container: container)
-        rehydratedStore.hydrateIfNeeded()
+        await rehydratedStore.hydrateIfNeeded()
 
         XCTAssertEqual(rehydratedStore.sessionStore.activeDraft?.templateNameSnapshot, "Upper 1")
         XCTAssertEqual(rehydratedStore.sessionStore.activeDraft?.blocks.count, 1)
     }
 
     @MainActor
-    func testExerciseRenamePreservesAnalyticsContinuityAndSnapshots() throws {
+    func testExerciseRenamePreservesAnalyticsContinuityAndSnapshots() async throws {
         let store = makeStore()
-        store.hydrateIfNeeded()
+        await store.hydrateIfNeeded()
         store.completeOnboarding(with: nil)
 
         let plan = makeSingleTemplatePlan(
@@ -64,7 +64,7 @@ final class WorkoutStoreTests: XCTestCase {
             aliases: ["Barbell Bench"],
             category: .chest
         )
-        store.refreshDerivedStores()
+        await store.refreshDerivedStores()
 
         let summary = try XCTUnwrap(
             store.progressStore.exerciseSummaries.first(where: { $0.exerciseID == CatalogSeed.benchPress })
@@ -102,9 +102,10 @@ final class WorkoutStoreTests: XCTestCase {
             )
         ]
 
-        let overview = analytics.buildOverview(from: sessions)
-        let summaries = analytics.exerciseSummaries(from: sessions, catalogByID: catalog)
-        let records = analytics.personalRecords(from: sessions, catalogByID: catalog)
+        let snapshot = analytics.makeSessionAnalyticsSnapshot(sessions: sessions, catalogByID: catalog)
+        let overview = snapshot.overview
+        let summaries = snapshot.exerciseSummaries
+        let records = snapshot.personalRecords
 
         XCTAssertEqual(overview.totalSessions, 2)
         XCTAssertGreaterThan(overview.totalVolume, 0)
@@ -113,21 +114,485 @@ final class WorkoutStoreTests: XCTestCase {
         XCTAssertEqual(records.last?.weight, 235)
     }
 
+    func testDerivedStoreSnapshotMatchesStandaloneTodayAndProgressSnapshots() {
+        let analytics = AnalyticsRepository()
+        let now = Date(timeIntervalSince1970: 1_741_478_400)
+        let benchTemplateID = UUID()
+        let squatTemplateID = UUID()
+        let plan = Plan(
+            name: "Strength",
+            pinnedTemplateID: benchTemplateID,
+            templates: [
+                WorkoutTemplate(
+                    id: benchTemplateID,
+                    name: "Bench Day",
+                    scheduledWeekdays: [.monday],
+                    blocks: [],
+                    lastStartedAt: now.addingTimeInterval(-86_400)
+                ),
+                WorkoutTemplate(
+                    id: squatTemplateID,
+                    name: "Squat Day",
+                    scheduledWeekdays: [.thursday],
+                    blocks: [],
+                    lastStartedAt: now.addingTimeInterval(-172_800)
+                )
+            ]
+        )
+        let references = [
+            TemplateReference(
+                planID: plan.id,
+                planName: plan.name,
+                templateID: benchTemplateID,
+                templateName: "Bench Day",
+                scheduledWeekdays: [.monday],
+                lastStartedAt: now.addingTimeInterval(-86_400)
+            ),
+            TemplateReference(
+                planID: plan.id,
+                planName: plan.name,
+                templateID: squatTemplateID,
+                templateName: "Squat Day",
+                scheduledWeekdays: [.thursday],
+                lastStartedAt: now.addingTimeInterval(-172_800)
+            )
+        ]
+        let sessions = [
+            CompletedSession(
+                planID: plan.id,
+                templateID: benchTemplateID,
+                templateNameSnapshot: "Bench Day",
+                startedAt: now.addingTimeInterval(-180_000),
+                completedAt: now.addingTimeInterval(-172_800),
+                blocks: [
+                    CompletedSessionBlock(
+                        exerciseID: CatalogSeed.benchPress,
+                        exerciseNameSnapshot: "Bench Press",
+                        blockNote: "",
+                        restSeconds: 90,
+                        supersetGroup: nil,
+                        progressionRule: .manual,
+                        sets: [
+                            makeRow(kind: .warmup, weight: 95, reps: 5),
+                            makeRow(kind: .working, weight: 185, reps: 5)
+                        ]
+                    )
+                ]
+            ),
+            CompletedSession(
+                planID: plan.id,
+                templateID: squatTemplateID,
+                templateNameSnapshot: "Squat Day",
+                startedAt: now.addingTimeInterval(-93_600),
+                completedAt: now.addingTimeInterval(-86_400),
+                blocks: [
+                    CompletedSessionBlock(
+                        exerciseID: CatalogSeed.backSquat,
+                        exerciseNameSnapshot: "Back Squat",
+                        blockNote: "",
+                        restSeconds: 120,
+                        supersetGroup: nil,
+                        progressionRule: .manual,
+                        sets: [
+                            makeRow(kind: .working, weight: 225, reps: 5)
+                        ]
+                    )
+                ]
+            )
+        ]
+        let catalog = [
+            CatalogSeed.benchPress: ExerciseCatalogItem(id: CatalogSeed.benchPress, name: "Bench Press", category: .chest),
+            CatalogSeed.backSquat: ExerciseCatalogItem(id: CatalogSeed.backSquat, name: "Back Squat", category: .legs)
+        ]
+
+        let sessionAnalytics = analytics.makeSessionAnalyticsSnapshot(
+            sessions: sessions,
+            catalogByID: catalog,
+            now: now
+        )
+        let combined = analytics.makeDerivedStoreSnapshot(
+            plans: [plan],
+            references: references,
+            sessions: sessions,
+            sessionAnalytics: sessionAnalytics,
+            selectedExerciseID: CatalogSeed.backSquat,
+            now: now
+        )
+        let today = analytics.makeTodaySnapshot(
+            plans: [plan],
+            references: references,
+            sessions: sessions,
+            sessionAnalytics: sessionAnalytics,
+            now: now
+        )
+        let progress = analytics.makeProgressSnapshot(
+            sessionAnalytics: sessionAnalytics,
+            selectedExerciseID: CatalogSeed.backSquat,
+        )
+
+        let recordSignature: (PersonalRecord) -> String = {
+            [
+                $0.sessionID.uuidString,
+                $0.exerciseID.uuidString,
+                $0.displayName,
+                String($0.weight),
+                String($0.reps),
+                String($0.estimatedOneRepMax),
+                String($0.achievedAt.timeIntervalSinceReferenceDate)
+            ].joined(separator: "|")
+        }
+        let pointSignature: (ProgressPoint) -> String = {
+            [
+                $0.sessionID.uuidString,
+                String($0.date.timeIntervalSinceReferenceDate),
+                String($0.topWeight),
+                String($0.estimatedOneRepMax),
+                String($0.volume)
+            ].joined(separator: "|")
+        }
+        let summarySignature: (ExerciseAnalyticsSummary) -> String = {
+            [
+                $0.exerciseID.uuidString,
+                $0.displayName,
+                String($0.pointCount),
+                String($0.totalVolume),
+                $0.currentPR.map(recordSignature) ?? "nil",
+                $0.points.map(pointSignature).joined(separator: ",")
+            ].joined(separator: "||")
+        }
+
+        XCTAssertEqual(combined.today.pinnedTemplate, today.pinnedTemplate)
+        XCTAssertEqual(combined.today.quickStartTemplates, today.quickStartTemplates)
+        XCTAssertEqual(combined.today.recentSessions, today.recentSessions)
+        XCTAssertEqual(combined.today.recentPersonalRecords.map(recordSignature), today.recentPersonalRecords.map(recordSignature))
+
+        XCTAssertEqual(combined.progress.overview, progress.overview)
+        XCTAssertEqual(combined.progress.selectedExerciseID, progress.selectedExerciseID)
+        XCTAssertEqual(combined.progress.personalRecords.map(recordSignature), progress.personalRecords.map(recordSignature))
+        XCTAssertEqual(combined.progress.exerciseSummaries.map(summarySignature), progress.exerciseSummaries.map(summarySignature))
+    }
+
     @MainActor
-    func testCompatibilityResetClearsDataAndReturnsToOnboarding() {
+    func testBlobStoreMigrationPreservesCurrentData() async throws {
         let container = WorkoutModelContainerFactory.makeContainer(isStoredInMemoryOnly: true)
-        let firstStore = makeStore(container: container)
-        firstStore.hydrateIfNeeded()
-        firstStore.completeOnboarding(with: .generalGym)
+        let context = ModelContext(container)
+        context.autosaveEnabled = false
+        let encoder = JSONEncoder()
 
-        XCTAssertFalse(firstStore.plansStore.plans.isEmpty)
-        UserDefaults.standard.set(0, forKey: "workout_tracker_storage_version_v3")
+        let migratedPlan = Plan(
+            name: "Migrated Plan",
+            templates: [
+                WorkoutTemplate(
+                    name: "Bench Day",
+                    blocks: [
+                        ExerciseBlock(
+                            exerciseID: CatalogSeed.benchPress,
+                            exerciseNameSnapshot: "Bench Press",
+                            progressionRule: .manual,
+                            targets: [SetTarget(targetWeight: 185, repRange: RepRange(5, 5))]
+                        )
+                    ]
+                )
+            ]
+        )
+        let migratedCatalogItem = ExerciseCatalogItem(
+            id: CatalogSeed.benchPress,
+            name: "Bench Press",
+            category: .chest
+        )
+        let migratedProfile = ExerciseProfile(
+            exerciseID: CatalogSeed.benchPress,
+            trainingMax: 225,
+            preferredIncrement: 5
+        )
+        let migratedDraft = SessionDraft(
+            planID: migratedPlan.id,
+            templateID: try XCTUnwrap(migratedPlan.templates.first?.id),
+            templateNameSnapshot: "Bench Day",
+            blocks: []
+        )
+        let migratedCompletedSession = makeCompletedSession(
+            date: .now,
+            exerciseID: CatalogSeed.benchPress,
+            exerciseName: "Bench Press",
+            rows: [makeRow(kind: .working, weight: 185, reps: 5)]
+        )
 
-        let secondStore = makeStore(container: container)
-        secondStore.hydrateIfNeeded()
+        context.insert(
+            StoredExerciseCatalogRecord(
+                id: migratedCatalogItem.id,
+                payload: try encoder.encode(migratedCatalogItem),
+                sortOrder: 0
+            )
+        )
+        context.insert(StoredPlanRecord(id: migratedPlan.id, payload: try encoder.encode(migratedPlan)))
+        context.insert(
+            StoredExerciseProfileRecord(
+                id: migratedProfile.id,
+                exerciseID: migratedProfile.exerciseID,
+                payload: try encoder.encode(migratedProfile)
+            )
+        )
+        context.insert(StoredActiveSessionRecord(id: migratedDraft.id, payload: try encoder.encode(migratedDraft)))
+        context.insert(
+            StoredCompletedSessionRecord(
+                id: migratedCompletedSession.id,
+                completedAt: migratedCompletedSession.completedAt,
+                payload: try encoder.encode(migratedCompletedSession)
+            )
+        )
+        try context.save()
+        UserDefaults.standard.set(true, forKey: "workout_tracker_v2_completed_onboarding")
 
-        XCTAssertTrue(secondStore.plansStore.plans.isEmpty)
-        XCTAssertTrue(secondStore.shouldShowOnboarding)
+        let store = makeStore(container: container)
+        await store.hydrateIfNeeded()
+
+        XCTAssertEqual(store.plansStore.plans.first?.name, migratedPlan.name)
+        XCTAssertEqual(store.plansStore.catalog.first?.name, migratedCatalogItem.name)
+        XCTAssertEqual(store.plansStore.profile(for: migratedProfile.exerciseID)?.trainingMax, migratedProfile.trainingMax)
+        XCTAssertEqual(store.sessionStore.activeDraft?.templateNameSnapshot, migratedDraft.templateNameSnapshot)
+        XCTAssertEqual(store.sessionStore.completedSessions.first?.templateNameSnapshot, migratedCompletedSession.templateNameSnapshot)
+        XCTAssertFalse(store.shouldShowOnboarding)
+
+        let migratedContext = ModelContext(container)
+        XCTAssertEqual(try migratedContext.fetch(FetchDescriptor<StoredPlanRecord>()).count, 0)
+        XCTAssertEqual(try migratedContext.fetch(FetchDescriptor<StoredPlan>()).count, 1)
+    }
+
+    @MainActor
+    func testDiskStoreMigratesV1SchemaToV2RelationalModels() throws {
+        let storeDirectory = FileManager.default.temporaryDirectory
+            .appendingPathComponent(UUID().uuidString, isDirectory: true)
+        let storeURL = storeDirectory.appendingPathComponent("WorkoutTracker.store")
+        let encoder = JSONEncoder()
+
+        try FileManager.default.createDirectory(at: storeDirectory, withIntermediateDirectories: true)
+        defer {
+            try? FileManager.default.removeItem(at: storeDirectory)
+        }
+
+        let exerciseID = CatalogSeed.benchPress
+        let profileID = UUID()
+        let planID = UUID()
+        let templateID = UUID()
+        let templateBlockID = UUID()
+        let templateTargetID = UUID()
+        let activeSessionID = UUID()
+        let activeBlockID = UUID()
+        let activeRowID = UUID()
+        let completedSessionID = UUID()
+        let completedBlockID = UUID()
+        let completedRowID = UUID()
+        let now = Date(timeIntervalSince1970: 1_741_478_400)
+
+        do {
+            let v1Container = try makeDiskBackedContainer(
+                schema: Schema(versionedSchema: WorkoutSchemaV1.self),
+                url: storeURL
+            )
+            let context = ModelContext(v1Container)
+            context.autosaveEnabled = false
+
+            let catalogItem = WorkoutSchemaV1.StoredCatalogItem(
+                id: exerciseID,
+                name: "Bench Press",
+                aliasesData: try encoder.encode(["Barbell Bench"]),
+                categoryRaw: ExerciseCategory.chest.rawValue,
+                equipment: "Barbell",
+                isCustom: true
+            )
+
+            let profile = WorkoutSchemaV1.StoredExerciseProfile(
+                id: profileID,
+                exerciseID: exerciseID,
+                trainingMax: 225,
+                preferredIncrement: 5,
+                notes: "legacy notes"
+            )
+
+            let plan = WorkoutSchemaV1.StoredPlan(
+                id: planID,
+                name: "Migrated Plan",
+                createdAt: now,
+                pinnedTemplateID: templateID,
+                presetPackID: "generalGym"
+            )
+            let template = WorkoutSchemaV1.StoredTemplate(
+                id: templateID,
+                name: "Bench Day",
+                note: "Primary day",
+                scheduledWeekdaysData: try encoder.encode([Weekday.monday]),
+                lastStartedAt: now,
+                orderIndex: 0
+            )
+            let templateBlock = WorkoutSchemaV1.StoredTemplateBlock(
+                id: templateBlockID,
+                exerciseID: exerciseID,
+                exerciseNameSnapshot: "Bench Press",
+                blockNote: "Top set",
+                restSeconds: 120,
+                supersetGroup: nil,
+                allowsAutoWarmups: true,
+                orderIndex: 0,
+                progressionRuleData: try encoder.encode(ProgressionRule.manual)
+            )
+            let templateTarget = WorkoutSchemaV1.StoredTemplateTarget(
+                id: templateTargetID,
+                orderIndex: 0,
+                setKindRaw: SetKind.working.rawValue,
+                targetWeight: 185,
+                repLower: 5,
+                repUpper: 5,
+                rir: nil,
+                restSeconds: 120,
+                note: nil
+            )
+
+            templateTarget.block = templateBlock
+            templateBlock.targets = [templateTarget]
+            templateBlock.template = template
+            template.blocks = [templateBlock]
+            template.plan = plan
+            plan.templates = [template]
+
+            let activeSession = WorkoutSchemaV1.StoredActiveSession(
+                id: activeSessionID,
+                planID: planID,
+                templateID: templateID,
+                templateNameSnapshot: "Bench Day",
+                startedAt: now,
+                lastUpdatedAt: now,
+                notes: "Session note",
+                restTimerEndsAt: now.addingTimeInterval(90)
+            )
+            let activeBlock = WorkoutSchemaV1.StoredActiveSessionBlock(
+                id: activeBlockID,
+                orderIndex: 0,
+                sourceBlockID: templateBlockID,
+                exerciseID: exerciseID,
+                exerciseNameSnapshot: "Bench Press",
+                blockNote: "Active block",
+                restSeconds: 120,
+                supersetGroup: nil,
+                progressionRuleData: try encoder.encode(ProgressionRule.manual)
+            )
+            let activeRow = WorkoutSchemaV1.StoredActiveSessionRow(
+                id: activeRowID,
+                orderIndex: 0,
+                targetID: UUID(),
+                targetSetKindRaw: SetKind.working.rawValue,
+                targetWeight: 185,
+                targetRepLower: 5,
+                targetRepUpper: 5,
+                targetRir: nil,
+                targetRestSeconds: 120,
+                targetNote: nil,
+                logID: UUID(),
+                logWeight: 185,
+                logReps: 5,
+                logRir: nil,
+                logCompletedAt: now
+            )
+
+            activeRow.block = activeBlock
+            activeBlock.rows = [activeRow]
+            activeBlock.session = activeSession
+            activeSession.blocks = [activeBlock]
+
+            let completedSession = WorkoutSchemaV1.StoredCompletedSession(
+                id: completedSessionID,
+                planID: planID,
+                templateID: templateID,
+                templateNameSnapshot: "Bench Day",
+                startedAt: now.addingTimeInterval(-3_600),
+                completedAt: now,
+                notes: "Completed note"
+            )
+            let completedBlock = WorkoutSchemaV1.StoredCompletedSessionBlock(
+                id: completedBlockID,
+                orderIndex: 0,
+                exerciseID: exerciseID,
+                exerciseNameSnapshot: "Bench Press",
+                blockNote: "Completed block",
+                restSeconds: 120,
+                supersetGroup: nil,
+                progressionRuleData: try encoder.encode(ProgressionRule.manual)
+            )
+            let completedRow = WorkoutSchemaV1.StoredCompletedSessionRow(
+                id: completedRowID,
+                orderIndex: 0,
+                targetID: UUID(),
+                targetSetKindRaw: SetKind.working.rawValue,
+                targetWeight: 185,
+                targetRepLower: 5,
+                targetRepUpper: 5,
+                targetRir: nil,
+                targetRestSeconds: 120,
+                targetNote: nil,
+                logID: UUID(),
+                logWeight: 185,
+                logReps: 5,
+                logRir: nil,
+                logCompletedAt: now
+            )
+
+            completedRow.block = completedBlock
+            completedBlock.rows = [completedRow]
+            completedBlock.session = completedSession
+            completedSession.blocks = [completedBlock]
+
+            context.insert(catalogItem)
+            context.insert(profile)
+            context.insert(plan)
+            context.insert(template)
+            context.insert(templateBlock)
+            context.insert(templateTarget)
+            context.insert(activeSession)
+            context.insert(activeBlock)
+            context.insert(activeRow)
+            context.insert(completedSession)
+            context.insert(completedBlock)
+            context.insert(completedRow)
+
+            try context.save()
+        }
+
+        let migratedContainer = try makeDiskBackedContainer(
+            schema: Schema(versionedSchema: WorkoutSchemaV2.self),
+            migrationPlan: WorkoutSchemaMigrationPlan.self,
+            url: storeURL
+        )
+        let planContext = ModelContext(migratedContainer)
+        let sessionContext = ModelContext(migratedContainer)
+        planContext.autosaveEnabled = false
+        sessionContext.autosaveEnabled = false
+
+        let planRepository = PlanRepository(modelContext: planContext)
+        let sessionRepository = SessionRepository(modelContext: sessionContext)
+
+        let migratedPlan = try XCTUnwrap(planRepository.loadPlans().first)
+        XCTAssertEqual(migratedPlan.name, "Migrated Plan")
+        XCTAssertEqual(migratedPlan.pinnedTemplateID, templateID)
+        XCTAssertEqual(migratedPlan.templates.first?.name, "Bench Day")
+
+        let migratedCatalog = try XCTUnwrap(planRepository.loadCatalog().first)
+        XCTAssertEqual(migratedCatalog.name, "Bench Press")
+        XCTAssertEqual(migratedCatalog.aliases, ["Barbell Bench"])
+
+        let migratedProfile = try XCTUnwrap(planRepository.loadProfiles().first)
+        XCTAssertEqual(migratedProfile.exerciseID, exerciseID)
+        XCTAssertEqual(migratedProfile.trainingMax, 225)
+        XCTAssertEqual(migratedProfile.preferredIncrement, 5)
+
+        let activeDraft = try XCTUnwrap(sessionRepository.loadActiveDraft())
+        XCTAssertEqual(activeDraft.templateNameSnapshot, "Bench Day")
+        XCTAssertEqual(activeDraft.notes, "Session note")
+        XCTAssertEqual(activeDraft.blocks.first?.exerciseID, exerciseID)
+
+        let completed = try XCTUnwrap(sessionRepository.loadCompletedSessions().first)
+        XCTAssertEqual(completed.templateNameSnapshot, "Bench Day")
+        XCTAssertEqual(completed.notes, "Completed note")
+        XCTAssertEqual(completed.blocks.first?.exerciseID, exerciseID)
     }
 
     @MainActor
@@ -143,7 +608,7 @@ final class WorkoutStoreTests: XCTestCase {
         plan.name = "Starter Updated"
         repository.savePlans([plan])
 
-        let records = try context.fetch(FetchDescriptor<StoredPlanRecord>())
+        let records = try context.fetch(FetchDescriptor<StoredPlan>())
         XCTAssertEqual(records.count, 1)
         XCTAssertEqual(try XCTUnwrap(repository.loadPlans().first).name, "Starter Updated")
     }
@@ -166,15 +631,206 @@ final class WorkoutStoreTests: XCTestCase {
         draft.notes = "Felt strong"
         repository.saveActiveDraft(draft)
 
-        let records = try context.fetch(FetchDescriptor<StoredActiveSessionRecord>())
+        let records = try context.fetch(FetchDescriptor<StoredActiveSession>())
         XCTAssertEqual(records.count, 1)
         XCTAssertEqual(repository.loadActiveDraft()?.notes, "Felt strong")
     }
 
     @MainActor
-    func testFinishSessionIncrementallyUpdatesTodayAndProgressStores() throws {
+    func testDeferredDraftMutationsPersistWhenFlushed() throws {
+        let container = WorkoutModelContainerFactory.makeContainer(isStoredInMemoryOnly: true)
+        let context = ModelContext(container)
+        context.autosaveEnabled = false
+        let repository = SessionRepository(modelContext: context)
+        let store = SessionStore(repository: repository)
+        let row = SessionSetRow(
+            target: SetTarget(
+                setKind: .working,
+                targetWeight: 185,
+                repRange: RepRange(5, 5)
+            )
+        )
+        let block = SessionBlock(
+            exerciseID: CatalogSeed.benchPress,
+            exerciseNameSnapshot: "Bench Press",
+            restSeconds: 90,
+            progressionRule: .manual,
+            sets: [row]
+        )
+        let draft = SessionDraft(
+            planID: nil,
+            templateID: UUID(),
+            templateNameSnapshot: "Bench Day",
+            blocks: [block]
+        )
+
+        store.beginSession(draft)
+        store.pushMutation(persistence: .deferred) { updatedDraft in
+            SessionEngine.adjustWeight(by: 5, setID: row.id, in: block.id, draft: &updatedDraft)
+        }
+
+        XCTAssertEqual(store.activeDraft?.blocks.first?.sets.first?.log.weight, 190)
+        XCTAssertNil(repository.loadActiveDraft()?.blocks.first?.sets.first?.log.weight)
+
+        store.flushPendingDraftSave()
+
+        XCTAssertEqual(repository.loadActiveDraft()?.blocks.first?.sets.first?.log.weight, 190)
+    }
+
+    @MainActor
+    func testProgressStoreCachesHistorySessionsBySelectedDay() {
+        let analytics = AnalyticsRepository()
+        let progressStore = ProgressStore()
+        let dayOne = Date(timeIntervalSince1970: 1_741_478_400)
+        let dayTwo = dayOne.addingTimeInterval(86_400)
+        let sessions = [
+            CompletedSession(
+                planID: nil,
+                templateID: UUID(),
+                templateNameSnapshot: "Day One AM",
+                startedAt: dayOne.addingTimeInterval(-3_600),
+                completedAt: dayOne,
+                blocks: []
+            ),
+            CompletedSession(
+                planID: nil,
+                templateID: UUID(),
+                templateNameSnapshot: "Day One PM",
+                startedAt: dayOne.addingTimeInterval(3_600),
+                completedAt: dayOne.addingTimeInterval(7_200),
+                blocks: []
+            ),
+            CompletedSession(
+                planID: nil,
+                templateID: UUID(),
+                templateNameSnapshot: "Day Two",
+                startedAt: dayTwo.addingTimeInterval(-3_600),
+                completedAt: dayTwo,
+                blocks: []
+            )
+        ]
+
+        let sessionAnalytics = analytics.makeSessionAnalyticsSnapshot(
+            sessions: sessions,
+            catalogByID: [:],
+            now: dayTwo
+        )
+
+        progressStore.apply(
+            analytics.makeProgressSnapshot(
+                sessionAnalytics: sessionAnalytics,
+                selectedExerciseID: nil
+            ),
+            completedSessions: sessions
+        )
+
+        XCTAssertEqual(progressStore.historySessions.map(\.templateNameSnapshot), ["Day Two", "Day One PM", "Day One AM"])
+        XCTAssertEqual(progressStore.workoutDays.count, 2)
+
+        progressStore.selectDay(dayOne)
+        XCTAssertEqual(progressStore.historySessions.map(\.templateNameSnapshot), ["Day One PM", "Day One AM"])
+
+        progressStore.selectDay(nil)
+        XCTAssertEqual(progressStore.historySessions.map(\.templateNameSnapshot), ["Day Two", "Day One PM", "Day One AM"])
+    }
+
+    @MainActor
+    func testProgressStoreSamplesDenseExerciseTrendCharts() throws {
+        let analytics = AnalyticsRepository()
+        let progressStore = ProgressStore()
+        let start = Date(timeIntervalSince1970: 1_741_478_400)
+        let sessions = (0..<240).map { index in
+            makeCompletedSession(
+                date: start.addingTimeInterval(Double(index) * 86_400),
+                exerciseID: CatalogSeed.benchPress,
+                exerciseName: "Bench Press",
+                rows: [makeRow(kind: .working, weight: Double(135 + index), reps: 5)]
+            )
+        }
+        let sessionAnalytics = analytics.makeSessionAnalyticsSnapshot(
+            sessions: sessions,
+            catalogByID: [
+                CatalogSeed.benchPress: ExerciseCatalogItem(
+                    id: CatalogSeed.benchPress,
+                    name: "Bench Press",
+                    category: .chest
+                )
+            ],
+            now: start.addingTimeInterval(Double(sessions.count) * 86_400)
+        )
+        let snapshot = analytics.makeProgressSnapshot(
+            sessionAnalytics: sessionAnalytics,
+            selectedExerciseID: CatalogSeed.benchPress
+        )
+
+        progressStore.apply(snapshot, completedSessions: sessions)
+
+        let chartSeries = try XCTUnwrap(progressStore.selectedExerciseChartSeries)
+        XCTAssertTrue(chartSeries.isSampled)
+        XCTAssertLessThanOrEqual(chartSeries.trendPoints.count, 160)
+        XCTAssertLessThanOrEqual(chartSeries.markerPoints.count, 24)
+        XCTAssertEqual(chartSeries.trendPoints.first?.sessionID, snapshot.exerciseSummaries.first?.points.first?.sessionID)
+        XCTAssertEqual(chartSeries.trendPoints.last?.sessionID, snapshot.exerciseSummaries.first?.points.last?.sessionID)
+    }
+
+    func testExercisePickerSearchIndexMatchesAliasesAndDiacritics() {
+        let catalog = [
+            ExerciseCatalogItem(
+                id: UUID(),
+                name: "Bench Press",
+                aliases: ["Barbell Bench"],
+                category: .chest
+            ),
+            ExerciseCatalogItem(
+                id: UUID(),
+                name: "Développé Couché",
+                aliases: ["Développé Couché", "Presse poitrine"],
+                category: .chest
+            ),
+            ExerciseCatalogItem(
+                id: UUID(),
+                name: "Back Squat",
+                aliases: ["High Bar"],
+                category: .legs
+            )
+        ]
+        let index = ExercisePickerSearchIndex(catalog: catalog)
+
+        XCTAssertEqual(index.filter(query: "barbell").map(\.name), ["Bench Press"])
+        XCTAssertEqual(index.filter(query: "developpe").map(\.name), ["Développé Couché"])
+        XCTAssertEqual(index.filter(query: "high bar").map(\.name), ["Back Squat"])
+        XCTAssertEqual(index.filter(query: "   ").map(\.name), catalog.map(\.name))
+    }
+
+    func testCalendarMonthLayoutPrecomputesWorkoutDays() throws {
+        var calendar = Calendar(identifier: .gregorian)
+        calendar.timeZone = try XCTUnwrap(TimeZone(secondsFromGMT: 0))
+        calendar.firstWeekday = 1
+
+        let displayedMonth = try XCTUnwrap(
+            calendar.date(from: DateComponents(year: 2026, month: 3, day: 15))
+        )
+        let workoutDay = try XCTUnwrap(
+            calendar.date(from: DateComponents(year: 2026, month: 3, day: 9))
+        )
+
+        let layout = AppCalendarMonthLayout.make(
+            for: displayedMonth,
+            workoutDays: [workoutDay],
+            calendar: calendar
+        )
+
+        XCTAssertEqual(layout.monthStart, calendar.date(from: DateComponents(year: 2026, month: 3, day: 1)))
+        XCTAssertEqual(layout.dayEntries.count, 31)
+        XCTAssertTrue(layout.dayEntries.contains(where: { $0.date == workoutDay && $0.hasWorkout }))
+        XCTAssertEqual(layout.dayEntries.first?.dayNumber, 1)
+        XCTAssertEqual(layout.dayEntries.last?.dayNumber, 31)
+    }
+
+    @MainActor
+    func testFinishSessionIncrementallyUpdatesTodayAndProgressStores() async throws {
         let store = makeStore()
-        store.hydrateIfNeeded()
+        await store.hydrateIfNeeded()
         store.completeOnboarding(with: nil)
 
         let plan = makeSingleTemplatePlan(
@@ -199,9 +855,9 @@ final class WorkoutStoreTests: XCTestCase {
     }
 
     @MainActor
-    func testQuickStartsStayDeduplicatedAfterRepeatedTemplateCompletion() throws {
+    func testQuickStartsStayDeduplicatedAfterRepeatedTemplateCompletion() async throws {
         let store = makeStore()
-        store.hydrateIfNeeded()
+        await store.hydrateIfNeeded()
         store.completeOnboarding(with: .generalGym)
 
         let reference = try XCTUnwrap(store.todayStore.quickStartTemplates.first)
@@ -235,15 +891,21 @@ final class WorkoutStoreTests: XCTestCase {
         weight: Double
     ) -> Plan {
         var plan = store.makePlan(name: name)
-        let block = store.makeBlock(
+        let block = ExerciseBlock(
             exerciseID: CatalogSeed.benchPress,
-            setCount: 1,
-            repRange: RepRange(5, 5),
-            targetWeight: weight,
+            exerciseNameSnapshot: store.plansStore.exerciseName(for: CatalogSeed.benchPress),
             restSeconds: 90,
-            progressionRule: .manual
+            progressionRule: .manual,
+            targets: [
+                SetTarget(
+                    setKind: .working,
+                    targetWeight: weight,
+                    repRange: RepRange(5, 5),
+                    restSeconds: 90
+                )
+            ]
         )
-        let template = store.makeTemplate(name: templateName, blocks: [block])
+        let template = WorkoutTemplate(name: templateName, blocks: [block])
         plan.templates = [template]
         plan.pinnedTemplateID = template.id
         return plan
@@ -283,8 +945,23 @@ final class WorkoutStoreTests: XCTestCase {
         )
     }
 
+    private func makeDiskBackedContainer(
+        schema: Schema,
+        migrationPlan: (any SchemaMigrationPlan.Type)? = nil,
+        url: URL
+    ) throws -> ModelContainer {
+        let configuration = ModelConfiguration(schema: schema, url: url)
+        return try ModelContainer(
+            for: schema,
+            migrationPlan: migrationPlan,
+            configurations: configuration
+        )
+    }
+
     private func resetDefaults() {
         SettingsStore.resetPersistedSettings()
         UserDefaults.standard.removeObject(forKey: "workout_tracker_storage_version_v3")
+        UserDefaults.standard.removeObject(forKey: "workout_tracker_storage_version_v4")
+        UserDefaults.standard.removeObject(forKey: "workout_tracker_storage_version_v5")
     }
 }

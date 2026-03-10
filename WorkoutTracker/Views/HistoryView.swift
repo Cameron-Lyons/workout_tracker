@@ -2,25 +2,15 @@ import Charts
 import SwiftUI
 
 struct ProgressDashboardView: View {
-    @Environment(SessionStore.self) private var sessionStore
-    @Environment(SettingsStore.self) private var settingsStore
     @Environment(ProgressStore.self) private var progressStore
 
     @State private var displayedMonth = Calendar.autoupdatingCurrent.startOfDay(for: .now)
-
-    private var weightUnit: WeightUnit {
-        settingsStore.weightUnit
-    }
-
-    private var sessions: [CompletedSession] {
-        progressStore.filteredSessions(from: sessionStore.completedSessions)
-    }
 
     var body: some View {
         NavigationStack {
             ZStack {
                 AppBackground()
-                if sessionStore.completedSessions.isEmpty {
+                if progressStore.overview.totalSessions == 0 {
                     AppEmptyStateCard(
                         systemImage: "chart.xyaxis.line",
                         title: "No progress yet",
@@ -29,11 +19,11 @@ struct ProgressDashboardView: View {
                 } else {
                     ScrollView {
                         VStack(spacing: 16) {
-                            overviewSection
-                            personalRecordsSection
-                            progressChartSection
-                            calendarSection
-                            sessionHistorySection
+                            ProgressOverviewSectionView()
+                            ProgressRecordsSectionView()
+                            ProgressChartSectionView()
+                            ProgressCalendarSectionView(displayedMonth: $displayedMonth)
+                            ProgressHistorySectionView()
                         }
                         .padding(.horizontal, 14)
                         .padding(.vertical, 14)
@@ -46,8 +36,13 @@ struct ProgressDashboardView: View {
             .toolbarBackground(.visible, for: .navigationBar)
         }
     }
+}
 
-    private var overviewSection: some View {
+private struct ProgressOverviewSectionView: View {
+    @Environment(SettingsStore.self) private var settingsStore
+    @Environment(ProgressStore.self) private var progressStore
+
+    var body: some View {
         AppHeroCard(
             eyebrow: "Analytics",
             title: "\(progressStore.overview.totalSessions) sessions logged",
@@ -69,7 +64,10 @@ struct ProgressDashboardView: View {
                 AppHeroMetric(
                     id: "volume",
                     label: "Volume",
-                    value: WeightFormatter.displayString(progressStore.overview.totalVolume, unit: weightUnit),
+                    value: WeightFormatter.displayString(
+                        progressStore.overview.totalVolume,
+                        unit: settingsStore.weightUnit
+                    ),
                     systemImage: "scalemass"
                 ),
                 AppHeroMetric(
@@ -81,40 +79,30 @@ struct ProgressDashboardView: View {
             ]
         )
     }
+}
 
-    private var personalRecordsSection: some View {
+private struct ProgressRecordsSectionView: View {
+    @Environment(SettingsStore.self) private var settingsStore
+    @Environment(ProgressStore.self) private var progressStore
+
+    var body: some View {
         VStack(alignment: .leading, spacing: 12) {
             Label("Recent Personal Records", systemImage: "rosette")
                 .font(.headline.weight(.semibold))
                 .foregroundStyle(AppColors.textPrimary)
 
             ForEach(Array(progressStore.personalRecords.prefix(6))) { record in
-                HStack(alignment: .top) {
-                    VStack(alignment: .leading, spacing: 6) {
-                        Text(record.displayName)
-                            .font(.headline.weight(.semibold))
-                            .foregroundStyle(AppColors.textPrimary)
-
-                        Text(
-                            "\(WeightFormatter.displayString(record.weight, unit: weightUnit)) \(weightUnit.symbol) x \(record.reps)"
-                        )
-                        .font(.subheadline)
-                        .foregroundStyle(AppColors.textSecondary)
-                    }
-
-                    Spacer()
-
-                    Text(record.achievedAt.formatted(date: .abbreviated, time: .omitted))
-                        .font(.caption)
-                        .foregroundStyle(AppColors.accent)
-                }
-                .padding(14)
-                .appSurface(cornerRadius: 14, shadow: false)
+                PersonalRecordSummaryCardView(record: record, weightUnit: settingsStore.weightUnit)
             }
         }
     }
+}
 
-    private var progressChartSection: some View {
+private struct ProgressChartSectionView: View {
+    @Environment(SettingsStore.self) private var settingsStore
+    @Environment(ProgressStore.self) private var progressStore
+
+    var body: some View {
         VStack(alignment: .leading, spacing: 12) {
             Label("Exercise Trends", systemImage: "chart.line.uptrend.xyaxis")
                 .font(.headline.weight(.semibold))
@@ -139,32 +127,37 @@ struct ProgressDashboardView: View {
                 .pickerStyle(.menu)
                 .tint(AppColors.textPrimary)
 
-                if let summary = progressStore.selectedExerciseSummary {
-                    Chart(summary.points) { point in
-                        AreaMark(
-                            x: .value("Date", point.date),
-                            y: .value("Top Weight", point.topWeight)
-                        )
-                        .foregroundStyle(
-                            LinearGradient(
-                                colors: [AppColors.accent.opacity(0.30), AppColors.accent.opacity(0.04)],
-                                startPoint: .top,
-                                endPoint: .bottom
+                if let summary = progressStore.selectedExerciseSummary,
+                   let chartSeries = progressStore.selectedExerciseChartSeries {
+                    Chart {
+                        ForEach(chartSeries.trendPoints) { point in
+                            AreaMark(
+                                x: .value("Date", point.date),
+                                y: .value("Top Weight", point.topWeight)
                             )
-                        )
+                            .foregroundStyle(
+                                LinearGradient(
+                                    colors: [AppColors.accent.opacity(0.30), AppColors.accent.opacity(0.04)],
+                                    startPoint: .top,
+                                    endPoint: .bottom
+                                )
+                            )
 
-                        LineMark(
-                            x: .value("Date", point.date),
-                            y: .value("Top Weight", point.topWeight)
-                        )
-                        .lineStyle(StrokeStyle(lineWidth: 2.5, lineCap: .round, lineJoin: .round))
-                        .foregroundStyle(AppColors.accent)
+                            LineMark(
+                                x: .value("Date", point.date),
+                                y: .value("Top Weight", point.topWeight)
+                            )
+                            .lineStyle(StrokeStyle(lineWidth: 2.5, lineCap: .round, lineJoin: .round))
+                            .foregroundStyle(AppColors.accent)
+                        }
 
-                        PointMark(
-                            x: .value("Date", point.date),
-                            y: .value("Top Weight", point.topWeight)
-                        )
-                        .foregroundStyle(AppColors.accent)
+                        ForEach(chartSeries.markerPoints) { point in
+                            PointMark(
+                                x: .value("Date", point.date),
+                                y: .value("Top Weight", point.topWeight)
+                            )
+                            .foregroundStyle(AppColors.accent)
+                        }
                     }
                     .frame(height: 220)
                     .chartXAxis {
@@ -172,6 +165,12 @@ struct ProgressDashboardView: View {
                     }
                     .chartYAxis {
                         AxisMarks(position: .leading)
+                    }
+
+                    if chartSeries.isSampled {
+                        Text("Showing a sampled trend for longer exercise histories.")
+                            .font(.caption)
+                            .foregroundStyle(AppColors.textSecondary)
                     }
 
                     HStack(spacing: 10) {
@@ -182,7 +181,7 @@ struct ProgressDashboardView: View {
                         )
                         MetricBadge(
                             label: "Volume",
-                            value: WeightFormatter.displayString(summary.totalVolume, unit: weightUnit),
+                            value: WeightFormatter.displayString(summary.totalVolume, unit: settingsStore.weightUnit),
                             systemImage: "scalemass"
                         )
                     }
@@ -192,8 +191,14 @@ struct ProgressDashboardView: View {
         .padding(14)
         .appSurface(cornerRadius: 14, shadow: false)
     }
+}
 
-    private var calendarSection: some View {
+private struct ProgressCalendarSectionView: View {
+    @Environment(ProgressStore.self) private var progressStore
+
+    @Binding var displayedMonth: Date
+
+    var body: some View {
         VStack(alignment: .leading, spacing: 12) {
             Label("Session Calendar", systemImage: "calendar")
                 .font(.headline.weight(.semibold))
@@ -201,7 +206,7 @@ struct ProgressDashboardView: View {
 
             AppCalendarGrid(
                 displayedMonth: $displayedMonth,
-                sessions: sessionStore.completedSessions,
+                workoutDays: progressStore.workoutDays,
                 selectedDay: Binding(
                     get: { progressStore.selectedDay },
                     set: { progressStore.selectDay($0) }
@@ -211,8 +216,12 @@ struct ProgressDashboardView: View {
         .padding(14)
         .appSurface(cornerRadius: 14, shadow: false)
     }
+}
 
-    private var sessionHistorySection: some View {
+private struct ProgressHistorySectionView: View {
+    @Environment(ProgressStore.self) private var progressStore
+
+    var body: some View {
         VStack(alignment: .leading, spacing: 12) {
             HStack {
                 Label("Logged Sessions", systemImage: "clock.arrow.circlepath")
@@ -229,73 +238,160 @@ struct ProgressDashboardView: View {
                 }
             }
 
-            if sessions.isEmpty {
+            if progressStore.historySessions.isEmpty {
                 Text("No workouts match the selected day.")
                     .font(.subheadline)
                     .foregroundStyle(AppColors.textSecondary)
-                    .padding(14)
+                    .padding(AppCardMetrics.compactPadding)
                     .frame(maxWidth: .infinity, alignment: .leading)
-                    .appSurface(cornerRadius: 14, shadow: false)
+                    .appSurface(cornerRadius: AppCardMetrics.compactCornerRadius, shadow: false)
             } else {
-                ForEach(sessions) { session in
-                    VStack(alignment: .leading, spacing: 8) {
-                        Text(session.templateNameSnapshot)
-                            .font(.headline.weight(.semibold))
-                            .foregroundStyle(AppColors.textPrimary)
-
-                        Text(session.completedAt.formatted(date: .abbreviated, time: .shortened))
-                            .font(.caption)
-                            .foregroundStyle(AppColors.textSecondary)
-
-                        Text("\(session.blocks.count) exercise block\(session.blocks.count == 1 ? "" : "s")")
-                            .font(.caption)
-                            .foregroundStyle(AppColors.accent)
-                    }
-                    .padding(14)
-                    .frame(maxWidth: .infinity, alignment: .leading)
-                    .appSurface(cornerRadius: 14, shadow: false)
+                ForEach(progressStore.historySessions) { session in
+                    CompletedSessionSummaryCardView(session: session)
                 }
             }
         }
     }
 }
 
+struct AppCalendarMonthLayout: Equatable {
+    struct DayEntry: Identifiable, Equatable {
+        let id: Int
+        let date: Date?
+        let dayNumber: Int?
+        let hasWorkout: Bool
+    }
+
+    let monthStart: Date
+    let title: String
+    let weekdaySymbols: [String]
+    let dayEntries: [DayEntry]
+
+    static func make(
+        for displayedMonth: Date,
+        workoutDays: Set<Date>,
+        calendar: Calendar = .autoupdatingCurrent
+    ) -> AppCalendarMonthLayout {
+        let monthStart = calendar.date(
+            from: calendar.dateComponents([.year, .month], from: displayedMonth)
+        ) ?? displayedMonth
+        let title = monthStart.formatted(.dateTime.month(.wide).year())
+        let weekdaySymbols = calendar.shortStandaloneWeekdaySymbols
+
+        guard let dayRange = calendar.range(of: .day, in: .month, for: monthStart),
+              let firstWeekday = calendar.dateComponents([.weekday], from: monthStart).weekday else {
+            return AppCalendarMonthLayout(
+                monthStart: monthStart,
+                title: title,
+                weekdaySymbols: weekdaySymbols,
+                dayEntries: []
+            )
+        }
+
+        let normalizedLeading = max(0, firstWeekday - calendar.firstWeekday)
+        var dayEntries: [DayEntry] = []
+        dayEntries.reserveCapacity(normalizedLeading + dayRange.count)
+
+        for _ in 0..<normalizedLeading {
+            dayEntries.append(
+                DayEntry(
+                    id: dayEntries.count,
+                    date: nil,
+                    dayNumber: nil,
+                    hasWorkout: false
+                )
+            )
+        }
+
+        for dayNumber in dayRange {
+            let date = calendar.date(byAdding: .day, value: dayNumber - 1, to: monthStart)
+            let normalizedDate = date.map { calendar.startOfDay(for: $0) }
+            dayEntries.append(
+                DayEntry(
+                    id: dayEntries.count,
+                    date: normalizedDate,
+                    dayNumber: dayNumber,
+                    hasWorkout: normalizedDate.map { workoutDays.contains($0) } ?? false
+                )
+            )
+        }
+
+        return AppCalendarMonthLayout(
+            monthStart: monthStart,
+            title: title,
+            weekdaySymbols: weekdaySymbols,
+            dayEntries: dayEntries
+        )
+    }
+}
+
+private struct AppCalendarDayCellView: View, Equatable {
+    let entry: AppCalendarMonthLayout.DayEntry
+    let isSelected: Bool
+    let onSelect: () -> Void
+
+    nonisolated static func == (lhs: AppCalendarDayCellView, rhs: AppCalendarDayCellView) -> Bool {
+        lhs.entry == rhs.entry && lhs.isSelected == rhs.isSelected
+    }
+
+    var body: some View {
+        Group {
+            if let date = entry.date,
+               let dayNumber = entry.dayNumber {
+                Button {
+                    onSelect()
+                } label: {
+                    VStack(spacing: 3) {
+                        Text("\(dayNumber)")
+                            .font(.subheadline.weight(entry.hasWorkout ? .semibold : .regular))
+                            .foregroundStyle(entry.hasWorkout ? AppColors.textPrimary : AppColors.textSecondary)
+
+                        Circle()
+                            .fill(entry.hasWorkout ? AppColors.accent : .clear)
+                            .frame(width: 6, height: 6)
+                    }
+                    .frame(maxWidth: .infinity, minHeight: 42)
+                    .background(
+                        RoundedRectangle(cornerRadius: 8)
+                            .fill(
+                                isSelected
+                                    ? AppColors.accent.opacity(0.20)
+                                    : AppColors.surface.opacity(0.35)
+                            )
+                    )
+                }
+                .buttonStyle(.plain)
+                .disabled(!entry.hasWorkout)
+                .accessibilityIdentifier("progress.calendar.day.\(date.formatted(.iso8601.year().month().day()))")
+            } else {
+                Color.clear
+                    .frame(height: 42)
+            }
+        }
+    }
+}
+
 private struct AppCalendarGrid: View {
+    private static let columns = Array(repeating: GridItem(.flexible(), spacing: 4), count: 7)
+
     @Binding var displayedMonth: Date
-    let sessions: [CompletedSession]
+    let workoutDays: Set<Date>
     @Binding var selectedDay: Date?
 
     private let calendar = Calendar.autoupdatingCurrent
 
-    private var workoutDays: Set<Date> {
-        Set(sessions.map { calendar.startOfDay(for: $0.completedAt) })
-    }
+    @State private var monthLayout: AppCalendarMonthLayout
 
-    private var monthStart: Date {
-        calendar.date(from: calendar.dateComponents([.year, .month], from: displayedMonth)) ?? displayedMonth
-    }
-
-    private var monthTitle: String {
-        monthStart.formatted(.dateTime.month(.wide).year())
-    }
-
-    private var weekdaySymbols: [String] {
-        calendar.shortStandaloneWeekdaySymbols
-    }
-
-    private var days: [Date?] {
-        guard let dayRange = calendar.range(of: .day, in: .month, for: monthStart),
-              let firstWeekday = calendar.dateComponents([.weekday], from: monthStart).weekday else {
-            return []
-        }
-
-        let leadingEmptyCount = max(0, firstWeekday - calendar.firstWeekday)
-        let normalizedLeading = leadingEmptyCount < 0 ? leadingEmptyCount + 7 : leadingEmptyCount
-        let placeholders = Array(repeating: Optional<Date>.none, count: normalizedLeading)
-        let monthDays = dayRange.compactMap { day -> Date? in
-            calendar.date(byAdding: .day, value: day - 1, to: monthStart)
-        }
-        return placeholders + monthDays
+    init(displayedMonth: Binding<Date>, workoutDays: Set<Date>, selectedDay: Binding<Date?>) {
+        self._displayedMonth = displayedMonth
+        self.workoutDays = workoutDays
+        self._selectedDay = selectedDay
+        _monthLayout = State(
+            initialValue: AppCalendarMonthLayout.make(
+                for: displayedMonth.wrappedValue,
+                workoutDays: workoutDays
+            )
+        )
     }
 
     var body: some View {
@@ -309,7 +405,7 @@ private struct AppCalendarGrid: View {
 
                 Spacer()
 
-                Text(monthTitle)
+                Text(monthLayout.title)
                     .font(.system(.title3, design: .rounded).weight(.bold))
                     .foregroundStyle(AppColors.textPrimary)
 
@@ -322,62 +418,36 @@ private struct AppCalendarGrid: View {
                 }
             }
 
-            LazyVGrid(
-                columns: Array(repeating: GridItem(.flexible(), spacing: 4), count: 7),
-                spacing: 8
-            ) {
-                ForEach(Array(weekdaySymbols.enumerated()), id: \.offset) { _, symbol in
+            LazyVGrid(columns: Self.columns, spacing: 8) {
+                ForEach(Array(monthLayout.weekdaySymbols.enumerated()), id: \.offset) { _, symbol in
                     Text(symbol)
                         .font(.caption.weight(.semibold))
                         .foregroundStyle(AppColors.textSecondary)
                         .frame(maxWidth: .infinity)
                 }
 
-                ForEach(Array(days.enumerated()), id: \.offset) { _, day in
-                    if let day {
-                        dayButton(day)
-                    } else {
-                        Color.clear
-                            .frame(height: 42)
-                    }
+                ForEach(monthLayout.dayEntries) { entry in
+                    AppCalendarDayCellView(
+                        entry: entry,
+                        isSelected: entry.date == selectedDay,
+                        onSelect: {
+                            selectedDay = entry.date == selectedDay ? nil : entry.date
+                        }
+                    )
+                    .equatable()
                 }
             }
         }
-    }
-
-    private func dayButton(_ day: Date) -> some View {
-        let normalized = calendar.startOfDay(for: day)
-        let hasWorkout = workoutDays.contains(normalized)
-        let isSelected = selectedDay.map { calendar.isDate($0, inSameDayAs: day) } ?? false
-
-        return Button {
-            selectedDay = isSelected ? nil : normalized
-        } label: {
-            VStack(spacing: 3) {
-                Text("\(calendar.component(.day, from: day))")
-                    .font(.subheadline.weight(hasWorkout ? .semibold : .regular))
-                    .foregroundStyle(hasWorkout ? AppColors.textPrimary : AppColors.textSecondary)
-
-                Circle()
-                    .fill(hasWorkout ? AppColors.accent : .clear)
-                    .frame(width: 6, height: 6)
-            }
-            .frame(maxWidth: .infinity, minHeight: 42)
-            .background(
-                RoundedRectangle(cornerRadius: 8)
-                    .fill(
-                        isSelected
-                            ? AppColors.accent.opacity(0.20)
-                            : AppColors.surface.opacity(0.35)
-                    )
-            )
+        .onChange(of: displayedMonth, initial: false) { _, newValue in
+            monthLayout = AppCalendarMonthLayout.make(for: newValue, workoutDays: workoutDays)
         }
-        .buttonStyle(.plain)
-        .disabled(!hasWorkout)
+        .onChange(of: workoutDays, initial: false) { _, newValue in
+            monthLayout = AppCalendarMonthLayout.make(for: displayedMonth, workoutDays: newValue)
+        }
     }
 
     private func shiftMonth(by value: Int) {
-        guard let nextMonth = calendar.date(byAdding: .month, value: value, to: monthStart) else {
+        guard let nextMonth = calendar.date(byAdding: .month, value: value, to: monthLayout.monthStart) else {
             return
         }
 

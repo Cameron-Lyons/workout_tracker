@@ -23,10 +23,10 @@ private struct TemplateDraftBlock: Identifiable, Equatable {
         exerciseID: UUID? = nil,
         exerciseName: String = "",
         blockNote: String = "",
-        restSeconds: Int = 90,
-        setCount: Int = 3,
-        repLower: Int = 8,
-        repUpper: Int = 12,
+        restSeconds: Int = ExerciseBlockDefaults.restSeconds,
+        setCount: Int = ExerciseBlockDefaults.setCount,
+        repLower: Int = ExerciseBlockDefaults.repRange.lowerBound,
+        repUpper: Int = ExerciseBlockDefaults.repRange.upperBound,
         targetWeightText: String = "",
         supersetGroup: String = "",
         progressionKind: ProgressionRuleKind = .manual,
@@ -98,7 +98,6 @@ struct PlanEditorSheet: View {
                                 name: trimmedName,
                                 createdAt: existingPlan?.createdAt ?? .now,
                                 pinnedTemplateID: existingPlan?.pinnedTemplateID,
-                                presetPackID: existingPlan?.presetPackID,
                                 templates: existingPlan?.templates ?? []
                             )
                         )
@@ -118,7 +117,6 @@ struct TemplateEditorSheet: View {
     @Environment(\.dismiss) private var dismiss
     @Environment(AppStore.self) private var appStore
 
-    let planID: UUID
     let existingTemplate: WorkoutTemplate?
     let onSave: (WorkoutTemplate, [ExerciseProfile]) -> Void
 
@@ -137,7 +135,7 @@ struct TemplateEditorSheet: View {
             ZStack {
                 AppBackground()
                 ScrollView {
-                    VStack(spacing: 16) {
+                    LazyVStack(spacing: 16) {
                         VStack(spacing: 12) {
                             TextField("Template name", text: $templateName)
                                 .textInputAutocapitalization(.words)
@@ -214,8 +212,19 @@ struct TemplateEditorSheet: View {
                                     .font(.subheadline)
                                     .foregroundStyle(AppColors.textSecondary)
                             } else {
-                                ForEach($blocks) { $block in
-                                    blockEditor($block)
+                                LazyVStack(spacing: 12) {
+                                    ForEach($blocks) { $block in
+                                        TemplateDraftBlockEditorView(
+                                            block: $block,
+                                            weightUnit: weightUnit,
+                                            onPickExercise: { blockID in
+                                                showingExercisePickerForBlockID = blockID
+                                            },
+                                            onDelete: { blockID in
+                                                blocks.removeAll(where: { $0.id == blockID })
+                                            }
+                                        )
+                                    }
                                 }
                             }
                         }
@@ -275,88 +284,6 @@ struct TemplateEditorSheet: View {
         }
     }
 
-    private func blockEditor(_ block: Binding<TemplateDraftBlock>) -> some View {
-        VStack(alignment: .leading, spacing: 12) {
-            HStack {
-                Text(block.wrappedValue.exerciseName.nonEmptyTrimmed ?? "Choose exercise")
-                    .font(.headline.weight(.semibold))
-                    .foregroundStyle(AppColors.textPrimary)
-
-                Spacer()
-
-                Button("Pick") {
-                    showingExercisePickerForBlockID = block.wrappedValue.id
-                }
-                .buttonStyle(.bordered)
-                .tint(AppColors.accent)
-
-                Button(role: .destructive) {
-                    blocks.removeAll(where: { $0.id == block.wrappedValue.id })
-                } label: {
-                    Image(systemName: "trash")
-                }
-                .buttonStyle(.bordered)
-            }
-
-            Picker("Progression", selection: block.progressionKind) {
-                Text("Manual").tag(ProgressionRuleKind.manual)
-                Text("Double").tag(ProgressionRuleKind.doubleProgression)
-                Text("Wave").tag(ProgressionRuleKind.percentageWave)
-            }
-            .pickerStyle(.segmented)
-
-            HStack(spacing: 10) {
-                NumericInputField(title: "Sets", text: block.setCountTextBinding, keyboardType: .numberPad)
-                NumericInputField(title: "Rep Min", text: block.repLowerTextBinding, keyboardType: .numberPad)
-                NumericInputField(title: "Rep Max", text: block.repUpperTextBinding, keyboardType: .numberPad)
-            }
-
-            HStack(spacing: 10) {
-                NumericInputField(title: "Target Weight (\(weightUnit.symbol))", text: block.targetWeightText)
-                NumericInputField(title: "Rest (sec)", text: block.restSecondsTextBinding, keyboardType: .numberPad)
-            }
-
-            if block.wrappedValue.progressionKind != .manual {
-                HStack(spacing: 10) {
-                    NumericInputField(title: "Increment (\(weightUnit.symbol))", text: block.incrementText)
-                    NumericInputField(title: "TM / Profile Weight (\(weightUnit.symbol))", text: block.trainingMaxText)
-                }
-
-                NumericInputField(
-                    title: "Preferred Increment Override (\(weightUnit.symbol))",
-                    text: block.preferredIncrementText
-                )
-            }
-
-            HStack(spacing: 10) {
-                TextField("Superset group", text: block.supersetGroup)
-                    .textInputAutocapitalization(.characters)
-                    .foregroundStyle(AppColors.textPrimary)
-                    .appInputField()
-
-                Picker("Set Type", selection: block.setKind) {
-                    Text("Working").tag(SetKind.working)
-                    Text("Dropset").tag(SetKind.dropSet)
-                    Text("Warmup").tag(SetKind.warmup)
-                }
-                .pickerStyle(.menu)
-                .tint(AppColors.textPrimary)
-                .frame(maxWidth: .infinity)
-                .appInputField()
-            }
-
-            Toggle("Auto warmups", isOn: block.allowsAutoWarmups)
-                .tint(AppColors.accent)
-
-            TextField("Block note", text: block.blockNote, axis: .vertical)
-                .foregroundStyle(AppColors.textPrimary)
-                .lineLimit(2...3)
-                .appInputField()
-        }
-        .padding(14)
-        .appInsetCard(cornerRadius: 14, fillOpacity: 0.82, borderOpacity: 0.7)
-    }
-
     private func loadTemplate() {
         templateName = existingTemplate?.name ?? ""
         templateNote = existingTemplate?.note ?? ""
@@ -370,7 +297,7 @@ struct TemplateEditorSheet: View {
         blocks = existingTemplate.blocks.map { block in
             let profile = appStore.plansStore.profile(for: block.exerciseID)
             let targetWeight = block.targets.first?.targetWeight
-            let repRange = block.targets.first?.repRange ?? RepRange(8, 12)
+            let repRange = block.targets.first?.repRange ?? ExerciseBlockDefaults.repRange
 
             return TemplateDraftBlock(
                 id: block.id,
@@ -458,8 +385,7 @@ struct TemplateEditorSheet: View {
                 id: appStore.plansStore.profile(for: exerciseID)?.id ?? UUID(),
                 exerciseID: exerciseID,
                 trainingMax: profileTrainingMax,
-                preferredIncrement: preferredIncrement,
-                notes: appStore.plansStore.profile(for: exerciseID)?.notes ?? ""
+                preferredIncrement: preferredIncrement
             )
             savedProfiles.append(profile)
 
@@ -478,42 +404,8 @@ struct TemplateEditorSheet: View {
             case .percentageWave:
                 progressionRule = ProgressionRule(
                     kind: .percentageWave,
-                    percentageWave: PercentageWaveRule(
+                    percentageWave: PercentageWaveRule.fiveThreeOne(
                         trainingMax: profileTrainingMax,
-                        weeks: [
-                            PercentageWaveWeek(
-                                name: "Week 1",
-                                sets: [
-                                    PercentageWaveSet(percentage: 0.65, repRange: RepRange(5, 5)),
-                                    PercentageWaveSet(percentage: 0.75, repRange: RepRange(5, 5)),
-                                    PercentageWaveSet(percentage: 0.85, repRange: RepRange(5, 5), note: "AMRAP")
-                                ]
-                            ),
-                            PercentageWaveWeek(
-                                name: "Week 2",
-                                sets: [
-                                    PercentageWaveSet(percentage: 0.70, repRange: RepRange(3, 3)),
-                                    PercentageWaveSet(percentage: 0.80, repRange: RepRange(3, 3)),
-                                    PercentageWaveSet(percentage: 0.90, repRange: RepRange(3, 3), note: "AMRAP")
-                                ]
-                            ),
-                            PercentageWaveWeek(
-                                name: "Week 3",
-                                sets: [
-                                    PercentageWaveSet(percentage: 0.75, repRange: RepRange(5, 5)),
-                                    PercentageWaveSet(percentage: 0.85, repRange: RepRange(3, 3)),
-                                    PercentageWaveSet(percentage: 0.95, repRange: RepRange(1, 1), note: "AMRAP")
-                                ]
-                            ),
-                            PercentageWaveWeek(
-                                name: "Deload",
-                                sets: [
-                                    PercentageWaveSet(percentage: 0.40, repRange: RepRange(5, 5)),
-                                    PercentageWaveSet(percentage: 0.50, repRange: RepRange(5, 5)),
-                                    PercentageWaveSet(percentage: 0.60, repRange: RepRange(5, 5))
-                                ]
-                            )
-                        ],
                         currentWeekIndex: existingTemplate?.blocks.first(where: { $0.id == block.id })?.progressionRule.percentageWave?.currentWeekIndex ?? 0,
                         cycle: existingTemplate?.blocks.first(where: { $0.id == block.id })?.progressionRule.percentageWave?.cycle ?? 1,
                         cycleIncrement: increment ?? appStore.settingsStore.preferredIncrement(for: exerciseName)
@@ -553,6 +445,96 @@ struct TemplateEditorSheet: View {
         )
         onSave(template, savedProfiles)
         dismiss()
+    }
+}
+
+private struct TemplateDraftBlockEditorView: View {
+    @Binding var block: TemplateDraftBlock
+
+    let weightUnit: WeightUnit
+    let onPickExercise: (UUID) -> Void
+    let onDelete: (UUID) -> Void
+
+    var body: some View {
+        VStack(alignment: .leading, spacing: 12) {
+            HStack {
+                Text(block.exerciseName.nonEmptyTrimmed ?? "Choose exercise")
+                    .font(.headline.weight(.semibold))
+                    .foregroundStyle(AppColors.textPrimary)
+
+                Spacer()
+
+                Button("Pick") {
+                    onPickExercise(block.id)
+                }
+                .buttonStyle(.bordered)
+                .tint(AppColors.accent)
+
+                Button(role: .destructive) {
+                    onDelete(block.id)
+                } label: {
+                    Image(systemName: "trash")
+                }
+                .buttonStyle(.bordered)
+            }
+
+            Picker("Progression", selection: $block.progressionKind) {
+                Text("Manual").tag(ProgressionRuleKind.manual)
+                Text("Double").tag(ProgressionRuleKind.doubleProgression)
+                Text("Wave").tag(ProgressionRuleKind.percentageWave)
+            }
+            .pickerStyle(.segmented)
+
+            HStack(spacing: 10) {
+                NumericInputField(title: "Sets", text: $block.setCountTextBinding, keyboardType: .numberPad)
+                NumericInputField(title: "Rep Min", text: $block.repLowerTextBinding, keyboardType: .numberPad)
+                NumericInputField(title: "Rep Max", text: $block.repUpperTextBinding, keyboardType: .numberPad)
+            }
+
+            HStack(spacing: 10) {
+                NumericInputField(title: "Target Weight (\(weightUnit.symbol))", text: $block.targetWeightText)
+                NumericInputField(title: "Rest (sec)", text: $block.restSecondsTextBinding, keyboardType: .numberPad)
+            }
+
+            if block.progressionKind != .manual {
+                HStack(spacing: 10) {
+                    NumericInputField(title: "Increment (\(weightUnit.symbol))", text: $block.incrementText)
+                    NumericInputField(title: "TM / Profile Weight (\(weightUnit.symbol))", text: $block.trainingMaxText)
+                }
+
+                NumericInputField(
+                    title: "Preferred Increment Override (\(weightUnit.symbol))",
+                    text: $block.preferredIncrementText
+                )
+            }
+
+            HStack(spacing: 10) {
+                TextField("Superset group", text: $block.supersetGroup)
+                    .textInputAutocapitalization(.characters)
+                    .foregroundStyle(AppColors.textPrimary)
+                    .appInputField()
+
+                Picker("Set Type", selection: $block.setKind) {
+                    Text("Working").tag(SetKind.working)
+                    Text("Dropset").tag(SetKind.dropSet)
+                    Text("Warmup").tag(SetKind.warmup)
+                }
+                .pickerStyle(.menu)
+                .tint(AppColors.textPrimary)
+                .frame(maxWidth: .infinity)
+                .appInputField()
+            }
+
+            Toggle("Auto warmups", isOn: $block.allowsAutoWarmups)
+                .tint(AppColors.accent)
+
+            TextField("Block note", text: $block.blockNote, axis: .vertical)
+                .foregroundStyle(AppColors.textPrimary)
+                .lineLimit(2...3)
+                .appInputField()
+        }
+        .padding(14)
+        .appInsetCard(cornerRadius: 14, fillOpacity: 0.82, borderOpacity: 0.7)
     }
 }
 

@@ -6,7 +6,28 @@ enum StrengthProgressionDefaults {
     static let lowerBodyIncreaseInPounds = 5.0
 }
 
-enum WeightUnit: String, CaseIterable, Codable {
+enum ExerciseBlockDefaults {
+    static let restSeconds = 90
+    static let setCount = 3
+    static let repRange = RepRange(8, 12)
+}
+
+enum AnalyticsDefaults {
+    static let rollingWindowDays = 30
+    static let recentActivityLimit = 5
+    static let quickStartLimit = 4
+    static let secondsPerWeek: TimeInterval = 60 * 60 * 24 * 7
+
+    static func rollingWindowStart(from startOfToday: Date, calendar: Calendar) -> Date {
+        calendar.date(byAdding: .day, value: -rollingWindowDays, to: startOfToday) ?? startOfToday
+    }
+
+    static func weeksSpan(from firstSessionDate: Date, to startOfToday: Date) -> Double {
+        max(1.0, startOfToday.timeIntervalSince(firstSessionDate) / secondsPerWeek)
+    }
+}
+
+enum WeightUnit: String, CaseIterable, Codable, Sendable {
     case pounds
     case kilograms
 
@@ -21,15 +42,6 @@ enum WeightUnit: String, CaseIterable, Codable {
             return "lb"
         case .kilograms:
             return "kg"
-        }
-    }
-
-    var shortLabel: String {
-        switch self {
-        case .pounds:
-            return "US (lb)"
-        case .kilograms:
-            return "Metric (kg)"
         }
     }
 
@@ -156,7 +168,7 @@ enum WeightInputConversion {
     }
 }
 
-enum ExerciseCategory: String, CaseIterable, Codable {
+enum ExerciseCategory: String, CaseIterable, Codable, Sendable {
     case chest
     case back
     case shoulders
@@ -168,7 +180,7 @@ enum ExerciseCategory: String, CaseIterable, Codable {
     case custom
 }
 
-enum Weekday: Int, CaseIterable, Codable, Identifiable {
+enum Weekday: Int, CaseIterable, Codable, Identifiable, Sendable {
     case sunday = 1
     case monday = 2
     case tuesday = 3
@@ -191,20 +203,9 @@ enum Weekday: Int, CaseIterable, Codable, Identifiable {
         }
     }
 
-    var fullLabel: String {
-        switch self {
-        case .sunday: return "Sunday"
-        case .monday: return "Monday"
-        case .tuesday: return "Tuesday"
-        case .wednesday: return "Wednesday"
-        case .thursday: return "Thursday"
-        case .friday: return "Friday"
-        case .saturday: return "Saturday"
-        }
-    }
 }
 
-enum SetKind: String, CaseIterable, Codable {
+enum SetKind: String, CaseIterable, Codable, Sendable {
     case warmup
     case working
     case dropSet
@@ -221,7 +222,7 @@ enum SetKind: String, CaseIterable, Codable {
     }
 }
 
-enum ProgressionRuleKind: String, CaseIterable, Codable {
+enum ProgressionRuleKind: String, CaseIterable, Codable, Sendable {
     case manual
     case doubleProgression
     case percentageWave
@@ -255,12 +256,12 @@ enum ExerciseClassification {
     }
 }
 
-struct WarmupRampStep: Codable, Equatable {
+struct WarmupRampStep: Codable, Equatable, Sendable {
     var percentage: Double
     var reps: Int
 }
 
-struct RepRange: Codable, Equatable {
+struct RepRange: Codable, Equatable, Sendable {
     var lowerBound: Int
     var upperBound: Int
 
@@ -278,59 +279,50 @@ struct RepRange: Codable, Equatable {
     }
 }
 
-struct ExerciseCatalogItem: Identifiable, Codable, Equatable, Hashable {
+struct ExerciseCatalogItem: Identifiable, Codable, Equatable, Hashable, Sendable {
     var id: UUID
     var name: String
     var aliases: [String]
     var category: ExerciseCategory
-    var equipment: String?
-    var isCustom: Bool
 
     init(
         id: UUID = UUID(),
         name: String,
         aliases: [String] = [],
-        category: ExerciseCategory,
-        equipment: String? = nil,
-        isCustom: Bool = false
+        category: ExerciseCategory
     ) {
         self.id = id
         self.name = name
         self.aliases = aliases
         self.category = category
-        self.equipment = equipment
-        self.isCustom = isCustom
     }
 }
 
-struct ExerciseProfile: Identifiable, Codable, Equatable {
+struct ExerciseProfile: Identifiable, Codable, Equatable, Sendable {
     var id: UUID
     var exerciseID: UUID
     var trainingMax: Double?
     var preferredIncrement: Double?
-    var notes: String
 
     init(
         id: UUID = UUID(),
         exerciseID: UUID,
         trainingMax: Double? = nil,
-        preferredIncrement: Double? = nil,
-        notes: String = ""
+        preferredIncrement: Double? = nil
     ) {
         self.id = id
         self.exerciseID = exerciseID
         self.trainingMax = trainingMax
         self.preferredIncrement = preferredIncrement
-        self.notes = notes
     }
 }
 
-struct DoubleProgressionRule: Codable, Equatable {
+struct DoubleProgressionRule: Codable, Equatable, Sendable {
     var targetRepRange: RepRange
     var increment: Double
 }
 
-struct PercentageWaveSet: Identifiable, Codable, Equatable {
+struct PercentageWaveSet: Identifiable, Codable, Equatable, Sendable {
     var id: UUID
     var percentage: Double
     var repRange: RepRange
@@ -349,7 +341,7 @@ struct PercentageWaveSet: Identifiable, Codable, Equatable {
     }
 }
 
-struct PercentageWaveWeek: Identifiable, Codable, Equatable {
+struct PercentageWaveWeek: Identifiable, Codable, Equatable, Sendable {
     var id: UUID
     var name: String
     var sets: [PercentageWaveSet]
@@ -361,7 +353,7 @@ struct PercentageWaveWeek: Identifiable, Codable, Equatable {
     }
 }
 
-struct PercentageWaveRule: Codable, Equatable {
+struct PercentageWaveRule: Codable, Equatable, Sendable {
     var trainingMax: Double?
     var weeks: [PercentageWaveWeek]
     var currentWeekIndex: Int
@@ -383,7 +375,61 @@ struct PercentageWaveRule: Codable, Equatable {
     }
 }
 
-struct ProgressionRule: Identifiable, Codable, Equatable {
+extension PercentageWaveRule {
+    static func fiveThreeOne(
+        trainingMax: Double? = nil,
+        currentWeekIndex: Int = 0,
+        cycle: Int = 1,
+        cycleIncrement: Double
+    ) -> PercentageWaveRule {
+        PercentageWaveRule(
+            trainingMax: trainingMax,
+            weeks: makeFiveThreeOneWeeks(),
+            currentWeekIndex: currentWeekIndex,
+            cycle: cycle,
+            cycleIncrement: cycleIncrement
+        )
+    }
+
+    private static func makeFiveThreeOneWeeks() -> [PercentageWaveWeek] {
+        [
+            PercentageWaveWeek(
+                name: "Week 1",
+                sets: [
+                    PercentageWaveSet(percentage: 0.65, repRange: RepRange(5, 5)),
+                    PercentageWaveSet(percentage: 0.75, repRange: RepRange(5, 5)),
+                    PercentageWaveSet(percentage: 0.85, repRange: RepRange(5, 5), note: "AMRAP")
+                ]
+            ),
+            PercentageWaveWeek(
+                name: "Week 2",
+                sets: [
+                    PercentageWaveSet(percentage: 0.70, repRange: RepRange(3, 3)),
+                    PercentageWaveSet(percentage: 0.80, repRange: RepRange(3, 3)),
+                    PercentageWaveSet(percentage: 0.90, repRange: RepRange(3, 3), note: "AMRAP")
+                ]
+            ),
+            PercentageWaveWeek(
+                name: "Week 3",
+                sets: [
+                    PercentageWaveSet(percentage: 0.75, repRange: RepRange(5, 5)),
+                    PercentageWaveSet(percentage: 0.85, repRange: RepRange(3, 3)),
+                    PercentageWaveSet(percentage: 0.95, repRange: RepRange(1, 1), note: "AMRAP")
+                ]
+            ),
+            PercentageWaveWeek(
+                name: "Deload",
+                sets: [
+                    PercentageWaveSet(percentage: 0.40, repRange: RepRange(5, 5)),
+                    PercentageWaveSet(percentage: 0.50, repRange: RepRange(5, 5)),
+                    PercentageWaveSet(percentage: 0.60, repRange: RepRange(5, 5))
+                ]
+            )
+        ]
+    }
+}
+
+struct ProgressionRule: Identifiable, Codable, Equatable, Sendable {
     var id: UUID
     var kind: ProgressionRuleKind
     var doubleProgression: DoubleProgressionRule?
@@ -404,7 +450,7 @@ struct ProgressionRule: Identifiable, Codable, Equatable {
     static let manual = ProgressionRule(kind: .manual)
 }
 
-struct SetTarget: Identifiable, Codable, Equatable {
+struct SetTarget: Identifiable, Codable, Equatable, Sendable {
     var id: UUID
     var setKind: SetKind
     var targetWeight: Double?
@@ -432,7 +478,7 @@ struct SetTarget: Identifiable, Codable, Equatable {
     }
 }
 
-struct SetLog: Identifiable, Codable, Equatable {
+struct SetLog: Identifiable, Codable, Equatable, Sendable {
     var id: UUID
     var setTargetID: UUID
     var weight: Double?
@@ -461,7 +507,7 @@ struct SetLog: Identifiable, Codable, Equatable {
     }
 }
 
-struct SessionSetRow: Identifiable, Codable, Equatable {
+struct SessionSetRow: Identifiable, Codable, Equatable, Sendable {
     var id: UUID
     var target: SetTarget
     var log: SetLog
@@ -473,7 +519,7 @@ struct SessionSetRow: Identifiable, Codable, Equatable {
     }
 }
 
-struct ExerciseBlock: Identifiable, Codable, Equatable {
+struct ExerciseBlock: Identifiable, Codable, Equatable, Sendable {
     var id: UUID
     var exerciseID: UUID
     var exerciseNameSnapshot: String
@@ -489,7 +535,7 @@ struct ExerciseBlock: Identifiable, Codable, Equatable {
         exerciseID: UUID,
         exerciseNameSnapshot: String,
         blockNote: String = "",
-        restSeconds: Int = 90,
+        restSeconds: Int = ExerciseBlockDefaults.restSeconds,
         supersetGroup: String? = nil,
         progressionRule: ProgressionRule = .manual,
         targets: [SetTarget],
@@ -507,7 +553,7 @@ struct ExerciseBlock: Identifiable, Codable, Equatable {
     }
 }
 
-struct WorkoutTemplate: Identifiable, Codable, Equatable {
+struct WorkoutTemplate: Identifiable, Codable, Equatable, Sendable {
     var id: UUID
     var name: String
     var note: String
@@ -532,12 +578,11 @@ struct WorkoutTemplate: Identifiable, Codable, Equatable {
     }
 }
 
-struct Plan: Identifiable, Codable, Equatable {
+struct Plan: Identifiable, Codable, Equatable, Sendable {
     var id: UUID
     var name: String
     var createdAt: Date
     var pinnedTemplateID: UUID?
-    var presetPackID: String?
     var templates: [WorkoutTemplate]
 
     init(
@@ -545,21 +590,18 @@ struct Plan: Identifiable, Codable, Equatable {
         name: String,
         createdAt: Date = .now,
         pinnedTemplateID: UUID? = nil,
-        presetPackID: String? = nil,
         templates: [WorkoutTemplate]
     ) {
         self.id = id
         self.name = name
         self.createdAt = createdAt
         self.pinnedTemplateID = pinnedTemplateID
-        self.presetPackID = presetPackID
         self.templates = templates
     }
 }
 
-struct SessionBlock: Identifiable, Codable, Equatable {
+struct SessionBlock: Identifiable, Codable, Equatable, Sendable {
     var id: UUID
-    var sourceBlockID: UUID?
     var exerciseID: UUID
     var exerciseNameSnapshot: String
     var blockNote: String
@@ -570,7 +612,6 @@ struct SessionBlock: Identifiable, Codable, Equatable {
 
     init(
         id: UUID = UUID(),
-        sourceBlockID: UUID? = nil,
         exerciseID: UUID,
         exerciseNameSnapshot: String,
         blockNote: String = "",
@@ -580,7 +621,6 @@ struct SessionBlock: Identifiable, Codable, Equatable {
         sets: [SessionSetRow]
     ) {
         self.id = id
-        self.sourceBlockID = sourceBlockID
         self.exerciseID = exerciseID
         self.exerciseNameSnapshot = exerciseNameSnapshot
         self.blockNote = blockNote
@@ -591,7 +631,7 @@ struct SessionBlock: Identifiable, Codable, Equatable {
     }
 }
 
-struct SessionDraft: Identifiable, Codable, Equatable {
+struct SessionDraft: Identifiable, Codable, Equatable, Sendable {
     var id: UUID
     var planID: UUID?
     var templateID: UUID
@@ -625,7 +665,7 @@ struct SessionDraft: Identifiable, Codable, Equatable {
     }
 }
 
-struct CompletedSessionBlock: Identifiable, Codable, Equatable {
+struct CompletedSessionBlock: Identifiable, Codable, Equatable, Sendable {
     var id: UUID
     var exerciseID: UUID
     var exerciseNameSnapshot: String
@@ -656,7 +696,7 @@ struct CompletedSessionBlock: Identifiable, Codable, Equatable {
     }
 }
 
-struct CompletedSession: Identifiable, Codable, Equatable {
+struct CompletedSession: Identifiable, Codable, Equatable, Sendable {
     var id: UUID
     var planID: UUID?
     var templateID: UUID
@@ -687,7 +727,7 @@ struct CompletedSession: Identifiable, Codable, Equatable {
     }
 }
 
-struct TemplateReference: Identifiable, Equatable {
+struct TemplateReference: Identifiable, Equatable, Sendable {
     var id: UUID { templateID }
     var planID: UUID
     var planName: String
@@ -697,7 +737,7 @@ struct TemplateReference: Identifiable, Equatable {
     var lastStartedAt: Date?
 }
 
-struct ProgressPoint: Identifiable, Equatable {
+struct ProgressPoint: Identifiable, Equatable, Sendable {
     var id: UUID
     var sessionID: UUID
     var date: Date
@@ -722,7 +762,7 @@ struct ProgressPoint: Identifiable, Equatable {
     }
 }
 
-struct PersonalRecord: Identifiable, Equatable {
+struct PersonalRecord: Identifiable, Equatable, Sendable {
     var id: UUID
     var sessionID: UUID
     var exerciseID: UUID
@@ -753,7 +793,7 @@ struct PersonalRecord: Identifiable, Equatable {
     }
 }
 
-struct ExerciseAnalyticsSummary: Identifiable, Equatable {
+struct ExerciseAnalyticsSummary: Identifiable, Equatable, Sendable {
     var id: UUID { exerciseID }
     var exerciseID: UUID
     var displayName: String
@@ -763,7 +803,7 @@ struct ExerciseAnalyticsSummary: Identifiable, Equatable {
     var points: [ProgressPoint]
 }
 
-struct ProgressOverview: Equatable {
+struct ProgressOverview: Equatable, Sendable {
     var totalSessions: Int
     var sessionsThisWeek: Int
     var sessionsLast30Days: Int
@@ -779,7 +819,7 @@ struct ProgressOverview: Equatable {
     )
 }
 
-struct SessionFinishSummary: Identifiable, Equatable {
+struct SessionFinishSummary: Identifiable, Equatable, Sendable {
     var id: UUID
     var templateName: String
     var completedAt: Date
@@ -804,7 +844,105 @@ struct SessionFinishSummary: Identifiable, Equatable {
     }
 }
 
-enum PresetPack: String, CaseIterable, Identifiable {
+enum TemplateReferenceSelection {
+    static func pinnedTemplate(
+        from plans: [Plan],
+        references: [TemplateReference],
+        now: Date,
+        calendar: Calendar = .autoupdatingCurrent
+    ) -> TemplateReference? {
+        let referencesByTemplateID = Dictionary(uniqueKeysWithValues: references.map { ($0.templateID, $0) })
+        let weekday = Weekday(rawValue: calendar.component(.weekday, from: now))
+
+        if let weekday,
+           let scheduledToday = references.first(where: { $0.scheduledWeekdays.contains(weekday) }) {
+            return scheduledToday
+        }
+
+        for plan in plans {
+            if let pinnedTemplateID = plan.pinnedTemplateID,
+               let pinned = referencesByTemplateID[pinnedTemplateID] {
+                return pinned
+            }
+        }
+
+        return references.max(by: {
+            ($0.lastStartedAt ?? .distantPast) < ($1.lastStartedAt ?? .distantPast)
+        }) ?? references.first
+    }
+
+    static func quickStarts(
+        references: [TemplateReference],
+        sessions: [CompletedSession],
+        limit: Int = AnalyticsDefaults.quickStartLimit
+    ) -> [TemplateReference] {
+        let referencesByTemplateID = Dictionary(uniqueKeysWithValues: references.map { ($0.templateID, $0) })
+        let recentTemplateIDs = sessions.reversed().map(\.templateID)
+        var resolved: [TemplateReference] = []
+        var seenTemplateIDs: Set<UUID> = []
+
+        for templateID in recentTemplateIDs {
+            guard let match = referencesByTemplateID[templateID],
+                  seenTemplateIDs.insert(match.templateID).inserted else {
+                continue
+            }
+
+            resolved.append(match)
+            if resolved.count == limit {
+                return resolved
+            }
+        }
+
+        for reference in references where seenTemplateIDs.insert(reference.templateID).inserted {
+            resolved.append(reference)
+            if resolved.count == limit {
+                break
+            }
+        }
+
+        return resolved
+    }
+}
+
+enum PersonalRecordSelection {
+    static func mergedNewestFirst(
+        _ newRecords: [PersonalRecord],
+        existingRecords: [PersonalRecord],
+        limit: Int? = nil
+    ) -> [PersonalRecord] {
+        let mergedRecords = Array(newRecords.reversed()) + existingRecords
+        var seenRecordIDs: Set<UUID> = []
+        let deduplicated = mergedRecords.filter { record in
+            seenRecordIDs.insert(record.id).inserted
+        }
+
+        if let limit {
+            return Array(deduplicated.prefix(limit))
+        }
+
+        return deduplicated
+    }
+}
+
+enum ExerciseAnalyticsSelection {
+    static func selectedExerciseID(
+        _ currentSelection: UUID?,
+        summaries: [ExerciseAnalyticsSummary]
+    ) -> UUID? {
+        guard !summaries.isEmpty else {
+            return nil
+        }
+
+        if let currentSelection,
+           summaries.contains(where: { $0.exerciseID == currentSelection }) {
+            return currentSelection
+        }
+
+        return summaries.first?.exerciseID
+    }
+}
+
+enum PresetPack: String, CaseIterable, Identifiable, Sendable {
     case generalGym
     case startingStrength
     case fiveThreeOne
@@ -887,37 +1025,37 @@ enum CatalogSeed {
 
     static func defaultCatalog() -> [ExerciseCatalogItem] {
         [
-            ExerciseCatalogItem(id: benchPress, name: "Bench Press", category: .chest, equipment: "Barbell"),
-            ExerciseCatalogItem(id: inclineBenchPress, name: "Incline Bench Press", category: .chest, equipment: "Barbell"),
-            ExerciseCatalogItem(id: dumbbellFly, name: "Dumbbell Fly", category: .chest, equipment: "Dumbbell"),
-            ExerciseCatalogItem(id: backSquat, name: "Back Squat", category: .legs, equipment: "Barbell"),
-            ExerciseCatalogItem(id: frontSquat, name: "Front Squat", category: .legs, equipment: "Barbell"),
-            ExerciseCatalogItem(id: deadlift, name: "Deadlift", category: .legs, equipment: "Barbell"),
-            ExerciseCatalogItem(id: romanianDeadlift, name: "Romanian Deadlift", category: .legs, equipment: "Barbell"),
-            ExerciseCatalogItem(id: overheadPress, name: "Overhead Press", category: .shoulders, equipment: "Barbell"),
-            ExerciseCatalogItem(id: dumbbellShoulderPress, name: "Dumbbell Shoulder Press", category: .shoulders, equipment: "Dumbbell"),
-            ExerciseCatalogItem(id: powerClean, name: "Power Clean", category: .fullBody, equipment: "Barbell"),
-            ExerciseCatalogItem(id: barbellRow, name: "Barbell Row", category: .back, equipment: "Barbell"),
-            ExerciseCatalogItem(id: pullUp, name: "Pull Up", category: .back, equipment: "Bodyweight"),
-            ExerciseCatalogItem(id: weightedPullUp, name: "Weighted Pull Up", aliases: ["Pull Up"], category: .back, equipment: "Bodyweight"),
-            ExerciseCatalogItem(id: latPulldown, name: "Lat Pulldown", category: .back, equipment: "Cable"),
-            ExerciseCatalogItem(id: seatedCableRow, name: "Seated Cable Row", category: .back, equipment: "Cable"),
-            ExerciseCatalogItem(id: dips, name: "Dips", category: .chest, equipment: "Bodyweight"),
-            ExerciseCatalogItem(id: lateralRaise, name: "Lateral Raise", category: .shoulders, equipment: "Dumbbell"),
-            ExerciseCatalogItem(id: facePull, name: "Face Pull", category: .shoulders, equipment: "Cable"),
-            ExerciseCatalogItem(id: rearDeltFly, name: "Rear Delt Fly", category: .shoulders, equipment: "Dumbbell"),
-            ExerciseCatalogItem(id: tricepsPushdown, name: "Triceps Pushdown", category: .arms, equipment: "Cable"),
-            ExerciseCatalogItem(id: skullCrusher, name: "Skull Crusher", category: .arms, equipment: "EZ Bar"),
-            ExerciseCatalogItem(id: barbellCurl, name: "Barbell Curl", category: .arms, equipment: "Barbell"),
-            ExerciseCatalogItem(id: hammerCurl, name: "Hammer Curl", category: .arms, equipment: "Dumbbell"),
-            ExerciseCatalogItem(id: legPress, name: "Leg Press", category: .legs, equipment: "Machine"),
-            ExerciseCatalogItem(id: legCurl, name: "Leg Curl", category: .legs, equipment: "Machine"),
-            ExerciseCatalogItem(id: legExtension, name: "Leg Extension", category: .legs, equipment: "Machine"),
-            ExerciseCatalogItem(id: walkingLunge, name: "Walking Lunge", category: .legs, equipment: "Dumbbell"),
-            ExerciseCatalogItem(id: bulgarianSplitSquat, name: "Bulgarian Split Squat", category: .legs, equipment: "Dumbbell"),
-            ExerciseCatalogItem(id: hipThrust, name: "Hip Thrust", category: .legs, equipment: "Barbell"),
-            ExerciseCatalogItem(id: standingCalfRaise, name: "Standing Calf Raise", category: .legs, equipment: "Machine"),
-            ExerciseCatalogItem(id: seatedCalfRaise, name: "Seated Calf Raise", category: .legs, equipment: "Machine")
+            ExerciseCatalogItem(id: benchPress, name: "Bench Press", category: .chest),
+            ExerciseCatalogItem(id: inclineBenchPress, name: "Incline Bench Press", category: .chest),
+            ExerciseCatalogItem(id: dumbbellFly, name: "Dumbbell Fly", category: .chest),
+            ExerciseCatalogItem(id: backSquat, name: "Back Squat", category: .legs),
+            ExerciseCatalogItem(id: frontSquat, name: "Front Squat", category: .legs),
+            ExerciseCatalogItem(id: deadlift, name: "Deadlift", category: .legs),
+            ExerciseCatalogItem(id: romanianDeadlift, name: "Romanian Deadlift", category: .legs),
+            ExerciseCatalogItem(id: overheadPress, name: "Overhead Press", category: .shoulders),
+            ExerciseCatalogItem(id: dumbbellShoulderPress, name: "Dumbbell Shoulder Press", category: .shoulders),
+            ExerciseCatalogItem(id: powerClean, name: "Power Clean", category: .fullBody),
+            ExerciseCatalogItem(id: barbellRow, name: "Barbell Row", category: .back),
+            ExerciseCatalogItem(id: pullUp, name: "Pull Up", category: .back),
+            ExerciseCatalogItem(id: weightedPullUp, name: "Weighted Pull Up", aliases: ["Pull Up"], category: .back),
+            ExerciseCatalogItem(id: latPulldown, name: "Lat Pulldown", category: .back),
+            ExerciseCatalogItem(id: seatedCableRow, name: "Seated Cable Row", category: .back),
+            ExerciseCatalogItem(id: dips, name: "Dips", category: .chest),
+            ExerciseCatalogItem(id: lateralRaise, name: "Lateral Raise", category: .shoulders),
+            ExerciseCatalogItem(id: facePull, name: "Face Pull", category: .shoulders),
+            ExerciseCatalogItem(id: rearDeltFly, name: "Rear Delt Fly", category: .shoulders),
+            ExerciseCatalogItem(id: tricepsPushdown, name: "Triceps Pushdown", category: .arms),
+            ExerciseCatalogItem(id: skullCrusher, name: "Skull Crusher", category: .arms),
+            ExerciseCatalogItem(id: barbellCurl, name: "Barbell Curl", category: .arms),
+            ExerciseCatalogItem(id: hammerCurl, name: "Hammer Curl", category: .arms),
+            ExerciseCatalogItem(id: legPress, name: "Leg Press", category: .legs),
+            ExerciseCatalogItem(id: legCurl, name: "Leg Curl", category: .legs),
+            ExerciseCatalogItem(id: legExtension, name: "Leg Extension", category: .legs),
+            ExerciseCatalogItem(id: walkingLunge, name: "Walking Lunge", category: .legs),
+            ExerciseCatalogItem(id: bulgarianSplitSquat, name: "Bulgarian Split Squat", category: .legs),
+            ExerciseCatalogItem(id: hipThrust, name: "Hip Thrust", category: .legs),
+            ExerciseCatalogItem(id: standingCalfRaise, name: "Standing Calf Raise", category: .legs),
+            ExerciseCatalogItem(id: seatedCalfRaise, name: "Seated Calf Raise", category: .legs)
         ]
     }
 }
@@ -926,17 +1064,5 @@ extension String {
     var nonEmptyTrimmed: String? {
         let trimmed = trimmingCharacters(in: .whitespacesAndNewlines)
         return trimmed.isEmpty ? nil : trimmed
-    }
-}
-
-extension Array {
-    @discardableResult
-    mutating func removeIfPresent(at index: Int) -> Bool {
-        guard indices.contains(index) else {
-            return false
-        }
-
-        remove(at: index)
-        return true
     }
 }

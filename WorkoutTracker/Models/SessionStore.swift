@@ -13,6 +13,7 @@ final class SessionStore {
     @ObservationIgnored private var draftSaveTask: Task<Void, Never>?
     @ObservationIgnored private let draftSaveDebounceNanoseconds: UInt64 = 400_000_000
     @ObservationIgnored private let maxUndoSnapshots = 50
+    @ObservationIgnored private(set) var completedSessionsRevision = 0
 
     var activeDraft: SessionDraft?
     var completedSessions: [CompletedSession] = []
@@ -31,6 +32,7 @@ final class SessionStore {
     func hydrate() {
         activeDraft = repository.loadActiveDraft()
         completedSessions = repository.loadCompletedSessions().sorted(by: { $0.completedAt < $1.completedAt })
+        bumpCompletedSessionsRevision()
     }
 
     func resetAllData() {
@@ -38,6 +40,7 @@ final class SessionStore {
         repository.deleteEverything()
         activeDraft = nil
         completedSessions = []
+        bumpCompletedSessionsRevision()
         isPresentingSession = false
         lastFinishedSummary = nil
         undoStack = []
@@ -65,13 +68,14 @@ final class SessionStore {
 
     func pushMutation(
         persistence: DraftPersistenceBehavior = .immediate,
-        _ mutation: (SessionDraft) -> SessionDraft
+        _ mutation: (inout SessionDraft) -> Void
     ) {
         guard let activeDraft else {
             return
         }
 
-        let updatedDraft = mutation(activeDraft)
+        var updatedDraft = activeDraft
+        mutation(&updatedDraft)
         guard updatedDraft != activeDraft else {
             return
         }
@@ -102,10 +106,16 @@ final class SessionStore {
         repository.saveActiveDraft(activeDraft)
     }
 
-    func completeSession(
-        analytics: AnalyticsRepository,
-        catalogByID: [UUID: ExerciseCatalogItem]
-    ) -> CompletedSession? {
+    func flushPendingDraftSave() {
+        guard draftSaveTask != nil else {
+            return
+        }
+
+        cancelPendingDraftSave()
+        repository.saveActiveDraft(activeDraft)
+    }
+
+    func completeSession() -> CompletedSession? {
         guard let activeDraft else {
             return nil
         }
@@ -114,17 +124,11 @@ final class SessionStore {
         let completedSession = SessionEngine.finishSession(draft: activeDraft)
         completedSessions.append(completedSession)
         completedSessions.sort(by: { $0.completedAt < $1.completedAt })
-        repository.saveCompletedSessions(completedSessions)
+        bumpCompletedSessionsRevision()
+        repository.saveCompletedSession(completedSession)
         repository.saveActiveDraft(nil)
         self.activeDraft = nil
         isPresentingSession = false
-
-        let previousSessions = Array(completedSessions.dropLast())
-        lastFinishedSummary = analytics.finishSummary(
-            for: completedSession,
-            previousSessions: previousSessions,
-            catalogByID: catalogByID
-        )
         undoStack = []
         return completedSession
     }
@@ -143,6 +147,10 @@ final class SessionStore {
         if undoStack.count > maxUndoSnapshots {
             undoStack.removeFirst(undoStack.count - maxUndoSnapshots)
         }
+    }
+
+    private func bumpCompletedSessionsRevision() {
+        completedSessionsRevision &+= 1
     }
 
     private func persistActiveDraft(using behavior: DraftPersistenceBehavior) {

@@ -21,7 +21,7 @@ struct TodayView: View {
             ZStack {
                 AppBackground()
                 ScrollView {
-                    VStack(spacing: 16) {
+                    LazyVStack(spacing: 16) {
                         heroCard
                             .appReveal(delay: 0.01)
 
@@ -82,7 +82,7 @@ struct TodayView: View {
                 AppHeroMetric(
                     id: "plans",
                     label: "Templates",
-                    value: "\(plansStore.templateReferences().count)",
+                    value: "\(plansStore.templateReferenceCount)",
                     systemImage: "rectangle.stack"
                 ),
                 AppHeroMetric(
@@ -242,32 +242,12 @@ struct TodayView: View {
                 Text("Finish sessions and the latest PRs will appear here.")
                     .font(.subheadline)
                     .foregroundStyle(AppColors.textSecondary)
-                    .padding(14)
+                    .padding(AppCardMetrics.compactPadding)
                     .frame(maxWidth: .infinity, alignment: .leading)
-                    .appSurface(cornerRadius: 14, shadow: false)
+                    .appSurface(cornerRadius: AppCardMetrics.compactCornerRadius, shadow: false)
             } else {
                 ForEach(todayStore.recentPersonalRecords) { record in
-                    HStack(alignment: .top) {
-                        VStack(alignment: .leading, spacing: 6) {
-                            Text(record.displayName)
-                                .font(.headline.weight(.semibold))
-                                .foregroundStyle(AppColors.textPrimary)
-
-                            Text(
-                                "\(WeightFormatter.displayString(record.weight, unit: weightUnit)) \(weightUnit.symbol) x \(record.reps)"
-                            )
-                            .font(.subheadline)
-                            .foregroundStyle(AppColors.textSecondary)
-                        }
-
-                        Spacer()
-
-                        Text(record.achievedAt.formatted(date: .abbreviated, time: .omitted))
-                            .font(.caption)
-                            .foregroundStyle(AppColors.accent)
-                    }
-                    .padding(14)
-                    .appSurface(cornerRadius: 14, shadow: false)
+                    PersonalRecordSummaryCardView(record: record, weightUnit: weightUnit)
                 }
             }
         }
@@ -281,27 +261,12 @@ struct TodayView: View {
                 Text("Your finished workouts will show up here.")
                     .font(.subheadline)
                     .foregroundStyle(AppColors.textSecondary)
-                    .padding(14)
+                    .padding(AppCardMetrics.compactPadding)
                     .frame(maxWidth: .infinity, alignment: .leading)
-                    .appSurface(cornerRadius: 14, shadow: false)
+                    .appSurface(cornerRadius: AppCardMetrics.compactCornerRadius, shadow: false)
             } else {
                 ForEach(todayStore.recentSessions) { session in
-                    VStack(alignment: .leading, spacing: 6) {
-                        Text(session.templateNameSnapshot)
-                            .font(.headline.weight(.semibold))
-                            .foregroundStyle(AppColors.textPrimary)
-
-                        Text(session.completedAt.formatted(date: .abbreviated, time: .shortened))
-                            .font(.caption)
-                            .foregroundStyle(AppColors.textSecondary)
-
-                        Text("\(session.blocks.count) exercise block\(session.blocks.count == 1 ? "" : "s") logged")
-                            .font(.caption)
-                            .foregroundStyle(AppColors.accent)
-                    }
-                    .padding(14)
-                    .frame(maxWidth: .infinity, alignment: .leading)
-                    .appSurface(cornerRadius: 14, shadow: false)
+                    CompletedSessionSummaryCardView(session: session, detailSuffix: " logged")
                 }
             }
         }
@@ -337,7 +302,7 @@ struct PlansView: View {
             ZStack {
                 AppBackground()
                 ScrollView {
-                    VStack(spacing: 16) {
+                    LazyVStack(spacing: 16) {
                         plansHero
                             .appReveal(delay: 0.01)
 
@@ -392,7 +357,6 @@ struct PlansView: View {
             }
             .sheet(item: $editingTemplateContext) { context in
                 TemplateEditorSheet(
-                    planID: context.planID,
                     existingTemplate: context.template
                 ) { template, profiles in
                     appStore.saveProfiles(profiles)
@@ -443,7 +407,7 @@ struct PlansView: View {
                 AppHeroMetric(
                     id: "templates",
                     label: "Templates",
-                    value: "\(plansStore.templateReferences().count)",
+                    value: "\(plansStore.templateReferenceCount)",
                     systemImage: "rectangle.stack"
                 ),
                 AppHeroMetric(
@@ -507,8 +471,10 @@ struct PlansView: View {
                     .frame(maxWidth: .infinity, alignment: .leading)
                     .appInsetCard(cornerRadius: 12, fillOpacity: 0.8, borderOpacity: 0.65)
             } else {
-                ForEach(plan.templates) { template in
-                    templateCard(plan: plan, template: template)
+                LazyVStack(spacing: 12) {
+                    ForEach(plan.templates) { template in
+                        templateCard(plan: plan, template: template)
+                    }
                 }
             }
         }
@@ -558,34 +524,36 @@ struct PlansView: View {
                 }
             }
 
-            ForEach(template.blocks) { block in
-                HStack(alignment: .top) {
-                    VStack(alignment: .leading, spacing: 4) {
-                        Text(block.exerciseNameSnapshot)
-                            .font(.subheadline.weight(.semibold))
-                            .foregroundStyle(AppColors.textPrimary)
+            LazyVStack(spacing: 10) {
+                ForEach(template.blocks) { block in
+                    HStack(alignment: .top) {
+                        VStack(alignment: .leading, spacing: 4) {
+                            Text(block.exerciseNameSnapshot)
+                                .font(.subheadline.weight(.semibold))
+                                .foregroundStyle(AppColors.textPrimary)
 
-                        Text("\(block.targets.count) sets • \(block.targets.first?.repRange.displayLabel ?? "-") reps")
-                            .font(.caption)
-                            .foregroundStyle(AppColors.textSecondary)
+                            Text("\(block.targets.count) sets • \(block.targets.first?.repRange.displayLabel ?? "-") reps")
+                                .font(.caption)
+                                .foregroundStyle(AppColors.textSecondary)
 
-                        if let supersetGroup = block.supersetGroup, !supersetGroup.isEmpty {
-                            Text("Superset \(supersetGroup)")
-                                .font(.caption2)
-                                .foregroundStyle(AppColors.accent)
+                            if let supersetGroup = block.supersetGroup, !supersetGroup.isEmpty {
+                                Text("Superset \(supersetGroup)")
+                                    .font(.caption2)
+                                    .foregroundStyle(AppColors.accent)
+                            }
                         }
+
+                        Spacer()
+
+                        MetricBadge(
+                            label: "Rule",
+                            value: block.progressionRule.kind.displayLabel,
+                            systemImage: "arrow.up.right"
+                        )
                     }
-
-                    Spacer()
-
-                    MetricBadge(
-                        label: "Rule",
-                        value: block.progressionRule.kind.displayLabel,
-                        systemImage: "arrow.up.right"
-                    )
+                    .padding(12)
+                    .appInsetCard(cornerRadius: 12, fillOpacity: 0.78, borderOpacity: 0.68)
                 }
-                .padding(12)
-                .appInsetCard(cornerRadius: 12, fillOpacity: 0.78, borderOpacity: 0.68)
             }
 
             HStack(spacing: 10) {

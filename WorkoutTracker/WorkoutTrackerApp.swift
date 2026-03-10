@@ -58,11 +58,20 @@ struct WorkoutTrackerApp: App {
                 }
             }
             .task {
-                appStore.hydrateIfNeeded()
+                await appStore.hydrateIfNeeded()
             }
-            .onChange(of: scenePhase) { _, phase in
-                if phase == .background || phase == .inactive {
-                    appStore.refreshDerivedStores()
+            .onChange(of: scenePhase, initial: false) { _, phase in
+                switch phase {
+                case .active:
+                    Task {
+                        await appStore.refreshDerivedStores()
+                    }
+
+                case .inactive, .background:
+                    appStore.flushPendingSessionPersistence()
+
+                @unknown default:
+                    break
                 }
             }
         }
