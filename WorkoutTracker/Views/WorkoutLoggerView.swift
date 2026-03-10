@@ -165,8 +165,7 @@ private struct ActiveSessionNotesCardView: View, Equatable {
             .lineLimit(2...4)
             .appInputField()
         }
-        .padding(14)
-        .appSurface(cornerRadius: 14, shadow: false)
+        .appSectionSurface()
     }
 }
 

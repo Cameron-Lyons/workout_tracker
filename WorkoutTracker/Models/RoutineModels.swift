@@ -12,6 +12,18 @@ enum ExerciseBlockDefaults {
     static let repRange = RepRange(8, 12)
 }
 
+enum DoubleProgressionDefaults {
+    static let repRange = RepRange(6, 10)
+}
+
+enum WarmupDefaults {
+    static let note = "Auto warmup"
+    static let ramp = [
+        WarmupRampStep(percentage: 0.40, reps: 5),
+        WarmupRampStep(percentage: 0.60, reps: 3)
+    ]
+}
+
 enum AnalyticsDefaults {
     static let rollingWindowDays = 30
     static let recentActivityLimit = 5

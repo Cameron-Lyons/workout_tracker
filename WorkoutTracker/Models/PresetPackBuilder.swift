@@ -2,6 +2,41 @@ import Foundation
 
 @MainActor
 enum PresetPackBuilder {
+    private enum PresetPackRest {
+        static let accessory = 60
+        static let unilateralAccessory = 75
+        static let standard = ExerciseBlockDefaults.restSeconds
+        static let compound = 120
+        static let mainLift = 150
+        static let waveMainLift = 180
+    }
+
+    private enum PresetPackSets {
+        static let standard = ExerciseBlockDefaults.setCount
+        static let deadliftTopSets = 2
+        static let singleTopSet = 1
+        static let powerCleanSets = 5
+        static let boringButBig = 5
+    }
+
+    private enum PresetPackRepRange {
+        static let upperMain = RepRange(6, 8)
+        static let row = RepRange(8, 10)
+        static let posteriorChain = DoubleProgressionDefaults.repRange
+        static let shoulders = RepRange(12, 15)
+        static let accessory = RepRange(10, 15)
+        static let squatVolume = RepRange(5, 8)
+        static let heavyPull = RepRange(4, 6)
+        static let calves = RepRange(12, 20)
+        static let strength = RepRange(5, 5)
+        static let power = RepRange(3, 3)
+        static let boringButBig = RepRange(10, 10)
+    }
+
+    private enum PresetPackLabels {
+        static let boringButBig = "BBB 5x10"
+    }
+
     static func makePlans(for pack: PresetPack, settings: SettingsStore) -> [Plan] {
         switch pack {
         case .generalGym:
@@ -32,32 +67,32 @@ enum PresetPackBuilder {
                 ExerciseBlock(
                     exerciseID: CatalogSeed.benchPress,
                     exerciseNameSnapshot: "Bench Press",
-                    restSeconds: 120,
+                    restSeconds: PresetPackRest.compound,
                     progressionRule: upperRule,
-                    targets: repeatedTargets(count: 3, repRange: RepRange(6, 8))
+                    targets: repeatedTargets(repRange: PresetPackRepRange.upperMain)
                 ),
                 ExerciseBlock(
                     exerciseID: CatalogSeed.barbellRow,
                     exerciseNameSnapshot: "Barbell Row",
-                    restSeconds: 120,
+                    restSeconds: PresetPackRest.compound,
                     progressionRule: upperRule,
-                    targets: repeatedTargets(count: 3, repRange: RepRange(8, 10))
+                    targets: repeatedTargets(repRange: PresetPackRepRange.row)
                 ),
                 ExerciseBlock(
                     exerciseID: CatalogSeed.lateralRaise,
                     exerciseNameSnapshot: "Lateral Raise",
-                    restSeconds: 60,
+                    restSeconds: PresetPackRest.accessory,
                     supersetGroup: "A",
                     progressionRule: .manual,
-                    targets: repeatedTargets(count: 3, repRange: RepRange(12, 15))
+                    targets: repeatedTargets(repRange: PresetPackRepRange.shoulders)
                 ),
                 ExerciseBlock(
                     exerciseID: CatalogSeed.tricepsPushdown,
                     exerciseNameSnapshot: "Triceps Pushdown",
-                    restSeconds: 60,
+                    restSeconds: PresetPackRest.accessory,
                     supersetGroup: "A",
                     progressionRule: .manual,
-                    targets: repeatedTargets(count: 3, repRange: RepRange(10, 15))
+                    targets: repeatedTargets(repRange: PresetPackRepRange.accessory)
                 )
             ]
         )
@@ -69,30 +104,30 @@ enum PresetPackBuilder {
                 ExerciseBlock(
                     exerciseID: CatalogSeed.backSquat,
                     exerciseNameSnapshot: "Back Squat",
-                    restSeconds: 150,
+                    restSeconds: PresetPackRest.mainLift,
                     progressionRule: lowerRule,
-                    targets: repeatedTargets(count: 3, repRange: RepRange(5, 8))
+                    targets: repeatedTargets(repRange: PresetPackRepRange.squatVolume)
                 ),
                 ExerciseBlock(
                     exerciseID: CatalogSeed.romanianDeadlift,
                     exerciseNameSnapshot: "Romanian Deadlift",
-                    restSeconds: 120,
+                    restSeconds: PresetPackRest.compound,
                     progressionRule: lowerRule,
-                    targets: repeatedTargets(count: 3, repRange: RepRange(6, 10))
+                    targets: repeatedTargets(repRange: PresetPackRepRange.posteriorChain)
                 ),
                 ExerciseBlock(
                     exerciseID: CatalogSeed.legPress,
                     exerciseNameSnapshot: "Leg Press",
-                    restSeconds: 90,
+                    restSeconds: PresetPackRest.standard,
                     progressionRule: .manual,
-                    targets: repeatedTargets(count: 3, repRange: RepRange(10, 15))
+                    targets: repeatedTargets(repRange: PresetPackRepRange.accessory)
                 ),
                 ExerciseBlock(
                     exerciseID: CatalogSeed.standingCalfRaise,
                     exerciseNameSnapshot: "Standing Calf Raise",
-                    restSeconds: 60,
+                    restSeconds: PresetPackRest.accessory,
                     progressionRule: .manual,
-                    targets: repeatedTargets(count: 3, repRange: RepRange(12, 20))
+                    targets: repeatedTargets(repRange: PresetPackRepRange.calves)
                 )
             ]
         )
@@ -103,32 +138,32 @@ enum PresetPackBuilder {
                 ExerciseBlock(
                     exerciseID: CatalogSeed.overheadPress,
                     exerciseNameSnapshot: "Overhead Press",
-                    restSeconds: 120,
+                    restSeconds: PresetPackRest.compound,
                     progressionRule: upperRule,
-                    targets: repeatedTargets(count: 3, repRange: RepRange(6, 8))
+                    targets: repeatedTargets(repRange: PresetPackRepRange.upperMain)
                 ),
                 ExerciseBlock(
                     exerciseID: CatalogSeed.pullUp,
                     exerciseNameSnapshot: "Pull Up",
-                    restSeconds: 120,
+                    restSeconds: PresetPackRest.compound,
                     progressionRule: .manual,
-                    targets: repeatedTargets(count: 3, repRange: RepRange(6, 10))
+                    targets: repeatedTargets(repRange: PresetPackRepRange.posteriorChain)
                 ),
                 ExerciseBlock(
                     exerciseID: CatalogSeed.inclineBenchPress,
                     exerciseNameSnapshot: "Incline Bench Press",
-                    restSeconds: 90,
+                    restSeconds: PresetPackRest.standard,
                     supersetGroup: "B",
                     progressionRule: .manual,
-                    targets: repeatedTargets(count: 3, repRange: RepRange(8, 12))
+                    targets: repeatedTargets(repRange: ExerciseBlockDefaults.repRange)
                 ),
                 ExerciseBlock(
                     exerciseID: CatalogSeed.hammerCurl,
                     exerciseNameSnapshot: "Hammer Curl",
-                    restSeconds: 60,
+                    restSeconds: PresetPackRest.accessory,
                     supersetGroup: "B",
                     progressionRule: .manual,
-                    targets: repeatedTargets(count: 3, repRange: RepRange(10, 15))
+                    targets: repeatedTargets(repRange: PresetPackRepRange.accessory)
                 )
             ]
         )
@@ -139,32 +174,35 @@ enum PresetPackBuilder {
                 ExerciseBlock(
                     exerciseID: CatalogSeed.deadlift,
                     exerciseNameSnapshot: "Deadlift",
-                    restSeconds: 150,
+                    restSeconds: PresetPackRest.mainLift,
                     progressionRule: lowerRule,
-                    targets: repeatedTargets(count: 2, repRange: RepRange(4, 6))
+                    targets: repeatedTargets(
+                        count: PresetPackSets.deadliftTopSets,
+                        repRange: PresetPackRepRange.heavyPull
+                    )
                 ),
                 ExerciseBlock(
                     exerciseID: CatalogSeed.frontSquat,
                     exerciseNameSnapshot: "Front Squat",
-                    restSeconds: 120,
+                    restSeconds: PresetPackRest.compound,
                     progressionRule: lowerRule,
-                    targets: repeatedTargets(count: 3, repRange: RepRange(6, 8))
+                    targets: repeatedTargets(repRange: PresetPackRepRange.upperMain)
                 ),
                 ExerciseBlock(
                     exerciseID: CatalogSeed.bulgarianSplitSquat,
                     exerciseNameSnapshot: "Bulgarian Split Squat",
-                    restSeconds: 75,
+                    restSeconds: PresetPackRest.unilateralAccessory,
                     supersetGroup: "C",
                     progressionRule: .manual,
-                    targets: repeatedTargets(count: 3, repRange: RepRange(8, 12))
+                    targets: repeatedTargets(repRange: ExerciseBlockDefaults.repRange)
                 ),
                 ExerciseBlock(
                     exerciseID: CatalogSeed.legCurl,
                     exerciseNameSnapshot: "Leg Curl",
-                    restSeconds: 60,
+                    restSeconds: PresetPackRest.accessory,
                     supersetGroup: "C",
                     progressionRule: .manual,
-                    targets: repeatedTargets(count: 3, repRange: RepRange(10, 15))
+                    targets: repeatedTargets(repRange: PresetPackRepRange.accessory)
                 )
             ]
         )
@@ -193,26 +231,29 @@ enum PresetPackBuilder {
                 ExerciseBlock(
                     exerciseID: CatalogSeed.backSquat,
                     exerciseNameSnapshot: "Back Squat",
-                    restSeconds: 150,
+                    restSeconds: PresetPackRest.mainLift,
                     progressionRule: squatRule,
-                    targets: repeatedTargets(count: 3, repRange: RepRange(5, 5))
+                    targets: repeatedTargets(repRange: PresetPackRepRange.strength)
                 ),
                 ExerciseBlock(
                     exerciseID: CatalogSeed.benchPress,
                     exerciseNameSnapshot: "Bench Press",
-                    restSeconds: 120,
+                    restSeconds: PresetPackRest.compound,
                     progressionRule: upperRule,
-                    targets: repeatedTargets(count: 3, repRange: RepRange(5, 5))
+                    targets: repeatedTargets(repRange: PresetPackRepRange.strength)
                 ),
                 ExerciseBlock(
                     exerciseID: CatalogSeed.deadlift,
                     exerciseNameSnapshot: "Deadlift",
-                    restSeconds: 180,
+                    restSeconds: PresetPackRest.waveMainLift,
                     progressionRule: SessionEngine.defaultDoubleProgressionRule(
                         exerciseName: "Deadlift",
                         preferredIncrement: settings.lowerBodyIncrement
                     ),
-                    targets: repeatedTargets(count: 1, repRange: RepRange(5, 5))
+                    targets: repeatedTargets(
+                        count: PresetPackSets.singleTopSet,
+                        repRange: PresetPackRepRange.strength
+                    )
                 )
             ]
         )
@@ -224,23 +265,26 @@ enum PresetPackBuilder {
                 ExerciseBlock(
                     exerciseID: CatalogSeed.backSquat,
                     exerciseNameSnapshot: "Back Squat",
-                    restSeconds: 150,
+                    restSeconds: PresetPackRest.mainLift,
                     progressionRule: squatRule,
-                    targets: repeatedTargets(count: 3, repRange: RepRange(5, 5))
+                    targets: repeatedTargets(repRange: PresetPackRepRange.strength)
                 ),
                 ExerciseBlock(
                     exerciseID: CatalogSeed.overheadPress,
                     exerciseNameSnapshot: "Overhead Press",
-                    restSeconds: 120,
+                    restSeconds: PresetPackRest.compound,
                     progressionRule: upperRule,
-                    targets: repeatedTargets(count: 3, repRange: RepRange(5, 5))
+                    targets: repeatedTargets(repRange: PresetPackRepRange.strength)
                 ),
                 ExerciseBlock(
                     exerciseID: CatalogSeed.powerClean,
                     exerciseNameSnapshot: "Power Clean",
-                    restSeconds: 120,
+                    restSeconds: PresetPackRest.compound,
                     progressionRule: upperRule,
-                    targets: repeatedTargets(count: 5, repRange: RepRange(3, 3))
+                    targets: repeatedTargets(
+                        count: PresetPackSets.powerCleanSets,
+                        repRange: PresetPackRepRange.power
+                    )
                 )
             ]
         )
@@ -334,9 +378,13 @@ enum PresetPackBuilder {
         )
     }
 
-    private static func repeatedTargets(count: Int, repRange: RepRange) -> [SetTarget] {
+    private static func repeatedTargets(
+        count: Int = PresetPackSets.standard,
+        repRange: RepRange,
+        note: String? = nil
+    ) -> [SetTarget] {
         (0..<count).map { _ in
-            SetTarget(repRange: repRange)
+            SetTarget(repRange: repRange, note: note)
         }
     }
 
@@ -353,6 +401,25 @@ enum PresetPackBuilder {
         )
     }
 
+    private static func waveProgressionRule(for exerciseName: String) -> ProgressionRule {
+        ProgressionRule(
+            kind: .percentageWave,
+            percentageWave: PercentageWaveRule.fiveThreeOne(
+                cycleIncrement: ExerciseClassification.isLowerBody(exerciseName) ? 10 : 5
+            )
+        )
+    }
+
+    private static func waveMainBlock(exerciseID: UUID, exerciseName: String) -> ExerciseBlock {
+        ExerciseBlock(
+            exerciseID: exerciseID,
+            exerciseNameSnapshot: exerciseName,
+            restSeconds: PresetPackRest.waveMainLift,
+            progressionRule: waveProgressionRule(for: exerciseName),
+            targets: []
+        )
+    }
+
     private static func waveTemplate(
         name: String,
         mainExerciseID: UUID,
@@ -361,20 +428,7 @@ enum PresetPackBuilder {
     ) -> WorkoutTemplate {
         WorkoutTemplate(
             name: name,
-            blocks: [
-                ExerciseBlock(
-                    exerciseID: mainExerciseID,
-                    exerciseNameSnapshot: mainExerciseName,
-                    restSeconds: 180,
-                    progressionRule: ProgressionRule(
-                        kind: .percentageWave,
-                        percentageWave: PercentageWaveRule.fiveThreeOne(
-                            cycleIncrement: ExerciseClassification.isLowerBody(mainExerciseName) ? 10 : 5
-                        )
-                    ),
-                    targets: []
-                )
-            ] + accessories
+            blocks: [waveMainBlock(exerciseID: mainExerciseID, exerciseName: mainExerciseName)] + accessories
         )
     }
 
@@ -388,31 +442,17 @@ enum PresetPackBuilder {
         WorkoutTemplate(
             name: name,
             blocks: [
-                ExerciseBlock(
-                    exerciseID: mainExerciseID,
-                    exerciseNameSnapshot: mainExerciseName,
-                    restSeconds: 180,
-                    progressionRule: ProgressionRule(
-                        kind: .percentageWave,
-                        percentageWave: PercentageWaveRule.fiveThreeOne(
-                            cycleIncrement: ExerciseClassification.isLowerBody(mainExerciseName) ? 10 : 5
-                        )
-                    ),
-                    targets: []
-                ),
+                waveMainBlock(exerciseID: mainExerciseID, exerciseName: mainExerciseName),
                 ExerciseBlock(
                     exerciseID: bbbExerciseID,
                     exerciseNameSnapshot: bbbExerciseName,
-                    restSeconds: 120,
+                    restSeconds: PresetPackRest.compound,
                     progressionRule: .manual,
-                    targets: (0..<5).map { _ in
-                        SetTarget(
-                            setKind: .working,
-                            targetWeight: nil,
-                            repRange: RepRange(10, 10),
-                            note: "BBB 5x10"
-                        )
-                    }
+                    targets: repeatedTargets(
+                        count: PresetPackSets.boringButBig,
+                        repRange: PresetPackRepRange.boringButBig,
+                        note: PresetPackLabels.boringButBig
+                    )
                 )
             ]
         )

@@ -69,10 +69,7 @@ final class SettingsStore {
            !decoded.isEmpty {
             self.warmupRamp = decoded
         } else {
-            self.warmupRamp = [
-                WarmupRampStep(percentage: 0.40, reps: 5),
-                WarmupRampStep(percentage: 0.60, reps: 3)
-            ]
+            self.warmupRamp = WarmupDefaults.ramp
         }
     }
 

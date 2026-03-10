@@ -184,8 +184,7 @@ struct ExercisePickerSheet: View {
                             .tint(AppColors.accent)
                             .disabled(customExerciseName.nonEmptyTrimmed == nil)
                         }
-                        .padding(14)
-                        .appSurface(cornerRadius: 14, shadow: false)
+                        .appSectionSurface()
                     }
 
                     ScrollView {

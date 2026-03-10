@@ -622,6 +622,11 @@ extension View {
         modifier(AppSurfaceModifier(cornerRadius: cornerRadius, shadowOpacity: shadow ? 0.24 : 0))
     }
 
+    func appSectionSurface() -> some View {
+        padding(AppCardMetrics.compactPadding)
+            .appSurface(cornerRadius: AppCardMetrics.compactCornerRadius, shadow: false)
+    }
+
     func appInputField() -> some View {
         modifier(AppInputFieldModifier())
     }
@@ -638,6 +643,15 @@ extension View {
                 borderOpacity: borderOpacity
             )
         )
+    }
+
+    func appEditorInsetCard(fillOpacity: Double = 0.82, borderOpacity: Double = 0.7) -> some View {
+        padding(AppCardMetrics.compactPadding)
+            .appInsetCard(
+                cornerRadius: AppCardMetrics.compactCornerRadius,
+                fillOpacity: fillOpacity,
+                borderOpacity: borderOpacity
+            )
     }
 
     func appReveal(delay: Double = 0) -> some View {

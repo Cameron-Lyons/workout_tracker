@@ -584,7 +584,6 @@ struct PlansView: View {
                 .buttonStyle(.bordered)
             }
         }
-        .padding(14)
-        .appInsetCard(cornerRadius: 14, fillOpacity: 0.82, borderOpacity: 0.7)
+        .appEditorInsetCard()
     }
 }

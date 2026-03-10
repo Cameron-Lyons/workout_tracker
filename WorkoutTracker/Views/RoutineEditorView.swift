@@ -147,8 +147,7 @@ struct TemplateEditorSheet: View {
                                 .lineLimit(2...4)
                                 .appInputField()
                         }
-                        .padding(14)
-                        .appSurface(cornerRadius: 14, shadow: false)
+                        .appSectionSurface()
 
                         VStack(alignment: .leading, spacing: 10) {
                             Text("Schedule")
@@ -186,8 +185,7 @@ struct TemplateEditorSheet: View {
                                 }
                             }
                         }
-                        .padding(14)
-                        .appSurface(cornerRadius: 14, shadow: false)
+                        .appSectionSurface()
 
                         VStack(alignment: .leading, spacing: 12) {
                             HStack {
@@ -228,8 +226,7 @@ struct TemplateEditorSheet: View {
                                 }
                             }
                         }
-                        .padding(14)
-                        .appSurface(cornerRadius: 14, shadow: false)
+                        .appSectionSurface()
                     }
                     .padding(.horizontal, 16)
                     .padding(.vertical, 14)
@@ -533,8 +530,7 @@ private struct TemplateDraftBlockEditorView: View {
                 .lineLimit(2...3)
                 .appInputField()
         }
-        .padding(14)
-        .appInsetCard(cornerRadius: 14, fillOpacity: 0.82, borderOpacity: 0.7)
+        .appEditorInsetCard()
     }
 }
 

@@ -164,10 +164,7 @@ final class WorkoutProgramEngineTests: XCTestCase {
             planID: UUID(),
             template: template,
             profilesByExerciseID: [:],
-            warmupRamp: [
-                WarmupRampStep(percentage: 0.40, reps: 5),
-                WarmupRampStep(percentage: 0.60, reps: 3)
-            ]
+            warmupRamp: WarmupDefaults.ramp
         )
 
         let setKinds = draft.blocks.first?.sets.map(\.target.setKind)

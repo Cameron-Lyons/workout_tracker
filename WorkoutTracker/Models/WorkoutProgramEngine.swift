@@ -377,7 +377,7 @@ enum SessionEngine {
         return ProgressionRule(
             kind: .doubleProgression,
             doubleProgression: DoubleProgressionRule(
-                targetRepRange: RepRange(6, 10),
+                targetRepRange: DoubleProgressionDefaults.repRange,
                 increment: preferredIncrement ?? fallbackIncrement
             )
         )
@@ -402,7 +402,7 @@ enum SessionEngine {
                     .rounded() * StrengthProgressionDefaults.gymRoundingIncrement,
                 repRange: RepRange($0.reps, $0.reps),
                 restSeconds: block.restSeconds,
-                note: "Auto warmup"
+                note: WarmupDefaults.note
             )
         }
 
