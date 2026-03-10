@@ -23,10 +23,13 @@ enum PersistenceMigrationCoordinator {
         let removedUnsupportedLegacyData = clearUnsupportedLegacyRecords(in: context)
         let hasRelationalData = hasRelationalData(in: context)
         let hasBlobData = hasBlobData(in: context)
+        var migrationSucceeded = true
 
         if hasRelationalData == false, hasBlobData {
-            migrateBlobRecords(in: context)
-            deleteLegacyBlobRecords(in: context)
+            migrationSucceeded = migrateBlobRecords(in: context)
+            if migrationSucceeded {
+                deleteLegacyBlobRecords(in: context)
+            }
         } else if hasRelationalData {
             deleteLegacyBlobRecords(in: context)
         }
@@ -35,8 +38,10 @@ enum PersistenceMigrationCoordinator {
             SettingsStore.resetPersistedSettings(defaults: defaults)
         }
 
-        if context.hasChanges {
-            try? context.save()
+        let didPersistChanges = persistPendingChanges(in: context)
+        guard migrationSucceeded, didPersistChanges else {
+            PersistenceDiagnostics.record("Deferred storage version bump because migration did not fully persist.")
+            return
         }
 
         defaults.set(Compatibility.storageVersion, forKey: Compatibility.storageVersionKey)
@@ -102,31 +107,35 @@ enum PersistenceMigrationCoordinator {
         return didDelete
     }
 
-    private static func migrateBlobRecords(in context: ModelContext) {
+    @discardableResult
+    private static func migrateBlobRecords(in context: ModelContext) -> Bool {
         let planRepository = PlanRepository(modelContext: context)
         let sessionRepository = SessionRepository(modelContext: context)
+        var didSucceed = true
 
         let catalog = loadLegacyCatalog(in: context)
         if !catalog.isEmpty {
-            planRepository.saveCatalog(catalog)
+            didSucceed = planRepository.saveCatalog(catalog) && didSucceed
         }
 
         let plans = loadLegacyPlans(in: context)
         if !plans.isEmpty {
-            planRepository.savePlans(plans)
+            didSucceed = planRepository.savePlans(plans) && didSucceed
         }
 
         let profiles = loadLegacyProfiles(in: context)
         if !profiles.isEmpty {
-            planRepository.saveProfiles(profiles)
+            didSucceed = planRepository.saveProfiles(profiles) && didSucceed
         }
 
-        sessionRepository.saveActiveDraft(loadLegacyActiveDraft(in: context))
+        didSucceed = sessionRepository.saveActiveDraft(loadLegacyActiveDraft(in: context)) && didSucceed
 
         let completedSessions = loadLegacyCompletedSessions(in: context)
         if !completedSessions.isEmpty {
-            sessionRepository.saveCompletedSessions(completedSessions)
+            didSucceed = sessionRepository.saveCompletedSessions(completedSessions) && didSucceed
         }
+
+        return didSucceed
     }
 
     private static func loadLegacyCatalog(in context: ModelContext) -> [ExerciseCatalogItem] {
@@ -167,6 +176,22 @@ enum PersistenceMigrationCoordinator {
         deleteAll(StoredExerciseProfileRecord.self, in: context)
         deleteAll(StoredActiveSessionRecord.self, in: context)
         deleteAll(StoredCompletedSessionRecord.self, in: context)
+    }
+
+    @discardableResult
+    private static func persistPendingChanges(in context: ModelContext) -> Bool {
+        guard context.hasChanges else {
+            return true
+        }
+
+        do {
+            try context.save()
+            return true
+        } catch {
+            context.rollback()
+            PersistenceDiagnostics.record("Failed to persist migration changes", error: error)
+            return false
+        }
     }
 
     @discardableResult

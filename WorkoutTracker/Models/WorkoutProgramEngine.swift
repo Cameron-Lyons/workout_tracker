@@ -71,6 +71,12 @@ enum ProgressionEngine {
         }
 
         let workingRows = completedBlock.sets.filter { $0.target.setKind == .working }
+        guard !workingRows.isEmpty,
+            workingRows.allSatisfy(\.log.isCompleted)
+        else {
+            return (block, profile)
+        }
+
         let hitAllTargets = workingRows.allSatisfy {
             guard let reps = $0.log.reps else {
                 return false

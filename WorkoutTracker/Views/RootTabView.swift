@@ -356,15 +356,15 @@ struct AppEmptyStateCard: View {
             ZStack {
                 Circle()
                     .fill(
-                            LinearGradient(
-                                colors: [
-                                    tone.softFill.opacity(1.4),
-                                    tone.softFill.opacity(0.45),
-                                ],
-                                startPoint: .topLeading,
-                                endPoint: .bottomTrailing
-                            )
+                        LinearGradient(
+                            colors: [
+                                tone.softFill.opacity(1.4),
+                                tone.softFill.opacity(0.45),
+                            ],
+                            startPoint: .topLeading,
+                            endPoint: .bottomTrailing
                         )
+                    )
 
                 Circle()
                     .stroke(tone.softBorder, lineWidth: 1)
@@ -519,6 +519,24 @@ struct RootAppView: View {
         ) { summary in
             SessionFinishSummaryView(summary: summary)
                 .environment(appStore.settingsStore)
+        }
+        .alert(
+            item: Binding(
+                get: { appStore.persistenceStartupIssue },
+                set: { issue in
+                    if issue == nil {
+                        appStore.dismissPersistenceStartupIssue()
+                    }
+                }
+            )
+        ) { issue in
+            Alert(
+                title: Text(issue.title),
+                message: Text(issue.message),
+                dismissButton: .default(Text("OK")) {
+                    appStore.dismissPersistenceStartupIssue()
+                }
+            )
         }
     }
 }

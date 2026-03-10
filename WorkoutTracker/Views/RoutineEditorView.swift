@@ -190,171 +190,184 @@ struct TemplateEditorSheet: View {
         NavigationStack {
             ZStack {
                 AppBackground()
-                ScrollView {
-                    LazyVStack(spacing: 18) {
-                        AppHeroCard(
-                            eyebrow: existingTemplate == nil ? "New Template" : "Edit Template",
-                            title: templateTitle,
-                            subtitle: blocks.isEmpty
-                                ? "Start with the basics first, then open advanced settings only for the blocks that need them."
-                                : "Keep the main prescription up front and tuck progression details into each block as needed.",
-                            systemImage: "rectangle.stack.badge.plus",
-                            metrics: [
-                                AppHeroMetric(
-                                    id: "blocks",
-                                    label: "Blocks",
-                                    value: "\(blocks.count)",
-                                    systemImage: "square.grid.2x2"
-                                ),
-                                AppHeroMetric(
-                                    id: "schedule",
-                                    label: "Schedule",
-                                    value: selectedWeekdays.isEmpty ? "Flexible" : "\(selectedWeekdays.count) days",
-                                    systemImage: "calendar"
-                                ),
-                                AppHeroMetric(
-                                    id: "ready",
-                                    label: "Needs Setup",
-                                    value: "\(unresolvedBlockCount)",
-                                    systemImage: "exclamationmark.circle"
-                                ),
-                                AppHeroMetric(
-                                    id: "unit",
-                                    label: "Weight Unit",
-                                    value: weightUnit.symbol.uppercased(),
-                                    systemImage: "scalemass"
-                                ),
-                            ],
-                            tone: .plans
-                        )
-
-                        VStack(alignment: .leading, spacing: 12) {
-                            AppSectionHeader(
-                                title: "Overview",
-                                systemImage: "square.and.pencil",
-                                subtitle: "Name the template and leave a note for the next time you run it.",
+                ScrollViewReader { scrollProxy in
+                    ScrollView {
+                        LazyVStack(spacing: 18) {
+                            AppHeroCard(
+                                eyebrow: existingTemplate == nil ? "New Template" : "Edit Template",
+                                title: templateTitle,
+                                subtitle: blocks.isEmpty
+                                    ? "Start with the basics first, then open advanced settings only for the blocks that need them."
+                                    : "Keep the main prescription up front and tuck progression details into each block as needed.",
+                                systemImage: "rectangle.stack.badge.plus",
+                                metrics: [
+                                    AppHeroMetric(
+                                        id: "blocks",
+                                        label: "Blocks",
+                                        value: "\(blocks.count)",
+                                        systemImage: "square.grid.2x2"
+                                    ),
+                                    AppHeroMetric(
+                                        id: "schedule",
+                                        label: "Schedule",
+                                        value: selectedWeekdays.isEmpty ? "Flexible" : "\(selectedWeekdays.count) days",
+                                        systemImage: "calendar"
+                                    ),
+                                    AppHeroMetric(
+                                        id: "ready",
+                                        label: "Needs Setup",
+                                        value: "\(unresolvedBlockCount)",
+                                        systemImage: "exclamationmark.circle"
+                                    ),
+                                    AppHeroMetric(
+                                        id: "unit",
+                                        label: "Weight Unit",
+                                        value: weightUnit.symbol.uppercased(),
+                                        systemImage: "scalemass"
+                                    ),
+                                ],
                                 tone: .plans
                             )
 
-                            TextField("Template name", text: $templateName)
-                                .textInputAutocapitalization(.words)
-                                .foregroundStyle(AppColors.textPrimary)
-                                .appInputField()
+                            VStack(alignment: .leading, spacing: 12) {
+                                AppSectionHeader(
+                                    title: "Overview",
+                                    systemImage: "square.and.pencil",
+                                    subtitle: "Name the template and leave a note for the next time you run it.",
+                                    tone: .plans
+                                )
 
-                            TextField("Notes", text: $templateNote, axis: .vertical)
-                                .foregroundStyle(AppColors.textPrimary)
-                                .lineLimit(2...4)
-                                .appInputField()
-                        }
-                        .appFeatureSurface()
+                                TextField("Template name", text: $templateName)
+                                    .textInputAutocapitalization(.words)
+                                    .foregroundStyle(AppColors.textPrimary)
+                                    .appInputField()
 
-                        VStack(alignment: .leading, spacing: 12) {
-                            AppSectionHeader(
-                                title: "Schedule",
-                                systemImage: "calendar.badge.clock",
-                                subtitle: "Pin recurring days now or leave the template flexible.",
-                                trailing: selectedWeekdays.isEmpty ? "Any day" : "\(selectedWeekdays.count) selected",
-                                tone: .plans
-                            )
+                                TextField("Notes", text: $templateNote, axis: .vertical)
+                                    .foregroundStyle(AppColors.textPrimary)
+                                    .lineLimit(2...4)
+                                    .appInputField()
+                            }
+                            .appFeatureSurface()
 
-                            LazyVGrid(
-                                columns: [GridItem(.adaptive(minimum: 72), spacing: 10)],
-                                spacing: 10
-                            ) {
-                                ForEach(Weekday.allCases) { weekday in
+                            VStack(alignment: .leading, spacing: 12) {
+                                AppSectionHeader(
+                                    title: "Schedule",
+                                    systemImage: "calendar.badge.clock",
+                                    subtitle: "Pin recurring days now or leave the template flexible.",
+                                    trailing: selectedWeekdays.isEmpty ? "Any day" : "\(selectedWeekdays.count) selected",
+                                    tone: .plans
+                                )
+
+                                LazyVGrid(
+                                    columns: [GridItem(.adaptive(minimum: 72), spacing: 10)],
+                                    spacing: 10
+                                ) {
+                                    ForEach(Weekday.allCases) { weekday in
+                                        Button {
+                                            if selectedWeekdays.contains(weekday) {
+                                                selectedWeekdays.remove(weekday)
+                                            } else {
+                                                selectedWeekdays.insert(weekday)
+                                            }
+                                        } label: {
+                                            Text(weekday.shortLabel)
+                                                .font(.caption.weight(.semibold))
+                                                .foregroundStyle(
+                                                    selectedWeekdays.contains(weekday)
+                                                        ? AppColors.textPrimary
+                                                        : AppColors.textSecondary
+                                                )
+                                                .frame(maxWidth: .infinity)
+                                                .padding(.vertical, 10)
+                                                .appInsetCard(
+                                                    cornerRadius: 12,
+                                                    fill: selectedWeekdays.contains(weekday)
+                                                        ? AppToneStyle.plans.softFill.opacity(0.92)
+                                                        : nil,
+                                                    border: selectedWeekdays.contains(weekday)
+                                                        ? AppToneStyle.plans.softBorder
+                                                        : nil
+                                                )
+                                        }
+                                        .buttonStyle(.plain)
+                                    }
+                                }
+                            }
+                            .appFeatureSurface()
+
+                            VStack(alignment: .leading, spacing: 12) {
+                                HStack(alignment: .top, spacing: 12) {
+                                    AppSectionHeader(
+                                        title: "Exercise Blocks",
+                                        systemImage: "dumbbell",
+                                        subtitle: "Keep the default prescription simple, then expand a block for more control.",
+                                        trailing: blocks.isEmpty ? nil : "\(blocks.count)",
+                                        tone: .today
+                                    )
+
                                     Button {
-                                        if selectedWeekdays.contains(weekday) {
-                                            selectedWeekdays.remove(weekday)
-                                        } else {
-                                            selectedWeekdays.insert(weekday)
+                                        let newBlock = TemplateDraftBlock()
+                                        blocks.append(newBlock)
+
+                                        Task { @MainActor in
+                                            await Task.yield()
+                                            withAnimation(.easeInOut(duration: 0.2)) {
+                                                scrollProxy.scrollTo(newBlock.id, anchor: .bottom)
+                                            }
                                         }
                                     } label: {
-                                        Text(weekday.shortLabel)
-                                            .font(.caption.weight(.semibold))
-                                            .foregroundStyle(
-                                                selectedWeekdays.contains(weekday)
-                                                    ? AppColors.textPrimary
-                                                    : AppColors.textSecondary
-                                            )
-                                            .frame(maxWidth: .infinity)
-                                            .padding(.vertical, 10)
-                                            .appInsetCard(
-                                                cornerRadius: 12,
-                                                fill: selectedWeekdays.contains(weekday)
-                                                    ? AppToneStyle.plans.softFill.opacity(0.92)
-                                                    : nil,
-                                                border: selectedWeekdays.contains(weekday)
-                                                    ? AppToneStyle.plans.softBorder
-                                                    : nil
-                                            )
+                                        Label("Add Block", systemImage: "plus")
                                     }
-                                    .buttonStyle(.plain)
+                                    .buttonStyle(.borderedProminent)
+                                    .buttonBorderShape(.roundedRectangle(radius: 14))
+                                    .tint(AppToneStyle.today.accent)
+                                    .accessibilityIdentifier("plans.template.addBlockButton")
                                 }
-                            }
-                        }
-                        .appFeatureSurface()
 
-                        VStack(alignment: .leading, spacing: 12) {
-                            HStack(alignment: .top, spacing: 12) {
-                                AppSectionHeader(
-                                    title: "Exercise Blocks",
-                                    systemImage: "dumbbell",
-                                    subtitle: "Keep the default prescription simple, then expand a block for more control.",
-                                    trailing: blocks.isEmpty ? nil : "\(blocks.count)",
-                                    tone: .today
-                                )
+                                if blocks.isEmpty {
+                                    VStack(alignment: .leading, spacing: 8) {
+                                        AppStatePill(title: "Start Here", systemImage: "sparkles", tone: .today)
 
-                                Button {
-                                    blocks.append(TemplateDraftBlock())
-                                } label: {
-                                    Label("Add Block", systemImage: "plus")
-                                }
-                                .buttonStyle(.borderedProminent)
-                                .buttonBorderShape(.roundedRectangle(radius: 14))
-                                .tint(AppToneStyle.today.accent)
-                                .accessibilityIdentifier("plans.template.addBlockButton")
-                            }
+                                        Text("Add at least one exercise block.")
+                                            .font(.headline.weight(.semibold))
+                                            .foregroundStyle(AppColors.textPrimary)
 
-                            if blocks.isEmpty {
-                                VStack(alignment: .leading, spacing: 8) {
-                                    AppStatePill(title: "Start Here", systemImage: "sparkles", tone: .today)
-
-                                    Text("Add at least one exercise block.")
-                                        .font(.headline.weight(.semibold))
-                                        .foregroundStyle(AppColors.textPrimary)
-
-                                    Text("Each block holds the main prescription up front, with progression details hidden until you need them.")
+                                        Text(
+                                            "Each block holds the main prescription up front, with progression details hidden until you need them."
+                                        )
                                         .font(.subheadline)
                                         .foregroundStyle(AppColors.textSecondary)
-                                }
-                                .frame(maxWidth: .infinity, alignment: .leading)
-                                .appInsetContentCard(
-                                    fill: AppToneStyle.today.softFill.opacity(0.55),
-                                    border: AppToneStyle.today.softBorder
-                                )
-                            } else {
-                                LazyVStack(spacing: 12) {
-                                    ForEach($blocks) { $block in
-                                        TemplateDraftBlockEditorView(
-                                            block: $block,
-                                            weightUnit: weightUnit,
-                                            onPickExercise: { blockID in
-                                                showingExercisePickerForBlockID = blockID
-                                            },
-                                            onDelete: { blockID in
-                                                blocks.removeAll(where: { $0.id == blockID })
-                                            }
-                                        )
+                                    }
+                                    .frame(maxWidth: .infinity, alignment: .leading)
+                                    .appInsetContentCard(
+                                        fill: AppToneStyle.today.softFill.opacity(0.55),
+                                        border: AppToneStyle.today.softBorder
+                                    )
+                                } else {
+                                    LazyVStack(spacing: 12) {
+                                        ForEach($blocks) { $block in
+                                            TemplateDraftBlockEditorView(
+                                                block: $block,
+                                                weightUnit: weightUnit,
+                                                onPickExercise: { blockID in
+                                                    showingExercisePickerForBlockID = blockID
+                                                },
+                                                onDelete: { blockID in
+                                                    blocks.removeAll(where: { $0.id == blockID })
+                                                }
+                                            )
+                                            .id($block.wrappedValue.id)
+                                        }
                                     }
                                 }
                             }
+                            .appFeatureSurface()
                         }
-                        .appFeatureSurface()
+                        .scrollIndicators(.hidden)
                     }
                     .padding(.horizontal, 16)
                     .padding(.vertical, 14)
                 }
-                .scrollIndicators(.hidden)
             }
             .navigationTitle(existingTemplate == nil ? "New Template" : "Edit Template")
             .toolbarBackground(AppColors.chrome, for: .navigationBar)
@@ -639,22 +652,27 @@ private struct TemplateDraftBlockEditorView: View {
                         .font(.system(.title3, design: .rounded).weight(.bold))
                         .foregroundStyle(AppColors.textPrimary)
 
-                    Text(block.exerciseID == nil
-                        ? "Pick the movement first, then set the working prescription."
-                        : "Keep the core prescription visible and hide the extra tuning below.")
-                        .font(.subheadline)
-                        .foregroundStyle(AppColors.textSecondary)
+                    Text(
+                        block.exerciseID == nil
+                            ? "Pick the movement first, then set the working prescription."
+                            : "Keep the core prescription visible and hide the extra tuning below."
+                    )
+                    .font(.subheadline)
+                    .foregroundStyle(AppColors.textSecondary)
                 }
 
                 Spacer(minLength: 12)
 
                 VStack(spacing: 8) {
-                    Button("Pick") {
+                    Button {
                         onPickExercise(block.id)
+                    } label: {
+                        Text("Pick")
                     }
                     .buttonStyle(.bordered)
                     .buttonBorderShape(.roundedRectangle(radius: 12))
                     .tint(AppToneStyle.plans.accent)
+                    .accessibilityIdentifier("plans.template.pickExerciseButton")
 
                     Button(role: .destructive) {
                         onDelete(block.id)

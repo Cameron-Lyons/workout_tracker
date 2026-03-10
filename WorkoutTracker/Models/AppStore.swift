@@ -18,6 +18,7 @@ final class AppStore {
     let progressStore: ProgressStore
 
     var isHydrated = false
+    var persistenceStartupIssue: PersistenceStartupIssue?
 
     init(
         modelContainer: ModelContainer = WorkoutModelContainerFactory.makeContainer(),
@@ -44,6 +45,7 @@ final class AppStore {
         self.sessionStore = sessionStore
         self.todayStore = todayStore
         self.progressStore = progressStore
+        persistenceStartupIssue = WorkoutModelContainerFactory.consumeStartupIssue()
         self.derivedStateController = derivedStateController
         self.planCoordinator = AppPlanCoordinator(
             settingsStore: settingsStore,
@@ -57,6 +59,10 @@ final class AppStore {
             sessionStore: sessionStore,
             derivedStateController: derivedStateController
         )
+    }
+
+    func dismissPersistenceStartupIssue() {
+        persistenceStartupIssue = nil
     }
 
     var shouldShowOnboarding: Bool {

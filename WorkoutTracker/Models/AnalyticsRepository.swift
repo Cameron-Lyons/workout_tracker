@@ -45,6 +45,7 @@ struct AnalyticsRepository: Sendable {
     }
 
     private struct BlockAnalysis {
+        var volume: Double
         var payload: SessionExercisePayload?
         var newRecords: [PersonalRecord]
     }
@@ -133,9 +134,9 @@ struct AnalyticsRepository: Sendable {
                 for record in blockAnalysis.newRecords {
                     accumulator.currentPR = record
                 }
+                sessionVolume += blockAnalysis.volume
+                accumulator.totalVolume += blockAnalysis.volume
                 if let payload = blockAnalysis.payload {
-                    sessionVolume += payload.volume
-                    accumulator.totalVolume += payload.volume
                     accumulator.points.append(
                         ProgressPoint(
                             sessionID: payload.sessionID,
@@ -280,14 +281,26 @@ struct AnalyticsRepository: Sendable {
         var blockVolume = 0.0
         var topWeight = 0.0
         var topReps = 0
-        var hasWeightedRow = false
+        var hasProgressRow = false
         var newRecords: [PersonalRecord] = []
 
         for row in block.sets {
-            guard let weight = row.log.weight,
+            guard row.log.isCompleted,
+                let weight = row.log.weight,
                 let reps = row.log.reps,
                 reps > 0
             else {
+                continue
+            }
+
+            guard weight > 0 else {
+                continue
+            }
+
+            let rowVolume = weight * Double(reps)
+            blockVolume += rowVolume
+
+            guard row.target.setKind == .working else {
                 continue
             }
 
@@ -309,22 +322,15 @@ struct AnalyticsRepository: Sendable {
                 )
             }
 
-            guard weight > 0 else {
-                continue
-            }
-
-            let rowVolume = weight * Double(reps)
-            blockVolume += rowVolume
-
-            if !hasWeightedRow || weight > topWeight {
+            if !hasProgressRow || weight > topWeight {
                 topWeight = weight
                 topReps = reps
-                hasWeightedRow = true
+                hasProgressRow = true
             }
         }
 
         let payload =
-            hasWeightedRow
+            hasProgressRow
             ? SessionExercisePayload(
                 sessionID: session.id,
                 exerciseID: block.exerciseID,
@@ -335,7 +341,7 @@ struct AnalyticsRepository: Sendable {
                 volume: blockVolume
             ) : nil
 
-        return BlockAnalysis(payload: payload, newRecords: newRecords)
+        return BlockAnalysis(volume: blockVolume, payload: payload, newRecords: newRecords)
     }
 
 }
