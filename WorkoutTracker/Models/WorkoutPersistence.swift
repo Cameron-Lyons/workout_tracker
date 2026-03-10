@@ -1,5 +1,6 @@
 import Foundation
 import SwiftData
+import os
 
 // Legacy v1/v1.5 models remain registered so older stores can be opened and reset.
 @Model
@@ -1101,18 +1102,150 @@ typealias StoredCompletedSession = WorkoutSchemaV2.StoredCompletedSession
 typealias StoredCompletedSessionBlock = WorkoutSchemaV2.StoredCompletedSessionBlock
 typealias StoredCompletedSessionRow = WorkoutSchemaV2.StoredCompletedSessionRow
 
+struct PersistenceStartupIssue: Identifiable, Equatable {
+    let id = UUID()
+    let title: String
+    let message: String
+}
+
+enum PersistenceDiagnostics {
+    private static let logger = Logger(subsystem: "com.cam.workouttracker", category: "Persistence")
+
+    static func record(_ message: String) {
+        logger.error("\(message, privacy: .public)")
+    }
+
+    static func record(_ message: String, error: any Error) {
+        logger.error(
+            "\(message, privacy: .public): \(String(describing: error), privacy: .public)"
+        )
+    }
+}
+
 enum WorkoutModelContainerFactory {
-    static func makeContainer(isStoredInMemoryOnly: Bool = false) -> ModelContainer {
-        let configuration = ModelConfiguration(isStoredInMemoryOnly: isStoredInMemoryOnly)
+    private static let schema = Schema(versionedSchema: WorkoutSchemaV2.self)
+    private static let storeDirectoryName = "WorkoutTracker"
+    private static let storeFilename = "WorkoutTracker.store"
+    nonisolated(unsafe) private static var pendingStartupIssue: PersistenceStartupIssue?
+    private static let storageUnavailableMessage =
+        "WorkoutTracker could not open its local database, so the app started with temporary "
+        + "in-memory storage. Data from this launch will not persist after you close the app."
+    private static let storageResetMessage =
+        "WorkoutTracker reset its local database after a storage error. Existing saved plans "
+        + "and workout history may need to be recreated."
+
+    static func makeContainer(
+        isStoredInMemoryOnly: Bool = false,
+        storeURL: URL? = nil
+    ) -> ModelContainer {
+        pendingStartupIssue = nil
+
+        if isStoredInMemoryOnly {
+            do {
+                return try makeInMemoryContainer()
+            } catch {
+                fatalError("Failed to initialize in-memory SwiftData container: \(error)")
+            }
+        }
+
+        guard let resolvedStoreURL = try? persistentStoreURL(explicitURL: storeURL) else {
+            PersistenceDiagnostics.record("Failed to resolve persistent store URL. Falling back to in-memory storage.")
+            return fallbackInMemoryContainer(
+                title: "Storage Unavailable",
+                message: storageUnavailableMessage
+            )
+        }
 
         do {
-            return try ModelContainer(
-                for: Schema(versionedSchema: WorkoutSchemaV2.self),
-                migrationPlan: WorkoutSchemaMigrationPlan.self,
-                configurations: configuration
-            )
+            return try makePersistentContainer(at: resolvedStoreURL)
         } catch {
-            fatalError("Failed to initialize SwiftData container: \(error)")
+            PersistenceDiagnostics.record("Failed to initialize persistent SwiftData container", error: error)
+
+            do {
+                try removePersistentStoreArtifacts(at: resolvedStoreURL)
+                let recoveredContainer = try makePersistentContainer(at: resolvedStoreURL)
+                pendingStartupIssue = PersistenceStartupIssue(
+                    title: "Storage Reset",
+                    message: storageResetMessage
+                )
+                PersistenceDiagnostics.record("Recovered persistent store by resetting local database.")
+                return recoveredContainer
+            } catch {
+                PersistenceDiagnostics.record(
+                    "Failed to recover persistent SwiftData container. Falling back to in-memory storage",
+                    error: error
+                )
+                return fallbackInMemoryContainer(
+                    title: "Storage Unavailable",
+                    message: storageUnavailableMessage
+                )
+            }
+        }
+    }
+
+    static func consumeStartupIssue() -> PersistenceStartupIssue? {
+        defer { pendingStartupIssue = nil }
+        return pendingStartupIssue
+    }
+
+    private static func makePersistentContainer(at url: URL) throws -> ModelContainer {
+        let configuration = ModelConfiguration(schema: schema, url: url)
+        return try ModelContainer(
+            for: schema,
+            migrationPlan: WorkoutSchemaMigrationPlan.self,
+            configurations: configuration
+        )
+    }
+
+    private static func makeInMemoryContainer() throws -> ModelContainer {
+        let configuration = ModelConfiguration(isStoredInMemoryOnly: true)
+        return try ModelContainer(
+            for: schema,
+            migrationPlan: WorkoutSchemaMigrationPlan.self,
+            configurations: configuration
+        )
+    }
+
+    private static func fallbackInMemoryContainer(title: String, message: String) -> ModelContainer {
+        pendingStartupIssue = PersistenceStartupIssue(title: title, message: message)
+
+        do {
+            return try makeInMemoryContainer()
+        } catch {
+            fatalError("Failed to initialize fallback SwiftData container: \(error)")
+        }
+    }
+
+    private static func persistentStoreURL(explicitURL: URL?) throws -> URL {
+        if let explicitURL {
+            try FileManager.default.createDirectory(
+                at: explicitURL.deletingLastPathComponent(),
+                withIntermediateDirectories: true
+            )
+            return explicitURL
+        }
+
+        let supportDirectory = try FileManager.default.url(
+            for: .applicationSupportDirectory,
+            in: .userDomainMask,
+            appropriateFor: nil,
+            create: true
+        )
+        let storeDirectory = supportDirectory.appendingPathComponent(storeDirectoryName, isDirectory: true)
+        try FileManager.default.createDirectory(at: storeDirectory, withIntermediateDirectories: true)
+        return storeDirectory.appendingPathComponent(storeFilename)
+    }
+
+    private static func removePersistentStoreArtifacts(at url: URL) throws {
+        let fileManager = FileManager.default
+        let relatedURLs = [
+            url,
+            URL(fileURLWithPath: url.path + "-shm"),
+            URL(fileURLWithPath: url.path + "-wal"),
+        ]
+
+        for candidate in relatedURLs where fileManager.fileExists(atPath: candidate.path) {
+            try fileManager.removeItem(at: candidate)
         }
     }
 }

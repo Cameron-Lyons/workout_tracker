@@ -145,6 +145,103 @@ final class WorkoutProgramEngineTests: XCTestCase {
         XCTAssertEqual(updated.profile?.trainingMax, 210)
     }
 
+    func testDoubleProgressionDoesNotAdvanceWithoutWorkingSets() {
+        let block = ExerciseBlock(
+            exerciseID: CatalogSeed.backSquat,
+            exerciseNameSnapshot: "Back Squat",
+            progressionRule: ProgressionRule(
+                kind: .doubleProgression,
+                doubleProgression: DoubleProgressionRule(
+                    targetRepRange: RepRange(8, 10),
+                    increment: 5
+                )
+            ),
+            targets: [
+                SetTarget(targetWeight: 225, repRange: RepRange(8, 10))
+            ]
+        )
+
+        let completedBlock = CompletedSessionBlock(
+            exerciseID: CatalogSeed.backSquat,
+            exerciseNameSnapshot: "Back Squat",
+            blockNote: "",
+            restSeconds: 90,
+            supersetGroup: nil,
+            progressionRule: block.progressionRule,
+            sets: [
+                SessionSetRow(
+                    target: SetTarget(setKind: .warmup, targetWeight: 135, repRange: RepRange(5, 5)),
+                    log: SetLog(setTargetID: UUID(), weight: 135, reps: 5, completedAt: .now)
+                )
+            ]
+        )
+
+        let updated = ProgressionEngine.applyCompletion(
+            to: block,
+            using: completedBlock,
+            profile: nil,
+            fallbackIncrement: 5
+        )
+
+        XCTAssertEqual(updated.block.targets.compactMap(\.targetWeight), [225])
+    }
+
+    func testDoubleProgressionDoesNotAdvanceWhenWorkingSetsRemainIncomplete() {
+        let block = ExerciseBlock(
+            exerciseID: CatalogSeed.backSquat,
+            exerciseNameSnapshot: "Back Squat",
+            progressionRule: ProgressionRule(
+                kind: .doubleProgression,
+                doubleProgression: DoubleProgressionRule(
+                    targetRepRange: RepRange(8, 10),
+                    increment: 5
+                )
+            ),
+            targets: [
+                SetTarget(targetWeight: 225, repRange: RepRange(8, 10)),
+                SetTarget(targetWeight: 225, repRange: RepRange(8, 10)),
+            ]
+        )
+
+        let completedBlock = CompletedSessionBlock(
+            exerciseID: CatalogSeed.backSquat,
+            exerciseNameSnapshot: "Back Squat",
+            blockNote: "",
+            restSeconds: 90,
+            supersetGroup: nil,
+            progressionRule: block.progressionRule,
+            sets: [
+                SessionSetRow(
+                    target: block.targets[0],
+                    log: SetLog(
+                        setTargetID: block.targets[0].id,
+                        weight: 225,
+                        reps: 10,
+                        completedAt: .now
+                    )
+                ),
+                SessionSetRow(
+                    target: block.targets[1],
+                    log: SetLog(
+                        setTargetID: block.targets[1].id,
+                        weight: 225,
+                        reps: 10,
+                        completedAt: nil
+                    )
+                ),
+            ]
+        )
+
+        let updated = ProgressionEngine.applyCompletion(
+            to: block,
+            using: completedBlock,
+            profile: nil,
+            fallbackIncrement: 5
+        )
+
+        XCTAssertEqual(updated.block.targets.compactMap(\.targetWeight), [225, 225])
+    }
+
     func testStartingSessionInjectsWarmupsBeforeWorkingSets() {
         let template = WorkoutTemplate(
             name: "Test Template",

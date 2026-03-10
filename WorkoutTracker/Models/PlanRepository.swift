@@ -22,7 +22,8 @@ final class PlanRepository {
             }
     }
 
-    func saveCatalog(_ catalog: [ExerciseCatalogItem]) {
+    @discardableResult
+    func saveCatalog(_ catalog: [ExerciseCatalogItem]) -> Bool {
         var recordsByID = Dictionary(uniqueKeysWithValues: loadCatalogRecords().map { ($0.id, $0) })
 
         for item in catalog {
@@ -43,7 +44,7 @@ final class PlanRepository {
         }
 
         recordsByID.values.forEach(modelContext.delete)
-        saveContext()
+        return saveContext("catalog")
     }
 
     func loadPlans() -> [Plan] {
@@ -52,7 +53,8 @@ final class PlanRepository {
         return records.compactMap(plan(from:))
     }
 
-    func savePlans(_ plans: [Plan]) {
+    @discardableResult
+    func savePlans(_ plans: [Plan]) -> Bool {
         var recordsByID = Dictionary(uniqueKeysWithValues: loadPlanRecords().map { ($0.id, $0) })
 
         for plan in plans {
@@ -74,7 +76,7 @@ final class PlanRepository {
         }
 
         recordsByID.values.forEach(modelContext.delete)
-        saveContext()
+        return saveContext("plans")
     }
 
     func loadProfiles() -> [ExerciseProfile] {
@@ -82,7 +84,8 @@ final class PlanRepository {
         return records.compactMap(profile(from:))
     }
 
-    func saveProfiles(_ profiles: [ExerciseProfile]) {
+    @discardableResult
+    func saveProfiles(_ profiles: [ExerciseProfile]) -> Bool {
         var recordsByID = Dictionary(uniqueKeysWithValues: loadProfileRecords().map { ($0.id, $0) })
 
         for profile in profiles {
@@ -103,17 +106,18 @@ final class PlanRepository {
         }
 
         recordsByID.values.forEach(modelContext.delete)
-        saveContext()
+        return saveContext("profiles")
     }
 
-    func deleteEverything() {
+    @discardableResult
+    func deleteEverything() -> Bool {
         loadCatalogRecords().forEach(modelContext.delete)
         loadPlanRecords().forEach(modelContext.delete)
         loadProfileRecords().forEach(modelContext.delete)
         loadLegacyCatalogRecords().forEach(modelContext.delete)
         loadLegacyPlanRecords().forEach(modelContext.delete)
         loadLegacyProfileRecords().forEach(modelContext.delete)
-        saveContext()
+        return saveContext("plans reset")
     }
 
     private func catalogItem(from record: StoredCatalogItem) -> ExerciseCatalogItem? {
@@ -464,11 +468,19 @@ final class PlanRepository {
         try? decoder.decode(Value.self, from: data)
     }
 
-    private func saveContext() {
+    @discardableResult
+    private func saveContext(_ operation: String) -> Bool {
         guard modelContext.hasChanges else {
-            return
+            return true
         }
 
-        try? modelContext.save()
+        do {
+            try modelContext.save()
+            return true
+        } catch {
+            modelContext.rollback()
+            PersistenceDiagnostics.record("Failed to save \(operation) context", error: error)
+            return false
+        }
     }
 }

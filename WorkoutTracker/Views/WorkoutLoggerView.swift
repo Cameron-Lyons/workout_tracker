@@ -374,6 +374,8 @@ private struct SessionSetRowView: View, Equatable {
                     unit: weightUnit.symbol,
                     caption: loadCaption,
                     tone: tone,
+                    accessibilityLabelContext: row.target.setKind.displayName,
+                    accessibilityIdentifierPrefix: "session.adjust.load.\(blockID.uuidString).\(row.id.uuidString)",
                     onDecrease: {
                         appStore.adjustSetWeight(
                             blockID: blockID,
@@ -396,6 +398,8 @@ private struct SessionSetRowView: View, Equatable {
                     unit: "",
                     caption: repsCaption,
                     tone: tone,
+                    accessibilityLabelContext: row.target.setKind.displayName,
+                    accessibilityIdentifierPrefix: "session.adjust.reps.\(blockID.uuidString).\(row.id.uuidString)",
                     onDecrease: {
                         appStore.adjustSetReps(blockID: blockID, setID: row.id, delta: -1)
                     },
@@ -429,6 +433,8 @@ private struct SessionStatControlView: View {
     let unit: String
     let caption: String?
     let tone: AppToneStyle
+    let accessibilityLabelContext: String
+    let accessibilityIdentifierPrefix: String
     let onDecrease: () -> Void
     let onIncrease: () -> Void
 
@@ -454,8 +460,22 @@ private struct SessionStatControlView: View {
             }
 
             HStack(spacing: 8) {
-                SessionAdjustButton(systemImage: "minus", tone: tone, action: onDecrease)
-                SessionAdjustButton(systemImage: "plus", tone: tone, action: onIncrease)
+                SessionAdjustButton(
+                    systemImage: "minus",
+                    tone: tone,
+                    accessibilityLabel: "Decrease \(title.lowercased()) for the \(accessibilityLabelContext.lowercased()) set",
+                    accessibilityValue: unit.isEmpty ? value : "\(value) \(unit)",
+                    accessibilityIdentifier: "\(accessibilityIdentifierPrefix).decrease",
+                    action: onDecrease
+                )
+                SessionAdjustButton(
+                    systemImage: "plus",
+                    tone: tone,
+                    accessibilityLabel: "Increase \(title.lowercased()) for the \(accessibilityLabelContext.lowercased()) set",
+                    accessibilityValue: unit.isEmpty ? value : "\(value) \(unit)",
+                    accessibilityIdentifier: "\(accessibilityIdentifierPrefix).increase",
+                    action: onIncrease
+                )
             }
         }
         .frame(maxWidth: .infinity, minHeight: ActiveSessionViewMetrics.statControlHeight, alignment: .leading)
@@ -467,6 +487,9 @@ private struct SessionStatControlView: View {
 private struct SessionAdjustButton: View {
     let systemImage: String
     let tone: AppToneStyle
+    let accessibilityLabel: String
+    let accessibilityValue: String
+    let accessibilityIdentifier: String
     let action: () -> Void
 
     var body: some View {
@@ -485,6 +508,9 @@ private struct SessionAdjustButton: View {
                 )
         }
         .buttonStyle(.plain)
+        .accessibilityLabel(accessibilityLabel)
+        .accessibilityValue(accessibilityValue)
+        .accessibilityIdentifier(accessibilityIdentifier)
     }
 }
 

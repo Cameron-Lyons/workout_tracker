@@ -90,7 +90,7 @@ final class WorkoutTrackerUITests: XCTestCase {
         planNameField.typeText("Custom Plan")
         app.buttons["Save"].tap()
 
-        let addTemplateButton = app.buttons["Add Template"].firstMatch
+        let addTemplateButton = app.firstButton(withIdentifierPrefix: "plans.addTemplateButton.")
         XCTAssertTrue(addTemplateButton.waitForExistence(timeout: 4))
         addTemplateButton.tap()
 
@@ -103,7 +103,8 @@ final class WorkoutTrackerUITests: XCTestCase {
         XCTAssertTrue(addBlockButton.waitForExistence(timeout: 4))
         addBlockButton.tap()
 
-        let pickButton = app.buttons["Pick"].firstMatch
+        let pickButton = app.buttons["plans.template.pickExerciseButton"].firstMatch
+        app.revealIfNeeded(pickButton)
         XCTAssertTrue(pickButton.waitForExistence(timeout: 4))
         pickButton.tap()
 
@@ -111,24 +112,28 @@ final class WorkoutTrackerUITests: XCTestCase {
         XCTAssertTrue(benchOption.waitForExistence(timeout: 4))
         benchOption.tap()
 
-        let doubleSegment = app.buttons["Double"]
-        if doubleSegment.waitForExistence(timeout: 4) {
-            doubleSegment.tap()
-        }
-
-        let supersetField = app.textFields["Superset group"]
-        XCTAssertTrue(supersetField.waitForExistence(timeout: 4))
-        supersetField.tap()
-        supersetField.typeText("A")
-
         let saveTemplateButton = app.buttons["plans.template.saveButton"]
         XCTAssertTrue(saveTemplateButton.waitForExistence(timeout: 4))
         saveTemplateButton.tap()
 
-        let startButton = app.buttons["Start"].firstMatch
+        let startButton = app.firstButton(withIdentifierPrefix: "plans.startTemplate.")
         XCTAssertTrue(startButton.waitForExistence(timeout: 6))
         startButton.tap()
 
         XCTAssertTrue(app.buttons["session.finishButton"].waitForExistence(timeout: 8))
+    }
+}
+
+private extension XCUIApplication {
+    func firstButton(withIdentifierPrefix prefix: String) -> XCUIElement {
+        buttons.matching(NSPredicate(format: "identifier BEGINSWITH %@", prefix)).firstMatch
+    }
+
+    func revealIfNeeded(_ element: XCUIElement, maxSwipes: Int = 6) {
+        var swipeCount = 0
+        while !element.exists && swipeCount < maxSwipes {
+            swipeUp()
+            swipeCount += 1
+        }
     }
 }

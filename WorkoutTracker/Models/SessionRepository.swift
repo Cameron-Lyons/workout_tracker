@@ -17,7 +17,8 @@ final class SessionRepository {
         return records.last.flatMap(activeDraft(from:))
     }
 
-    func saveActiveDraft(_ draft: SessionDraft?) {
+    @discardableResult
+    func saveActiveDraft(_ draft: SessionDraft?) -> Bool {
         let records = loadActiveDraftRecords()
         let existingRecord = records.first
         records.dropFirst().forEach(modelContext.delete)
@@ -26,8 +27,7 @@ final class SessionRepository {
             if let existingRecord {
                 modelContext.delete(existingRecord)
             }
-            saveContext()
-            return
+            return saveContext("active draft")
         }
 
         let record: StoredActiveSession
@@ -49,7 +49,7 @@ final class SessionRepository {
 
         apply(draft, to: record)
         syncActiveBlocks(of: record, with: draft.blocks)
-        saveContext()
+        return saveContext("active draft")
     }
 
     func loadCompletedSessions() -> [CompletedSession] {
@@ -60,7 +60,8 @@ final class SessionRepository {
         return records.compactMap(completedSession(from:))
     }
 
-    func saveCompletedSessions(_ sessions: [CompletedSession]) {
+    @discardableResult
+    func saveCompletedSessions(_ sessions: [CompletedSession]) -> Bool {
         var recordsByID = Dictionary(uniqueKeysWithValues: loadCompletedSessionRecords().map { ($0.id, $0) })
 
         for session in sessions {
@@ -74,10 +75,11 @@ final class SessionRepository {
         }
 
         recordsByID.values.forEach(modelContext.delete)
-        saveContext()
+        return saveContext("completed sessions")
     }
 
-    func saveCompletedSession(_ session: CompletedSession) {
+    @discardableResult
+    func saveCompletedSession(_ session: CompletedSession) -> Bool {
         let descriptor = FetchDescriptor<StoredCompletedSession>(
             predicate: #Predicate<StoredCompletedSession> { $0.id == session.id }
         )
@@ -88,15 +90,16 @@ final class SessionRepository {
 
         apply(session, to: record)
         syncCompletedBlocks(of: record, with: session.blocks)
-        saveContext()
+        return saveContext("completed session")
     }
 
-    func deleteEverything() {
+    @discardableResult
+    func deleteEverything() -> Bool {
         loadActiveDraftRecords().forEach(modelContext.delete)
         loadCompletedSessionRecords().forEach(modelContext.delete)
         loadLegacyActiveDraftRecords().forEach(modelContext.delete)
         loadLegacyCompletedSessionRecords().forEach(modelContext.delete)
-        saveContext()
+        return saveContext("sessions reset")
     }
 
     private func activeDraft(from record: StoredActiveSession) -> SessionDraft? {
@@ -596,12 +599,20 @@ final class SessionRepository {
         try? decoder.decode(Value.self, from: data)
     }
 
-    private func saveContext() {
+    @discardableResult
+    private func saveContext(_ operation: String) -> Bool {
         guard modelContext.hasChanges else {
-            return
+            return true
         }
 
-        try? modelContext.save()
+        do {
+            try modelContext.save()
+            return true
+        } catch {
+            modelContext.rollback()
+            PersistenceDiagnostics.record("Failed to save \(operation) context", error: error)
+            return false
+        }
     }
 }
 

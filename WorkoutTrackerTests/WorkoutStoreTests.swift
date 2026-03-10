@@ -7,10 +7,12 @@ final class WorkoutStoreTests: XCTestCase {
     override func setUp() {
         super.setUp()
         resetDefaults()
+        _ = WorkoutModelContainerFactory.consumeStartupIssue()
     }
 
     override func tearDown() {
         resetDefaults()
+        _ = WorkoutModelContainerFactory.consumeStartupIssue()
         super.tearDown()
     }
 
@@ -54,7 +56,7 @@ final class WorkoutStoreTests: XCTestCase {
 
         let draft = try XCTUnwrap(store.sessionStore.activeDraft)
         let block = try XCTUnwrap(draft.blocks.first)
-        let row = try XCTUnwrap(block.sets.first)
+        let row = try XCTUnwrap(block.sets.first(where: { $0.target.setKind == .working }))
 
         store.toggleSetCompletion(blockID: block.id, setID: row.id)
         store.finishActiveSession()
@@ -113,6 +115,55 @@ final class WorkoutStoreTests: XCTestCase {
         XCTAssertEqual(summaries.first?.pointCount, 2)
         XCTAssertGreaterThan(summaries.first?.totalVolume ?? 0, 0)
         XCTAssertEqual(records.last?.weight, 235)
+    }
+
+    func testAnalyticsIgnoreIncompleteRowsForProgressAndVolume() {
+        let analytics = AnalyticsRepository()
+        let session = makeCompletedSession(
+            date: .now,
+            exerciseID: CatalogSeed.benchPress,
+            exerciseName: "Bench Press",
+            rows: [
+                makeRow(kind: .working, weight: 225, reps: 5),
+                makeRow(kind: .working, weight: 315, reps: 1, completedAt: nil),
+            ]
+        )
+
+        let records = analytics.finishSummary(
+            for: session,
+            previousBestByExerciseID: [:],
+            catalogByID: [:]
+        ).personalRecords
+        let payload = analytics.sessionExercisePayloads(from: session).first
+
+        XCTAssertEqual(analytics.volume(for: session), 1_125)
+        XCTAssertEqual(records.last?.weight, 225)
+        XCTAssertEqual(payload?.topWeight, 225)
+    }
+
+    func testAnalyticsReserveRecordsAndProgressPointsForWorkingSets() {
+        let analytics = AnalyticsRepository()
+        let session = makeCompletedSession(
+            date: .now,
+            exerciseID: CatalogSeed.backSquat,
+            exerciseName: "Back Squat",
+            rows: [
+                makeRow(kind: .warmup, weight: 315, reps: 1),
+                makeRow(kind: .dropSet, weight: 185, reps: 12),
+                makeRow(kind: .working, weight: 225, reps: 5),
+            ]
+        )
+
+        let summary = analytics.finishSummary(
+            for: session,
+            previousBestByExerciseID: [:],
+            catalogByID: [:]
+        )
+        let payload = analytics.sessionExercisePayloads(from: session).first
+
+        XCTAssertEqual(summary.personalRecords.last?.weight, 225)
+        XCTAssertEqual(payload?.topWeight, 225)
+        XCTAssertEqual(summary.totalVolume, 3_660)
     }
 
     func testDerivedStoreSnapshotMatchesStandaloneTodayAndProgressSnapshots() {
@@ -638,6 +689,35 @@ final class WorkoutStoreTests: XCTestCase {
     }
 
     @MainActor
+    func testContainerFactoryRecoversFromInvalidPersistentStorePath() throws {
+        let storeDirectory = FileManager.default.temporaryDirectory
+            .appendingPathComponent(UUID().uuidString, isDirectory: true)
+        let storeURL = storeDirectory.appendingPathComponent("WorkoutTracker.store")
+
+        try FileManager.default.createDirectory(at: storeDirectory, withIntermediateDirectories: true)
+        try FileManager.default.createDirectory(at: storeURL, withIntermediateDirectories: true)
+        defer {
+            try? FileManager.default.removeItem(at: storeDirectory)
+            _ = WorkoutModelContainerFactory.consumeStartupIssue()
+        }
+
+        let container = WorkoutModelContainerFactory.makeContainer(storeURL: storeURL)
+        let issue = try XCTUnwrap(WorkoutModelContainerFactory.consumeStartupIssue())
+        let context = ModelContext(container)
+        context.autosaveEnabled = false
+        let repository = PlanRepository(modelContext: context)
+        let catalogItem = ExerciseCatalogItem(
+            id: CatalogSeed.benchPress,
+            name: "Bench Press",
+            category: .chest
+        )
+
+        XCTAssertEqual(issue.title, "Storage Reset")
+        XCTAssertTrue(repository.saveCatalog([catalogItem]))
+        XCTAssertEqual(repository.loadCatalog().first?.name, "Bench Press")
+    }
+
+    @MainActor
     func testDeferredDraftMutationsPersistWhenFlushed() throws {
         let container = WorkoutModelContainerFactory.makeContainer(isStoredInMemoryOnly: true)
         let context = ModelContext(container)
@@ -864,7 +944,7 @@ final class WorkoutStoreTests: XCTestCase {
         store.startSession(planID: plan.id, templateID: try XCTUnwrap(plan.templates.first?.id))
 
         let block = try XCTUnwrap(store.sessionStore.activeDraft?.blocks.first)
-        let row = try XCTUnwrap(block.sets.first)
+        let row = try XCTUnwrap(block.sets.first(where: { $0.target.setKind == .working }))
         store.toggleSetCompletion(blockID: block.id, setID: row.id)
         store.finishActiveSession()
 
@@ -886,7 +966,7 @@ final class WorkoutStoreTests: XCTestCase {
         for _ in 0..<2 {
             store.startSession(planID: reference.planID, templateID: reference.templateID)
             let block = try XCTUnwrap(store.sessionStore.activeDraft?.blocks.first)
-            let row = try XCTUnwrap(block.sets.first)
+            let row = try XCTUnwrap(block.sets.first(where: { $0.target.setKind == .working }))
             store.toggleSetCompletion(blockID: block.id, setID: row.id)
             store.finishActiveSession()
         }
@@ -958,11 +1038,16 @@ final class WorkoutStoreTests: XCTestCase {
         )
     }
 
-    private func makeRow(kind: SetKind, weight: Double, reps: Int) -> SessionSetRow {
+    private func makeRow(
+        kind: SetKind,
+        weight: Double,
+        reps: Int,
+        completedAt: Date? = .now
+    ) -> SessionSetRow {
         let target = SetTarget(setKind: kind, targetWeight: weight, repRange: RepRange(reps, reps))
         return SessionSetRow(
             target: target,
-            log: SetLog(setTargetID: target.id, weight: weight, reps: reps, completedAt: .now)
+            log: SetLog(setTargetID: target.id, weight: weight, reps: reps, completedAt: completedAt)
         )
     }
 
