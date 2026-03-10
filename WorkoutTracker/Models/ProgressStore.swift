@@ -72,14 +72,16 @@ final class ProgressStore {
         let newPersonalRecordsByExerciseID = Dictionary(grouping: finishSummary?.personalRecords ?? [], by: \.exerciseID)
 
         for (exerciseID, payloads) in payloadsByExerciseID {
-            var summary = summariesByExerciseID[exerciseID] ?? ExerciseAnalyticsSummary(
-                exerciseID: exerciseID,
-                displayName: catalogByID[exerciseID]?.name ?? payloads.last?.displayName ?? "Unknown Exercise",
-                pointCount: 0,
-                totalVolume: 0,
-                currentPR: nil,
-                points: []
-            )
+            var summary =
+                summariesByExerciseID[exerciseID]
+                ?? ExerciseAnalyticsSummary(
+                    exerciseID: exerciseID,
+                    displayName: catalogByID[exerciseID]?.name ?? payloads.last?.displayName ?? "Unknown Exercise",
+                    pointCount: 0,
+                    totalVolume: 0,
+                    currentPR: nil,
+                    points: []
+                )
 
             let newPoints = payloads.map {
                 ProgressPoint(
@@ -185,9 +187,11 @@ final class ProgressStore {
         summariesByID: [UUID: ExerciseAnalyticsSummary]? = nil,
         changedExerciseIDs: Set<UUID>? = nil
     ) {
-        let summariesByID = summariesByID ?? Dictionary(
-            uniqueKeysWithValues: exerciseSummaries.map { ($0.exerciseID, $0) }
-        )
+        let summariesByID =
+            summariesByID
+            ?? Dictionary(
+                uniqueKeysWithValues: exerciseSummaries.map { ($0.exerciseID, $0) }
+            )
         exerciseSummariesByID = summariesByID
 
         if let changedExerciseIDs {
@@ -231,8 +235,9 @@ final class ProgressStore {
         }
 
         if let lastDate = summary.points.last?.date,
-           let firstNewDate = newPoints.first?.date,
-           lastDate > firstNewDate {
+            let firstNewDate = newPoints.first?.date,
+            lastDate > firstNewDate
+        {
             summary.points.append(contentsOf: newPoints)
             summary.points.sort(by: { $0.date < $1.date })
             return

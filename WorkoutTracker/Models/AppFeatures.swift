@@ -390,7 +390,8 @@ final class AppSessionCoordinator {
 
     func startSession(planID: UUID, templateID: UUID) {
         guard let plan = plansStore.plan(for: planID),
-              let template = plan.templates.first(where: { $0.id == templateID }) else {
+            let template = plan.templates.first(where: { $0.id == templateID })
+        else {
             return
         }
 

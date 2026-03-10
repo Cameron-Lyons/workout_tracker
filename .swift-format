@@ -1,0 +1,28 @@
+{
+  "version" : 1,
+  "indentation" : {
+    "spaces" : 4
+  },
+  "lineLength" : 140,
+  "maximumBlankLines" : 1,
+  "indentSwitchCaseLabels" : false,
+  "respectsExistingLineBreaks" : true,
+  "lineBreakBeforeEachArgument" : false,
+  "lineBreakBeforeEachGenericRequirement" : false,
+  "lineBreakAroundMultilineExpressionChainComponents" : false,
+  "rules" : {
+    "AlwaysUseLiteralForEmptyCollectionInit" : false,
+    "BeginDocumentationCommentWithOneLineSummary" : false,
+    "FileScopedDeclarationPrivacy" : true,
+    "NeverForceUnwrap" : false,
+    "NoBlockComments" : false,
+    "NoEmptyLinesOpeningClosingBraces" : false,
+    "OmitExplicitReturns" : false,
+    "OrderedImports" : true,
+    "ReplaceForEachWithForLoop" : false,
+    "UseExplicitNilCheckInConditions" : false,
+    "UseShorthandTypeNames" : false,
+    "UseSingleLinePropertyGetter" : false,
+    "UseWhereClausesInForLoops" : false
+  }
+}

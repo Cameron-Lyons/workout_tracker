@@ -101,7 +101,8 @@ final class PlansStore {
 
     func markTemplateStarted(planID: UUID, templateID: UUID, startedAt: Date) {
         guard var plan = plan(for: planID),
-              let templateIndex = plan.templates.firstIndex(where: { $0.id == templateID }) else {
+            let templateIndex = plan.templates.firstIndex(where: { $0.id == templateID })
+        else {
             return
         }
 
@@ -243,7 +244,8 @@ final class PlansStore {
         settings: SettingsStore
     ) {
         guard var plan = plan(for: planID),
-              let templateIndex = plan.templates.firstIndex(where: { $0.id == templateID }) else {
+            let templateIndex = plan.templates.firstIndex(where: { $0.id == templateID })
+        else {
             return
         }
 
@@ -251,9 +253,11 @@ final class PlansStore {
         var updatedProfiles: [ExerciseProfile] = []
 
         for completedBlock in completedSession.blocks {
-            guard let blockIndex = template.blocks.firstIndex(where: {
-                $0.exerciseID == completedBlock.exerciseID && $0.exerciseNameSnapshot == completedBlock.exerciseNameSnapshot
-            }) else {
+            guard
+                let blockIndex = template.blocks.firstIndex(where: {
+                    $0.exerciseID == completedBlock.exerciseID && $0.exerciseNameSnapshot == completedBlock.exerciseNameSnapshot
+                })
+            else {
                 continue
             }
 
@@ -268,7 +272,8 @@ final class PlansStore {
             template.blocks[blockIndex] = updated.block
 
             if let updatedProfile = updated.profile,
-               updatedProfiles.contains(where: { $0.id == updatedProfile.id }) == false {
+                updatedProfiles.contains(where: { $0.id == updatedProfile.id }) == false
+            {
                 updatedProfiles.append(updatedProfile)
             }
         }

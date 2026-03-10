@@ -60,11 +60,11 @@ enum AppAppearance {
         navAppearance.shadowColor = .clear
         navAppearance.titleTextAttributes = [
             .foregroundColor: UIColor(AppColors.textPrimary),
-            .font: UIFont.systemFont(ofSize: 17, weight: .semibold)
+            .font: UIFont.systemFont(ofSize: 17, weight: .semibold),
         ]
         navAppearance.largeTitleTextAttributes = [
             .foregroundColor: UIColor(AppColors.textPrimary),
-            .font: UIFont.systemFont(ofSize: 33, weight: .bold)
+            .font: UIFont.systemFont(ofSize: 33, weight: .bold),
         ]
         UINavigationBar.appearance().standardAppearance = navAppearance
         UINavigationBar.appearance().scrollEdgeAppearance = navAppearance
@@ -208,7 +208,7 @@ struct AppHeroCard: View {
                             LinearGradient(
                                 colors: [
                                     AppColors.accent.opacity(0.30),
-                                    AppColors.accentAlt.opacity(0.20)
+                                    AppColors.accentAlt.opacity(0.20),
                                 ],
                                 startPoint: .topLeading,
                                 endPoint: .bottomTrailing
@@ -243,7 +243,7 @@ struct AppHeroCard: View {
                 LazyVGrid(
                     columns: [
                         GridItem(.flexible(minimum: 110), spacing: 10),
-                        GridItem(.flexible(minimum: 110), spacing: 10)
+                        GridItem(.flexible(minimum: 110), spacing: 10),
                     ],
                     alignment: .leading,
                     spacing: 10
@@ -283,7 +283,7 @@ struct AppEmptyStateCard: View {
                         LinearGradient(
                             colors: [
                                 AppColors.accent.opacity(0.28),
-                                AppColors.accent.opacity(0.10)
+                                AppColors.accent.opacity(0.10),
                             ],
                             startPoint: .topLeading,
                             endPoint: .bottomTrailing
@@ -492,7 +492,7 @@ private struct SessionFinishHeroCardView: View, Equatable {
                     label: "Finished",
                     value: summary.completedAt.formatted(date: .omitted, time: .shortened),
                     systemImage: "clock"
-                )
+                ),
             ]
         )
     }

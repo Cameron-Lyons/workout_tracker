@@ -403,7 +403,8 @@ struct TemplateEditorSheet: View {
                     kind: .percentageWave,
                     percentageWave: PercentageWaveRule.fiveThreeOne(
                         trainingMax: profileTrainingMax,
-                        currentWeekIndex: existingTemplate?.blocks.first(where: { $0.id == block.id })?.progressionRule.percentageWave?.currentWeekIndex ?? 0,
+                        currentWeekIndex: existingTemplate?.blocks.first(where: { $0.id == block.id })?.progressionRule.percentageWave?
+                            .currentWeekIndex ?? 0,
                         cycle: existingTemplate?.blocks.first(where: { $0.id == block.id })?.progressionRule.percentageWave?.cycle ?? 1,
                         cycleIncrement: increment ?? appStore.settingsStore.preferredIncrement(for: exerciseName)
                     )

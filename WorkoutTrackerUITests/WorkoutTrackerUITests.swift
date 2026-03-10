@@ -11,7 +11,7 @@ final class WorkoutTrackerUITests: XCTestCase {
         app.launchArguments += [
             "--uitesting",
             "--uitesting-in-memory",
-            "--uitesting-empty-store"
+            "--uitesting-empty-store",
         ]
         app.launch()
 
@@ -44,7 +44,7 @@ final class WorkoutTrackerUITests: XCTestCase {
         app.launchArguments += [
             "--uitesting",
             "--uitesting-in-memory",
-            "--uitesting-empty-store"
+            "--uitesting-empty-store",
         ]
         app.launch()
 
@@ -68,7 +68,7 @@ final class WorkoutTrackerUITests: XCTestCase {
         app.launchArguments += [
             "--uitesting",
             "--uitesting-in-memory",
-            "--uitesting-empty-store"
+            "--uitesting-empty-store",
         ]
         app.launch()
 

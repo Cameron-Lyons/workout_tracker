@@ -73,7 +73,7 @@ struct OnboardingView: View {
                                 label: "Session",
                                 value: "Autosaved",
                                 systemImage: "square.and.arrow.down"
-                            )
+                            ),
                         ]
                     )
 

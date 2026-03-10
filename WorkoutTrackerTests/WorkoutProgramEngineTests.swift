@@ -1,4 +1,5 @@
 import XCTest
+
 @testable import WorkoutTracker
 
 final class WorkoutProgramEngineTests: XCTestCase {
@@ -30,7 +31,7 @@ final class WorkoutProgramEngineTests: XCTestCase {
             ),
             targets: [
                 SetTarget(targetWeight: 225, repRange: RepRange(8, 10)),
-                SetTarget(targetWeight: 225, repRange: RepRange(8, 10))
+                SetTarget(targetWeight: 225, repRange: RepRange(8, 10)),
             ]
         )
 
@@ -59,7 +60,7 @@ final class WorkoutProgramEngineTests: XCTestCase {
                         reps: 11,
                         completedAt: .now
                     )
-                )
+                ),
             ]
         )
 
@@ -87,7 +88,7 @@ final class WorkoutProgramEngineTests: XCTestCase {
                             sets: [
                                 PercentageWaveSet(percentage: 0.65, repRange: RepRange(5, 5)),
                                 PercentageWaveSet(percentage: 0.75, repRange: RepRange(5, 5)),
-                                PercentageWaveSet(percentage: 0.85, repRange: RepRange(5, 5))
+                                PercentageWaveSet(percentage: 0.85, repRange: RepRange(5, 5)),
                             ]
                         )
                     ],
@@ -108,7 +109,7 @@ final class WorkoutProgramEngineTests: XCTestCase {
             trainingMax: 200,
             weeks: [
                 PercentageWaveWeek(name: "Week 1", sets: [PercentageWaveSet(percentage: 0.65, repRange: RepRange(5, 5))]),
-                PercentageWaveWeek(name: "Week 2", sets: [PercentageWaveSet(percentage: 0.70, repRange: RepRange(3, 3))])
+                PercentageWaveWeek(name: "Week 2", sets: [PercentageWaveSet(percentage: 0.70, repRange: RepRange(3, 3))]),
             ],
             currentWeekIndex: 1,
             cycle: 1,

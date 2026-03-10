@@ -83,7 +83,7 @@ private struct ProgressOverviewSectionView: View {
                     label: "Avg / Week",
                     value: String(format: "%.1f", progressStore.overview.averageSessionsPerWeek),
                     systemImage: "waveform.path.ecg"
-                )
+                ),
             ]
         )
     }
@@ -136,7 +136,8 @@ private struct ProgressChartSectionView: View {
                 .tint(AppColors.textPrimary)
 
                 if let summary = progressStore.selectedExerciseSummary,
-                   let chartSeries = progressStore.selectedExerciseChartSeries {
+                    let chartSeries = progressStore.selectedExerciseChartSeries
+                {
                     Chart {
                         ForEach(chartSeries.trendPoints) { point in
                             AreaMark(
@@ -280,14 +281,16 @@ struct AppCalendarMonthLayout: Equatable {
         workoutDays: Set<Date>,
         calendar: Calendar = .autoupdatingCurrent
     ) -> AppCalendarMonthLayout {
-        let monthStart = calendar.date(
-            from: calendar.dateComponents([.year, .month], from: displayedMonth)
-        ) ?? displayedMonth
+        let monthStart =
+            calendar.date(
+                from: calendar.dateComponents([.year, .month], from: displayedMonth)
+            ) ?? displayedMonth
         let title = monthStart.formatted(.dateTime.month(.wide).year())
         let weekdaySymbols = calendar.shortStandaloneWeekdaySymbols
 
         guard let dayRange = calendar.range(of: .day, in: .month, for: monthStart),
-              let firstWeekday = calendar.dateComponents([.weekday], from: monthStart).weekday else {
+            let firstWeekday = calendar.dateComponents([.weekday], from: monthStart).weekday
+        else {
             return AppCalendarMonthLayout(
                 monthStart: monthStart,
                 title: title,
@@ -345,7 +348,8 @@ private struct AppCalendarDayCellView: View, Equatable {
     var body: some View {
         Group {
             if let date = entry.date,
-               let dayNumber = entry.dayNumber {
+                let dayNumber = entry.dayNumber
+            {
                 Button {
                     onSelect()
                 } label: {

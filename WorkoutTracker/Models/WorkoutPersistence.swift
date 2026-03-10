@@ -205,7 +205,7 @@ enum WorkoutSchemaV1: VersionedSchema {
             StoredActiveSessionRow.self,
             StoredCompletedSession.self,
             StoredCompletedSessionBlock.self,
-            StoredCompletedSessionRow.self
+            StoredCompletedSessionRow.self,
         ]
     }
 
@@ -659,7 +659,7 @@ enum WorkoutSchemaV2: VersionedSchema {
             StoredActiveSessionRow.self,
             StoredCompletedSession.self,
             StoredCompletedSessionBlock.self,
-            StoredCompletedSessionRow.self
+            StoredCompletedSessionRow.self,
         ]
     }
 
@@ -1075,7 +1075,7 @@ enum WorkoutSchemaV2: VersionedSchema {
 enum WorkoutSchemaMigrationPlan: SchemaMigrationPlan {
     static let schemas: [any VersionedSchema.Type] = [
         WorkoutSchemaV1.self,
-        WorkoutSchemaV2.self
+        WorkoutSchemaV2.self,
     ]
 
     static let stages: [MigrationStage] = [

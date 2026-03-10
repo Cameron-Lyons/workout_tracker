@@ -20,7 +20,7 @@ enum WarmupDefaults {
     static let note = "Auto warmup"
     static let ramp = [
         WarmupRampStep(percentage: 0.40, reps: 5),
-        WarmupRampStep(percentage: 0.60, reps: 3)
+        WarmupRampStep(percentage: 0.60, reps: 3),
     ]
 }
 
@@ -138,7 +138,8 @@ enum WeightFormatter {
 
 enum WeightInputParser {
     static func parseDisplayValue(_ text: String, allowsZero: Bool = false) -> Double? {
-        let sanitized = text
+        let sanitized =
+            text
             .trimmingCharacters(in: .whitespacesAndNewlines)
             .replacingOccurrences(of: ",", with: ".")
 
@@ -260,7 +261,7 @@ enum ExerciseClassification {
         "lunge",
         "leg",
         "calf",
-        "hip thrust"
+        "hip thrust",
     ]
 
     static func isLowerBody(_ exerciseName: String) -> Bool {
@@ -411,7 +412,7 @@ extension PercentageWaveRule {
                 sets: [
                     PercentageWaveSet(percentage: 0.65, repRange: RepRange(5, 5)),
                     PercentageWaveSet(percentage: 0.75, repRange: RepRange(5, 5)),
-                    PercentageWaveSet(percentage: 0.85, repRange: RepRange(5, 5), note: "AMRAP")
+                    PercentageWaveSet(percentage: 0.85, repRange: RepRange(5, 5), note: "AMRAP"),
                 ]
             ),
             PercentageWaveWeek(
@@ -419,7 +420,7 @@ extension PercentageWaveRule {
                 sets: [
                     PercentageWaveSet(percentage: 0.70, repRange: RepRange(3, 3)),
                     PercentageWaveSet(percentage: 0.80, repRange: RepRange(3, 3)),
-                    PercentageWaveSet(percentage: 0.90, repRange: RepRange(3, 3), note: "AMRAP")
+                    PercentageWaveSet(percentage: 0.90, repRange: RepRange(3, 3), note: "AMRAP"),
                 ]
             ),
             PercentageWaveWeek(
@@ -427,7 +428,7 @@ extension PercentageWaveRule {
                 sets: [
                     PercentageWaveSet(percentage: 0.75, repRange: RepRange(5, 5)),
                     PercentageWaveSet(percentage: 0.85, repRange: RepRange(3, 3)),
-                    PercentageWaveSet(percentage: 0.95, repRange: RepRange(1, 1), note: "AMRAP")
+                    PercentageWaveSet(percentage: 0.95, repRange: RepRange(1, 1), note: "AMRAP"),
                 ]
             ),
             PercentageWaveWeek(
@@ -435,9 +436,9 @@ extension PercentageWaveRule {
                 sets: [
                     PercentageWaveSet(percentage: 0.40, repRange: RepRange(5, 5)),
                     PercentageWaveSet(percentage: 0.50, repRange: RepRange(5, 5)),
-                    PercentageWaveSet(percentage: 0.60, repRange: RepRange(5, 5))
+                    PercentageWaveSet(percentage: 0.60, repRange: RepRange(5, 5)),
                 ]
-            )
+            ),
         ]
     }
 }
@@ -868,13 +869,15 @@ enum TemplateReferenceSelection {
         let weekday = Weekday(rawValue: calendar.component(.weekday, from: now))
 
         if let weekday,
-           let scheduledToday = references.first(where: { $0.scheduledWeekdays.contains(weekday) }) {
+            let scheduledToday = references.first(where: { $0.scheduledWeekdays.contains(weekday) })
+        {
             return scheduledToday
         }
 
         for plan in plans {
             if let pinnedTemplateID = plan.pinnedTemplateID,
-               let pinned = referencesByTemplateID[pinnedTemplateID] {
+                let pinned = referencesByTemplateID[pinnedTemplateID]
+            {
                 return pinned
             }
         }
@@ -896,7 +899,8 @@ enum TemplateReferenceSelection {
 
         for templateID in recentTemplateIDs {
             guard let match = referencesByTemplateID[templateID],
-                  seenTemplateIDs.insert(match.templateID).inserted else {
+                seenTemplateIDs.insert(match.templateID).inserted
+            else {
                 continue
             }
 
@@ -947,7 +951,8 @@ enum ExerciseAnalyticsSelection {
         }
 
         if let currentSelection,
-           summaries.contains(where: { $0.exerciseID == currentSelection }) {
+            summaries.contains(where: { $0.exerciseID == currentSelection })
+        {
             return currentSelection
         }
 
@@ -1068,7 +1073,7 @@ enum CatalogSeed {
             ExerciseCatalogItem(id: bulgarianSplitSquat, name: "Bulgarian Split Squat", category: .legs),
             ExerciseCatalogItem(id: hipThrust, name: "Hip Thrust", category: .legs),
             ExerciseCatalogItem(id: standingCalfRaise, name: "Standing Calf Raise", category: .legs),
-            ExerciseCatalogItem(id: seatedCalfRaise, name: "Seated Calf Raise", category: .legs)
+            ExerciseCatalogItem(id: seatedCalfRaise, name: "Seated Calf Raise", category: .legs),
         ]
     }
 }

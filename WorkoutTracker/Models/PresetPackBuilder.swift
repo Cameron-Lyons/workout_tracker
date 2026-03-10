@@ -93,7 +93,7 @@ enum PresetPackBuilder {
                     supersetGroup: "A",
                     progressionRule: .manual,
                     targets: repeatedTargets(repRange: PresetPackRepRange.accessory)
-                )
+                ),
             ]
         )
 
@@ -128,7 +128,7 @@ enum PresetPackBuilder {
                     restSeconds: PresetPackRest.accessory,
                     progressionRule: .manual,
                     targets: repeatedTargets(repRange: PresetPackRepRange.calves)
-                )
+                ),
             ]
         )
 
@@ -164,7 +164,7 @@ enum PresetPackBuilder {
                     supersetGroup: "B",
                     progressionRule: .manual,
                     targets: repeatedTargets(repRange: PresetPackRepRange.accessory)
-                )
+                ),
             ]
         )
 
@@ -203,7 +203,7 @@ enum PresetPackBuilder {
                     supersetGroup: "C",
                     progressionRule: .manual,
                     targets: repeatedTargets(repRange: PresetPackRepRange.accessory)
-                )
+                ),
             ]
         )
 
@@ -254,7 +254,7 @@ enum PresetPackBuilder {
                         count: PresetPackSets.singleTopSet,
                         repRange: PresetPackRepRange.strength
                     )
-                )
+                ),
             ]
         )
 
@@ -285,7 +285,7 @@ enum PresetPackBuilder {
                         count: PresetPackSets.powerCleanSets,
                         repRange: PresetPackRepRange.power
                     )
-                )
+                ),
             ]
         )
 
@@ -303,7 +303,7 @@ enum PresetPackBuilder {
             mainExerciseName: "Back Squat",
             accessories: [
                 accessoryBlock(id: CatalogSeed.frontSquat, name: "Front Squat"),
-                accessoryBlock(id: CatalogSeed.legCurl, name: "Leg Curl")
+                accessoryBlock(id: CatalogSeed.legCurl, name: "Leg Curl"),
             ]
         )
         let benchDay = waveTemplate(
@@ -312,7 +312,7 @@ enum PresetPackBuilder {
             mainExerciseName: "Bench Press",
             accessories: [
                 accessoryBlock(id: CatalogSeed.pullUp, name: "Pull Up"),
-                accessoryBlock(id: CatalogSeed.tricepsPushdown, name: "Triceps Pushdown")
+                accessoryBlock(id: CatalogSeed.tricepsPushdown, name: "Triceps Pushdown"),
             ]
         )
         let deadliftDay = waveTemplate(
@@ -321,7 +321,7 @@ enum PresetPackBuilder {
             mainExerciseName: "Deadlift",
             accessories: [
                 accessoryBlock(id: CatalogSeed.barbellRow, name: "Barbell Row"),
-                accessoryBlock(id: CatalogSeed.seatedCalfRaise, name: "Seated Calf Raise")
+                accessoryBlock(id: CatalogSeed.seatedCalfRaise, name: "Seated Calf Raise"),
             ]
         )
         let pressDay = waveTemplate(
@@ -330,7 +330,7 @@ enum PresetPackBuilder {
             mainExerciseName: "Overhead Press",
             accessories: [
                 accessoryBlock(id: CatalogSeed.latPulldown, name: "Lat Pulldown"),
-                accessoryBlock(id: CatalogSeed.hammerCurl, name: "Hammer Curl")
+                accessoryBlock(id: CatalogSeed.hammerCurl, name: "Hammer Curl"),
             ]
         )
 
@@ -453,7 +453,7 @@ enum PresetPackBuilder {
                         repRange: PresetPackRepRange.boringButBig,
                         note: PresetPackLabels.boringButBig
                     )
-                )
+                ),
             ]
         )
     }

@@ -481,7 +481,7 @@ private struct ActiveSessionHeaderView: View, Equatable {
                         label: "Rest",
                         value: restTimerLabel(at: context.date),
                         systemImage: "timer"
-                    )
+                    ),
                 ]
             )
         }

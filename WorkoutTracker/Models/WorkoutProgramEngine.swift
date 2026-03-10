@@ -370,7 +370,8 @@ enum SessionEngine {
         exerciseName: String,
         preferredIncrement: Double? = nil
     ) -> ProgressionRule {
-        let fallbackIncrement = ExerciseClassification.isLowerBody(exerciseName)
+        let fallbackIncrement =
+            ExerciseClassification.isLowerBody(exerciseName)
             ? StrengthProgressionDefaults.lowerBodyIncreaseInPounds
             : StrengthProgressionDefaults.upperBodyIncreaseInPounds
 
@@ -389,9 +390,10 @@ enum SessionEngine {
         warmupRamp: [WarmupRampStep]
     ) -> [SetTarget] {
         guard block.allowsAutoWarmups,
-              let firstWeightedTarget = workingTargets.first(where: { $0.targetWeight != nil }),
-              let firstWeight = firstWeightedTarget.targetWeight,
-              firstWeight > 0 else {
+            let firstWeightedTarget = workingTargets.first(where: { $0.targetWeight != nil }),
+            let firstWeight = firstWeightedTarget.targetWeight,
+            firstWeight > 0
+        else {
             return workingTargets
         }
 
@@ -416,8 +418,9 @@ enum SessionEngine {
         in draft: SessionDraft
     ) -> Date? {
         guard let block = draft.blocks.first(where: { $0.id == blockID }),
-              let row = block.sets.first(where: { $0.id == setID }),
-              row.log.isCompleted else {
+            let row = block.sets.first(where: { $0.id == setID }),
+            row.log.isCompleted
+        else {
             return draft.restTimerEndsAt
         }
 

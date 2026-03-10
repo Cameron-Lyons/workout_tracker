@@ -1,0 +1,34 @@
+included:
+  - WorkoutTracker
+  - WorkoutTrackerTests
+  - WorkoutTrackerUITests
+
+excluded:
+  - WorkoutTracker.xcodeproj
+  - build
+  - DerivedData
+
+disabled_rules:
+  - cyclomatic_complexity
+  - file_length
+  - function_body_length
+  - function_parameter_count
+  - large_tuple
+  - nesting
+  - opening_brace
+  - trailing_comma
+  - type_body_length
+
+opt_in_rules:
+  - empty_count
+  - first_where
+  - flatmap_over_map_reduce
+  - sorted_first_last
+
+line_length:
+  warning: 160
+  error: 200
+  ignores_comments: true
+  ignores_urls: true
+
+reporter: "xcode"

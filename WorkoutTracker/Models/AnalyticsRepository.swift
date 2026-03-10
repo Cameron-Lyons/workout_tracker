@@ -123,7 +123,8 @@ struct AnalyticsRepository: Sendable {
                 )
                 personalRecords.append(contentsOf: blockAnalysis.newRecords)
 
-                var accumulator = exerciseAccumulatorsByID[block.exerciseID]
+                var accumulator =
+                    exerciseAccumulatorsByID[block.exerciseID]
                     ?? ExerciseAnalyticsAccumulator(
                         exerciseID: block.exerciseID,
                         fallbackDisplayName: block.exerciseNameSnapshot
@@ -284,8 +285,9 @@ struct AnalyticsRepository: Sendable {
 
         for row in block.sets {
             guard let weight = row.log.weight,
-                  let reps = row.log.reps,
-                  reps > 0 else {
+                let reps = row.log.reps,
+                reps > 0
+            else {
                 continue
             }
 
@@ -321,15 +323,17 @@ struct AnalyticsRepository: Sendable {
             }
         }
 
-        let payload = hasWeightedRow ? SessionExercisePayload(
-            sessionID: session.id,
-            exerciseID: block.exerciseID,
-            displayName: displayName,
-            date: session.completedAt,
-            topWeight: topWeight,
-            estimatedOneRepMax: estimateOneRepMax(weight: topWeight, reps: topReps),
-            volume: blockVolume
-        ) : nil
+        let payload =
+            hasWeightedRow
+            ? SessionExercisePayload(
+                sessionID: session.id,
+                exerciseID: block.exerciseID,
+                displayName: displayName,
+                date: session.completedAt,
+                topWeight: topWeight,
+                estimatedOneRepMax: estimateOneRepMax(weight: topWeight, reps: topReps),
+                volume: blockVolume
+            ) : nil
 
         return BlockAnalysis(payload: payload, newRecords: newRecords)
     }

@@ -57,16 +57,20 @@ final class SettingsStore {
     init(defaults: UserDefaults = .standard) {
         self.defaults = defaults
         self.weightUnit = WeightUnit(rawValue: defaults.string(forKey: WeightUnit.settingsKey) ?? "") ?? .pounds
-        self.upperBodyIncrement = defaults.object(forKey: Keys.upperIncrement) as? Double
+        self.upperBodyIncrement =
+            defaults.object(forKey: Keys.upperIncrement) as? Double
             ?? WeightUnit.pounds.defaultUpperBodyIncrement
-        self.lowerBodyIncrement = defaults.object(forKey: Keys.lowerIncrement) as? Double
+        self.lowerBodyIncrement =
+            defaults.object(forKey: Keys.lowerIncrement) as? Double
             ?? WeightUnit.pounds.defaultLowerBodyIncrement
-        self.defaultRestSeconds = defaults.object(forKey: Keys.defaultRestSeconds) as? Int
+        self.defaultRestSeconds =
+            defaults.object(forKey: Keys.defaultRestSeconds) as? Int
             ?? ExerciseBlockDefaults.restSeconds
         self.hasCompletedOnboarding = defaults.bool(forKey: Keys.completedOnboarding)
         if let data = defaults.data(forKey: Keys.warmupRamp),
-           let decoded = try? decoder.decode([WarmupRampStep].self, from: data),
-           !decoded.isEmpty {
+            let decoded = try? decoder.decode([WarmupRampStep].self, from: data),
+            !decoded.isEmpty
+        {
             self.warmupRamp = decoded
         } else {
             self.warmupRamp = WarmupDefaults.ramp
@@ -84,7 +88,7 @@ final class SettingsStore {
             Keys.lowerIncrement,
             Keys.defaultRestSeconds,
             Keys.completedOnboarding,
-            Keys.warmupRamp
+            Keys.warmupRamp,
         ].forEach { defaults.removeObject(forKey: $0) }
     }
 }

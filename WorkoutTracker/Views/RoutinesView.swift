@@ -96,7 +96,7 @@ struct TodayView: View {
                     label: "Recent PRs",
                     value: "\(recentPRCount)",
                     systemImage: "rosette"
-                )
+                ),
             ]
         )
     }
@@ -159,16 +159,16 @@ struct TodayView: View {
 
             HStack(spacing: 8) {
                 ForEach(reference.scheduledWeekdays) { weekday in
-                        Text(weekday.shortLabel)
-                            .font(.caption.weight(.semibold))
-                            .foregroundStyle(AppColors.accent)
-                            .padding(.horizontal, 8)
-                            .padding(.vertical, 5)
-                            .appInsetCard(
-                                cornerRadius: AppCardMetrics.chipCornerRadius,
-                                fillOpacity: 0.8,
-                                borderOpacity: 0.65
-                            )
+                    Text(weekday.shortLabel)
+                        .font(.caption.weight(.semibold))
+                        .foregroundStyle(AppColors.accent)
+                        .padding(.horizontal, 8)
+                        .padding(.vertical, 5)
+                        .appInsetCard(
+                            cornerRadius: AppCardMetrics.chipCornerRadius,
+                            fillOpacity: 0.8,
+                            borderOpacity: 0.65
+                        )
                 }
             }
 
@@ -395,7 +395,8 @@ struct PlansView: View {
         AppHeroCard(
             eyebrow: "Plan Builder",
             title: "\(plansStore.plans.count) plans",
-            subtitle: "Templates define your future sessions. Schedule them loosely, pin the important ones, and start from Today whenever you want.",
+            subtitle:
+                "Templates define your future sessions. Schedule them loosely, pin the important ones, and start from Today whenever you want.",
             systemImage: "list.bullet.rectangle",
             metrics: [
                 AppHeroMetric(
@@ -421,7 +422,7 @@ struct PlansView: View {
                     label: "Profiles",
                     value: "\(plansStore.profiles.count)",
                     systemImage: "slider.horizontal.3"
-                )
+                ),
             ]
         )
     }
@@ -490,16 +491,16 @@ struct PlansView: View {
                             .foregroundStyle(AppColors.textPrimary)
 
                         if plan.pinnedTemplateID == template.id {
-                                Text("PINNED")
-                                    .font(.caption2.weight(.bold))
-                                    .foregroundStyle(AppColors.accent)
-                                    .padding(.horizontal, 6)
-                                    .padding(.vertical, 4)
-                                    .appInsetCard(
-                                        cornerRadius: AppCardMetrics.chipCornerRadius,
-                                        fillOpacity: 0.86,
-                                        borderOpacity: 0.8
-                                    )
+                            Text("PINNED")
+                                .font(.caption2.weight(.bold))
+                                .foregroundStyle(AppColors.accent)
+                                .padding(.horizontal, 6)
+                                .padding(.vertical, 4)
+                                .appInsetCard(
+                                    cornerRadius: AppCardMetrics.chipCornerRadius,
+                                    fillOpacity: 0.86,
+                                    borderOpacity: 0.8
+                                )
                         }
                     }
 

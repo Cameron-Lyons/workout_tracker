@@ -1,5 +1,6 @@
 import SwiftData
 import XCTest
+
 @testable import WorkoutTracker
 
 final class WorkoutStoreTests: XCTestCase {
@@ -88,7 +89,7 @@ final class WorkoutStoreTests: XCTestCase {
                 exerciseName: "Back Squat",
                 rows: [
                     makeRow(kind: .warmup, weight: 95, reps: 5),
-                    makeRow(kind: .working, weight: 225, reps: 5)
+                    makeRow(kind: .working, weight: 225, reps: 5),
                 ]
             ),
             makeCompletedSession(
@@ -97,9 +98,9 @@ final class WorkoutStoreTests: XCTestCase {
                 exerciseName: "Back Squat",
                 rows: [
                     makeRow(kind: .warmup, weight: 115, reps: 5),
-                    makeRow(kind: .working, weight: 235, reps: 5)
+                    makeRow(kind: .working, weight: 235, reps: 5),
                 ]
-            )
+            ),
         ]
 
         let snapshot = analytics.makeSessionAnalyticsSnapshot(sessions: sessions, catalogByID: catalog)
@@ -136,7 +137,7 @@ final class WorkoutStoreTests: XCTestCase {
                     scheduledWeekdays: [.thursday],
                     blocks: [],
                     lastStartedAt: now.addingTimeInterval(-172_800)
-                )
+                ),
             ]
         )
         let references = [
@@ -155,7 +156,7 @@ final class WorkoutStoreTests: XCTestCase {
                 templateName: "Squat Day",
                 scheduledWeekdays: [.thursday],
                 lastStartedAt: now.addingTimeInterval(-172_800)
-            )
+            ),
         ]
         let sessions = [
             CompletedSession(
@@ -174,7 +175,7 @@ final class WorkoutStoreTests: XCTestCase {
                         progressionRule: .manual,
                         sets: [
                             makeRow(kind: .warmup, weight: 95, reps: 5),
-                            makeRow(kind: .working, weight: 185, reps: 5)
+                            makeRow(kind: .working, weight: 185, reps: 5),
                         ]
                     )
                 ]
@@ -198,11 +199,11 @@ final class WorkoutStoreTests: XCTestCase {
                         ]
                     )
                 ]
-            )
+            ),
         ]
         let catalog = [
             CatalogSeed.benchPress: ExerciseCatalogItem(id: CatalogSeed.benchPress, name: "Bench Press", category: .chest),
-            CatalogSeed.backSquat: ExerciseCatalogItem(id: CatalogSeed.backSquat, name: "Back Squat", category: .legs)
+            CatalogSeed.backSquat: ExerciseCatalogItem(id: CatalogSeed.backSquat, name: "Back Squat", category: .legs),
         ]
 
         let sessionAnalytics = analytics.makeSessionAnalyticsSnapshot(
@@ -238,7 +239,7 @@ final class WorkoutStoreTests: XCTestCase {
                 String($0.weight),
                 String($0.reps),
                 String($0.estimatedOneRepMax),
-                String($0.achievedAt.timeIntervalSinceReferenceDate)
+                String($0.achievedAt.timeIntervalSinceReferenceDate),
             ].joined(separator: "|")
         }
         let pointSignature: (ProgressPoint) -> String = {
@@ -247,7 +248,7 @@ final class WorkoutStoreTests: XCTestCase {
                 String($0.date.timeIntervalSinceReferenceDate),
                 String($0.topWeight),
                 String($0.estimatedOneRepMax),
-                String($0.volume)
+                String($0.volume),
             ].joined(separator: "|")
         }
         let summarySignature: (ExerciseAnalyticsSummary) -> String = {
@@ -257,7 +258,7 @@ final class WorkoutStoreTests: XCTestCase {
                 String($0.pointCount),
                 String($0.totalVolume),
                 $0.currentPR.map(recordSignature) ?? "nil",
-                $0.points.map(pointSignature).joined(separator: ",")
+                $0.points.map(pointSignature).joined(separator: ","),
             ].joined(separator: "||")
         }
 
@@ -707,7 +708,7 @@ final class WorkoutStoreTests: XCTestCase {
                 startedAt: dayTwo.addingTimeInterval(-3_600),
                 completedAt: dayTwo,
                 blocks: []
-            )
+            ),
         ]
 
         let sessionAnalytics = analytics.makeSessionAnalyticsSnapshot(
@@ -792,7 +793,7 @@ final class WorkoutStoreTests: XCTestCase {
                 name: "Back Squat",
                 aliases: ["High Bar"],
                 category: .legs
-            )
+            ),
         ]
         let index = ExercisePickerSearchIndex(catalog: catalog)
 

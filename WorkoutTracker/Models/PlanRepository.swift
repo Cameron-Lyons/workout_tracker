@@ -14,7 +14,8 @@ final class PlanRepository {
 
     func loadCatalog() -> [ExerciseCatalogItem] {
         let records = (try? modelContext.fetch(FetchDescriptor<StoredCatalogItem>())) ?? []
-        return records
+        return
+            records
             .compactMap(catalogItem(from:))
             .sorted {
                 $0.name.localizedCaseInsensitiveCompare($1.name) == .orderedAscending

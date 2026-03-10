@@ -1,4 +1,5 @@
 import XCTest
+
 @testable import WorkoutTracker
 
 final class WeightLogicTests: XCTestCase {
