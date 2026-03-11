@@ -540,7 +540,7 @@ private struct SessionCompletionButtonView: View {
                 Text(isCompleted ? "Logged" : "Complete")
                     .font(.caption.weight(.semibold))
 
-                Text(isCompleted ? "Tap to edit" : "Tap when done")
+                Text(isCompleted ? "Tap to revise" : "Tap when done")
                     .font(.caption2)
                     .foregroundStyle(AppColors.textSecondary)
             }

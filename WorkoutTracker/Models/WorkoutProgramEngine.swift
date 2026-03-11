@@ -54,6 +54,7 @@ enum ProgressionEngine {
         case .percentageWave:
             return applyPercentageWave(
                 to: block,
+                using: completedBlock,
                 profile: profile,
                 fallbackIncrement: fallbackIncrement
             )
@@ -119,10 +120,18 @@ enum ProgressionEngine {
 
     private static func applyPercentageWave(
         to block: ExerciseBlock,
+        using completedBlock: CompletedSessionBlock,
         profile: ExerciseProfile?,
         fallbackIncrement: Double
     ) -> (block: ExerciseBlock, profile: ExerciseProfile?) {
         guard var wave = block.progressionRule.percentageWave, !wave.weeks.isEmpty else {
+            return (block, profile)
+        }
+
+        let workingRows = completedBlock.sets.filter { $0.target.setKind == .working }
+        guard !workingRows.isEmpty,
+            workingRows.allSatisfy(\.log.isCompleted)
+        else {
             return (block, profile)
         }
 
@@ -203,9 +212,6 @@ enum SessionEngine {
             block.mutatingSet(setID) { row in
                 if row.log.isCompleted {
                     row.log.completedAt = nil
-                    row.log.weight = nil
-                    row.log.reps = nil
-                    row.log.rir = nil
                 } else {
                     row.log.weight = row.log.weight ?? row.target.targetWeight
                     row.log.reps = row.log.reps ?? row.target.repRange.upperBound

@@ -1086,6 +1086,11 @@ final class WorkoutStoreTests: XCTestCase {
         store.savePlan(plan)
 
         store.startSession(planID: plan.id, templateID: template.id)
+        let activeBlocks = try XCTUnwrap(store.sessionStore.activeDraft?.blocks)
+        let mainSessionBlock = try XCTUnwrap(activeBlocks.first)
+        for row in mainSessionBlock.sets where row.target.setKind == .working {
+            store.toggleSetCompletion(blockID: mainSessionBlock.id, setID: row.id)
+        }
         store.finishActiveSession()
 
         let updatedTemplate = try XCTUnwrap(store.plansStore.plan(for: plan.id)?.templates.first)
