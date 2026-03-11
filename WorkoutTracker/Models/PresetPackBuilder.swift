@@ -44,6 +44,11 @@ enum PresetPackBuilder {
         static let deadlift = 225.0
     }
 
+    private enum PresetPackWave {
+        static let upperBodyCycleIncrement = 5.0
+        static let lowerBodyCycleIncrement = 10.0
+    }
+
     static func makePlans(for pack: PresetPack, settings: SettingsStore) -> [Plan] {
         switch pack {
         case .generalGym:
@@ -413,7 +418,9 @@ enum PresetPackBuilder {
             kind: .percentageWave,
             percentageWave: PercentageWaveRule.fiveThreeOne(
                 trainingMax: defaultTrainingMax(for: exerciseID),
-                cycleIncrement: ExerciseClassification.isLowerBody(exerciseName) ? 10 : 5
+                cycleIncrement: ExerciseClassification.isLowerBody(exerciseName)
+                    ? PresetPackWave.lowerBodyCycleIncrement
+                    : PresetPackWave.upperBodyCycleIncrement
             )
         )
     }

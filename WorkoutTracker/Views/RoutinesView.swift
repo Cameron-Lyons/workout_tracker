@@ -15,6 +15,94 @@ private struct SessionStartRequest: Identifiable {
     }
 }
 
+private func handleSessionStart(
+    activeDraft: SessionDraft?,
+    pendingStartRequest: Binding<SessionStartRequest?>,
+    planID: UUID,
+    templateID: UUID,
+    templateName: String,
+    onResumeCurrent: () -> Void,
+    onStartNew: (_ planID: UUID, _ templateID: UUID) -> Void
+) {
+    if activeDraft?.planID == planID, activeDraft?.templateID == templateID {
+        onResumeCurrent()
+        return
+    }
+
+    guard activeDraft != nil else {
+        onStartNew(planID, templateID)
+        return
+    }
+
+    pendingStartRequest.wrappedValue = SessionStartRequest(
+        planID: planID,
+        templateID: templateID,
+        templateName: templateName
+    )
+}
+
+private struct SessionStartConfirmationDialogModifier: ViewModifier {
+    @Binding var pendingStartRequest: SessionStartRequest?
+    let activeDraft: SessionDraft?
+    let onResumeCurrent: () -> Void
+    let onReplace: (_ request: SessionStartRequest) -> Void
+
+    func body(content: Content) -> some View {
+        content.confirmationDialog(
+            "Replace current session?",
+            isPresented: Binding(
+                get: { pendingStartRequest != nil },
+                set: { isPresented in
+                    if !isPresented {
+                        pendingStartRequest = nil
+                    }
+                }
+            ),
+            titleVisibility: .visible
+        ) {
+            if let pendingStartRequest {
+                Button("Resume Current Session") {
+                    onResumeCurrent()
+                    self.pendingStartRequest = nil
+                }
+
+                Button("Replace and Start \(pendingStartRequest.templateName)", role: .destructive) {
+                    onReplace(pendingStartRequest)
+                    self.pendingStartRequest = nil
+                }
+            }
+
+            Button("Cancel", role: .cancel) {
+                pendingStartRequest = nil
+            }
+        } message: {
+            if let activeDraft, let pendingStartRequest {
+                Text(
+                    "\(activeDraft.templateNameSnapshot) is still autosaved. Replacing it will discard that session and start \(pendingStartRequest.templateName) instead."
+                )
+            }
+        }
+    }
+}
+
+private extension View {
+    func sessionStartConfirmationDialog(
+        pendingStartRequest: Binding<SessionStartRequest?>,
+        activeDraft: SessionDraft?,
+        onResumeCurrent: @escaping () -> Void,
+        onReplace: @escaping (_ request: SessionStartRequest) -> Void
+    ) -> some View {
+        modifier(
+            SessionStartConfirmationDialogModifier(
+                pendingStartRequest: pendingStartRequest,
+                activeDraft: activeDraft,
+                onResumeCurrent: onResumeCurrent,
+                onReplace: onReplace
+            )
+        )
+    }
+}
+
 struct TodayView: View {
     @Environment(AppStore.self) private var appStore
     @Environment(PlansStore.self) private var plansStore
@@ -31,24 +119,6 @@ struct TodayView: View {
 
     private var weightUnit: WeightUnit {
         settingsStore.weightUnit
-    }
-
-    private func startOrConfirmSession(planID: UUID, templateID: UUID, templateName: String) {
-        if activeDraft?.planID == planID, activeDraft?.templateID == templateID {
-            appStore.resumeActiveSession()
-            return
-        }
-
-        guard activeDraft != nil else {
-            appStore.startSession(planID: planID, templateID: templateID)
-            return
-        }
-
-        pendingStartRequest = SessionStartRequest(
-            planID: planID,
-            templateID: templateID,
-            templateName: templateName
-        )
     }
 
     var body: some View {
@@ -93,43 +163,19 @@ struct TodayView: View {
             .navigationTitle("Today")
             .toolbarBackground(AppColors.chrome, for: .navigationBar)
             .toolbarBackground(.visible, for: .navigationBar)
-            .confirmationDialog(
-                "Replace current session?",
-                isPresented: Binding(
-                    get: { pendingStartRequest != nil },
-                    set: { isPresented in
-                        if !isPresented {
-                            pendingStartRequest = nil
-                        }
-                    }
-                ),
-                titleVisibility: .visible
-            ) {
-                if let pendingStartRequest {
-                    Button("Resume Current Session") {
-                        appStore.resumeActiveSession()
-                        self.pendingStartRequest = nil
-                    }
-
-                    Button("Replace and Start \(pendingStartRequest.templateName)", role: .destructive) {
-                        appStore.replaceActiveSessionAndStart(
-                            planID: pendingStartRequest.planID,
-                            templateID: pendingStartRequest.templateID
-                        )
-                        self.pendingStartRequest = nil
-                    }
-                }
-
-                Button("Cancel", role: .cancel) {
-                    pendingStartRequest = nil
-                }
-            } message: {
-                if let activeDraft, let pendingStartRequest {
-                    Text(
-                        "\(activeDraft.templateNameSnapshot) is still autosaved. Replacing it will discard that session and start \(pendingStartRequest.templateName) instead."
+            .sessionStartConfirmationDialog(
+                pendingStartRequest: $pendingStartRequest,
+                activeDraft: activeDraft,
+                onResumeCurrent: {
+                    appStore.resumeActiveSession()
+                },
+                onReplace: { request in
+                    appStore.replaceActiveSessionAndStart(
+                        planID: request.planID,
+                        templateID: request.templateID
                     )
                 }
-            }
+            )
         }
     }
 
@@ -292,10 +338,18 @@ struct TodayView: View {
                     .foregroundStyle(AppColors.textSecondary)
 
                 Button {
-                    startOrConfirmSession(
+                    handleSessionStart(
+                        activeDraft: activeDraft,
+                        pendingStartRequest: $pendingStartRequest,
                         planID: reference.planID,
                         templateID: reference.templateID,
-                        templateName: reference.templateName
+                        templateName: reference.templateName,
+                        onResumeCurrent: {
+                            appStore.resumeActiveSession()
+                        },
+                        onStartNew: { planID, templateID in
+                            appStore.startSession(planID: planID, templateID: templateID)
+                        }
                     )
                 } label: {
                     Label("Start Workout", systemImage: "play.fill")
@@ -332,10 +386,18 @@ struct TodayView: View {
                     LazyHStack(spacing: 12) {
                         ForEach(todayStore.quickStartTemplates) { reference in
                             Button {
-                                startOrConfirmSession(
+                                handleSessionStart(
+                                    activeDraft: activeDraft,
+                                    pendingStartRequest: $pendingStartRequest,
                                     planID: reference.planID,
                                     templateID: reference.templateID,
-                                    templateName: reference.templateName
+                                    templateName: reference.templateName,
+                                    onResumeCurrent: {
+                                        appStore.resumeActiveSession()
+                                    },
+                                    onStartNew: { planID, templateID in
+                                        appStore.startSession(planID: planID, templateID: templateID)
+                                    }
                                 )
                             } label: {
                                 TodayQuickStartTile(reference: reference)
@@ -531,6 +593,10 @@ struct PlansView: View {
     @State private var selectedPresetPack: PresetPack?
     @State private var pendingStartRequest: SessionStartRequest?
 
+    private var activeDraft: SessionDraft? {
+        sessionStore.activeDraft
+    }
+
     var body: some View {
         NavigationStack {
             ZStack {
@@ -623,62 +689,20 @@ struct PlansView: View {
             } message: {
                 Text(selectedPresetPack?.description ?? "")
             }
-            .confirmationDialog(
-                "Replace current session?",
-                isPresented: Binding(
-                    get: { pendingStartRequest != nil },
-                    set: { isPresented in
-                        if !isPresented {
-                            pendingStartRequest = nil
-                        }
-                    }
-                ),
-                titleVisibility: .visible
-            ) {
-                if let pendingStartRequest {
-                    Button("Resume Current Session") {
-                        appStore.resumeActiveSession()
-                        self.pendingStartRequest = nil
-                    }
-
-                    Button("Replace and Start \(pendingStartRequest.templateName)", role: .destructive) {
-                        appStore.replaceActiveSessionAndStart(
-                            planID: pendingStartRequest.planID,
-                            templateID: pendingStartRequest.templateID
-                        )
-                        self.pendingStartRequest = nil
-                    }
-                }
-
-                Button("Cancel", role: .cancel) {
-                    pendingStartRequest = nil
-                }
-            } message: {
-                if let activeDraft = sessionStore.activeDraft, let pendingStartRequest {
-                    Text(
-                        "\(activeDraft.templateNameSnapshot) is still autosaved. Replacing it will discard that session and start \(pendingStartRequest.templateName) instead."
+            .sessionStartConfirmationDialog(
+                pendingStartRequest: $pendingStartRequest,
+                activeDraft: activeDraft,
+                onResumeCurrent: {
+                    appStore.resumeActiveSession()
+                },
+                onReplace: { request in
+                    appStore.replaceActiveSessionAndStart(
+                        planID: request.planID,
+                        templateID: request.templateID
                     )
                 }
-            }
+            )
         }
-    }
-
-    private func startOrConfirmSession(planID: UUID, templateID: UUID, templateName: String) {
-        if sessionStore.activeDraft?.planID == planID, sessionStore.activeDraft?.templateID == templateID {
-            appStore.resumeActiveSession()
-            return
-        }
-
-        guard sessionStore.activeDraft != nil else {
-            appStore.startSession(planID: planID, templateID: templateID)
-            return
-        }
-
-        pendingStartRequest = SessionStartRequest(
-            planID: planID,
-            templateID: templateID,
-            templateName: templateName
-        )
     }
 
     private var plansHero: some View {
@@ -871,10 +895,18 @@ struct PlansView: View {
 
             HStack(spacing: 10) {
                 Button {
-                    startOrConfirmSession(
+                    handleSessionStart(
+                        activeDraft: activeDraft,
+                        pendingStartRequest: $pendingStartRequest,
                         planID: plan.id,
                         templateID: template.id,
-                        templateName: template.name
+                        templateName: template.name,
+                        onResumeCurrent: {
+                            appStore.resumeActiveSession()
+                        },
+                        onStartNew: { planID, templateID in
+                            appStore.startSession(planID: planID, templateID: templateID)
+                        }
                     )
                 } label: {
                     Label("Start", systemImage: "play.fill")

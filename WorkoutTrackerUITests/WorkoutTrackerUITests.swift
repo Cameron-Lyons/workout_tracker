@@ -6,7 +6,7 @@ final class WorkoutTrackerUITests: XCTestCase {
     }
 
     @MainActor
-    func testOnboardingPresetStartAndFinishWorkoutUpdatesProgress() throws {
+    private func launchAppForUITest() -> XCUIApplication {
         let app = XCUIApplication()
         app.launchArguments += [
             "--uitesting",
@@ -14,6 +14,12 @@ final class WorkoutTrackerUITests: XCTestCase {
             "--uitesting-empty-store",
         ]
         app.launch()
+        return app
+    }
+
+    @MainActor
+    func testOnboardingPresetStartAndFinishWorkoutUpdatesProgress() throws {
+        let app = launchAppForUITest()
 
         let presetButton = app.buttons["onboarding.preset.generalGym"]
         XCTAssertTrue(presetButton.waitForExistence(timeout: 8))
@@ -44,13 +50,7 @@ final class WorkoutTrackerUITests: XCTestCase {
 
     @MainActor
     func testSessionCanBeClosedAndResumedFromToday() throws {
-        let app = XCUIApplication()
-        app.launchArguments += [
-            "--uitesting",
-            "--uitesting-in-memory",
-            "--uitesting-empty-store",
-        ]
-        app.launch()
+        let app = launchAppForUITest()
 
         app.buttons["onboarding.preset.generalGym"].tap()
         app.buttons["today.pinnedStartButton"].tap()
@@ -68,13 +68,7 @@ final class WorkoutTrackerUITests: XCTestCase {
 
     @MainActor
     func testCreateCustomTemplateAndLaunchIt() throws {
-        let app = XCUIApplication()
-        app.launchArguments += [
-            "--uitesting",
-            "--uitesting-in-memory",
-            "--uitesting-empty-store",
-        ]
-        app.launch()
+        let app = launchAppForUITest()
 
         let blankButton = app.buttons["onboarding.startBlank"]
         XCTAssertTrue(blankButton.waitForExistence(timeout: 8))

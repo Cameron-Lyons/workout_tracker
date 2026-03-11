@@ -133,29 +133,6 @@ final class AppDerivedStateController {
         }
     }
 
-    func refreshProgress(plansStore: PlansStore, sessionStore: SessionStore) async {
-        progressRefreshGeneration += 1
-        let generation = progressRefreshGeneration
-        progressRefreshTask?.cancel()
-        progressRefreshTask = nil
-
-        let selectedExerciseID = progressStore.selectedExerciseID
-        let sessionAnalytics = await sessionAnalyticsSnapshot(
-            plansStore: plansStore,
-            sessionStore: sessionStore
-        )
-        let snapshot = analytics.makeProgressSnapshot(
-            sessionAnalytics: sessionAnalytics,
-            selectedExerciseID: selectedExerciseID
-        )
-
-        guard generation == progressRefreshGeneration else {
-            return
-        }
-
-        progressStore.apply(snapshot, completedSessions: sessionStore.completedSessions)
-    }
-
     func recordCompletedSession(
         _ session: CompletedSession,
         plansStore: PlansStore,

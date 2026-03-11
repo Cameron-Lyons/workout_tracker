@@ -2,13 +2,9 @@ import Foundation
 import SwiftData
 
 @MainActor
-final class SessionRepository {
-    private let modelContext: ModelContext
-    private let encoder = JSONEncoder()
-    private let decoder = JSONDecoder()
-
-    init(modelContext: ModelContext) {
-        self.modelContext = modelContext
+final class SessionRepository: RepositoryBase {
+    override init(modelContext: ModelContext) {
+        super.init(modelContext: modelContext)
     }
 
     func loadActiveDraft() -> SessionDraft? {
@@ -591,29 +587,6 @@ final class SessionRepository {
         (try? modelContext.fetch(FetchDescriptor<StoredCompletedSessionRecord>())) ?? []
     }
 
-    private func encode<Value: Encodable>(_ value: Value) -> Data? {
-        try? encoder.encode(value)
-    }
-
-    private func decode<Value: Decodable>(_ type: Value.Type, from data: Data) -> Value? {
-        try? decoder.decode(Value.self, from: data)
-    }
-
-    @discardableResult
-    private func saveContext(_ operation: String) -> Bool {
-        guard modelContext.hasChanges else {
-            return true
-        }
-
-        do {
-            try modelContext.save()
-            return true
-        } catch {
-            modelContext.rollback()
-            PersistenceDiagnostics.record("Failed to save \(operation) context", error: error)
-            return false
-        }
-    }
 }
 
 private protocol StoredSessionRecord: AnyObject {

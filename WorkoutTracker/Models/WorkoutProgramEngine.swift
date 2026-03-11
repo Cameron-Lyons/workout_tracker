@@ -174,6 +174,7 @@ enum ProgressionEngine {
 
 enum SessionEngine {
     private static let defaultRepRange = ExerciseBlockDefaults.repRange
+    private static let minimumRestTimerSeconds = 1
 
     static func startSession(
         planID: UUID?,
@@ -233,7 +234,9 @@ enum SessionEngine {
                     row.log.rir = row.log.rir ?? row.target.rir
                     row.log.completedAt = completedAt
                     let seconds = row.target.restSeconds ?? blockRestSeconds
-                    nextRestTimerEndsAt = completedAt.addingTimeInterval(TimeInterval(max(1, seconds)))
+                    nextRestTimerEndsAt = completedAt.addingTimeInterval(
+                        TimeInterval(max(minimumRestTimerSeconds, seconds))
+                    )
                 }
             }
         }

@@ -2,14 +2,47 @@ import Foundation
 import SwiftData
 
 @MainActor
-final class PlanRepository {
-    private let modelContext: ModelContext
+class RepositoryBase {
+    let modelContext: ModelContext
+
     private let encoder = JSONEncoder()
     private let decoder = JSONDecoder()
-    private let emptyArrayData = Data("[]".utf8)
 
     init(modelContext: ModelContext) {
         self.modelContext = modelContext
+    }
+
+    func encode<Value: Encodable>(_ value: Value) -> Data? {
+        try? encoder.encode(value)
+    }
+
+    func decode<Value: Decodable>(_ type: Value.Type, from data: Data) -> Value? {
+        try? decoder.decode(Value.self, from: data)
+    }
+
+    @discardableResult
+    func saveContext(_ operation: String) -> Bool {
+        guard modelContext.hasChanges else {
+            return true
+        }
+
+        do {
+            try modelContext.save()
+            return true
+        } catch {
+            modelContext.rollback()
+            PersistenceDiagnostics.record("Failed to save \(operation) context", error: error)
+            return false
+        }
+    }
+}
+
+@MainActor
+final class PlanRepository: RepositoryBase {
+    private let emptyArrayData = Data("[]".utf8)
+
+    override init(modelContext: ModelContext) {
+        super.init(modelContext: modelContext)
     }
 
     func loadCatalog() -> [ExerciseCatalogItem] {
@@ -460,27 +493,4 @@ final class PlanRepository {
         (try? modelContext.fetch(FetchDescriptor<StoredExerciseProfileRecord>())) ?? []
     }
 
-    private func encode<Value: Encodable>(_ value: Value) -> Data? {
-        try? encoder.encode(value)
-    }
-
-    private func decode<Value: Decodable>(_ type: Value.Type, from data: Data) -> Value? {
-        try? decoder.decode(Value.self, from: data)
-    }
-
-    @discardableResult
-    private func saveContext(_ operation: String) -> Bool {
-        guard modelContext.hasChanges else {
-            return true
-        }
-
-        do {
-            try modelContext.save()
-            return true
-        } catch {
-            modelContext.rollback()
-            PersistenceDiagnostics.record("Failed to save \(operation) context", error: error)
-            return false
-        }
-    }
 }
