@@ -23,6 +23,10 @@ final class WorkoutTrackerUITests: XCTestCase {
         XCTAssertTrue(pinnedStart.waitForExistence(timeout: 8))
         pinnedStart.tap()
 
+        let completeSetButton = app.firstButton(withIdentifierPrefix: "session.completeSet.")
+        XCTAssertTrue(completeSetButton.waitForExistence(timeout: 8))
+        completeSetButton.tap()
+
         let finishButton = app.buttons["session.finishButton"]
         XCTAssertTrue(finishButton.waitForExistence(timeout: 8))
         finishButton.tap()

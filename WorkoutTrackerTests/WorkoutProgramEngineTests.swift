@@ -353,7 +353,8 @@ final class WorkoutProgramEngineTests: XCTestCase {
             planID: UUID(),
             templateID: UUID(),
             templateNameSnapshot: "Bench Day",
-            blocks: [block]
+            blocks: [block],
+            restTimerEndsAt: completedAt.addingTimeInterval(90)
         )
 
         SessionEngine.toggleCompletion(of: row.id, in: block.id, draft: &draft, completedAt: reopenedAt)
@@ -363,5 +364,6 @@ final class WorkoutProgramEngineTests: XCTestCase {
         XCTAssertEqual(reopenedRow.log.weight, 190)
         XCTAssertEqual(reopenedRow.log.reps, 6)
         XCTAssertEqual(reopenedRow.log.rir, 1)
+        XCTAssertNil(draft.restTimerEndsAt)
     }
 }

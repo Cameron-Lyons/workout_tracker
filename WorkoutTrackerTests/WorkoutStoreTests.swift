@@ -40,6 +40,28 @@ final class WorkoutStoreTests: XCTestCase {
     }
 
     @MainActor
+    func testEmptySessionDoesNotFinishOrPersist() async throws {
+        let store = makeStore()
+        await store.hydrateIfNeeded()
+        store.completeOnboarding(with: nil)
+
+        let plan = makeSingleTemplatePlan(
+            name: "Test Plan",
+            templateName: "Upper 1",
+            store: store,
+            weight: 185
+        )
+        store.savePlan(plan)
+        let templateID = try XCTUnwrap(plan.templates.first?.id)
+
+        store.startSession(planID: plan.id, templateID: templateID)
+
+        XCTAssertFalse(store.finishActiveSession())
+        XCTAssertNotNil(store.sessionStore.activeDraft)
+        XCTAssertTrue(store.sessionStore.completedSessions.isEmpty)
+    }
+
+    @MainActor
     func testExerciseRenamePreservesAnalyticsContinuityAndSnapshots() async throws {
         let store = makeStore()
         await store.hydrateIfNeeded()

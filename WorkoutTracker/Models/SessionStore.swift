@@ -120,6 +120,14 @@ final class SessionStore {
             return nil
         }
 
+        guard
+            activeDraft.blocks.contains(where: { block in
+                block.sets.contains(where: \.log.isCompleted)
+            })
+        else {
+            return nil
+        }
+
         cancelPendingDraftSave()
         let completedSession = SessionEngine.finishSession(draft: activeDraft)
         completedSessions.append(completedSession)

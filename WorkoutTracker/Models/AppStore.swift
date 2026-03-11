@@ -146,7 +146,8 @@ final class AppStore {
         sessionCoordinator.clearRestTimer()
     }
 
-    func finishActiveSession() {
+    @discardableResult
+    func finishActiveSession() -> Bool {
         sessionCoordinator.finishActiveSession()
     }
 

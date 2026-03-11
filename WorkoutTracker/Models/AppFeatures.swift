@@ -501,11 +501,12 @@ final class AppSessionCoordinator {
         sessionStore.clearRestTimer()
     }
 
-    func finishActiveSession() {
+    @discardableResult
+    func finishActiveSession() -> Bool {
         let catalogByID = plansStore.catalogByID
         let finishedBlocks = sessionStore.activeDraft?.blocks
         guard let completedSession = sessionStore.completeSession() else {
-            return
+            return false
         }
 
         let finishSummary = derivedStateController.finishSummary(
@@ -531,6 +532,7 @@ final class AppSessionCoordinator {
             sessionStore: sessionStore,
             finishSummary: finishSummary
         )
+        return true
     }
 
     func discardActiveSession() {

@@ -565,48 +565,52 @@ private struct ActiveSessionFooterView: View {
     let state: ActiveSessionHeaderState
 
     var body: some View {
-        VStack(spacing: 12) {
-            HStack {
-                MetricBadge(
-                    label: "Logged",
-                    value: "\(state.completedSetCount)",
-                    systemImage: "checklist",
-                    tone: .success
-                )
+        TimelineView(.periodic(from: .now, by: 1)) { context in
+            VStack(spacing: 12) {
+                HStack {
+                    MetricBadge(
+                        label: "Logged",
+                        value: "\(state.completedSetCount)",
+                        systemImage: "checklist",
+                        tone: .success
+                    )
 
-                Spacer()
+                    Spacer()
 
-                MetricBadge(
-                    label: "Rest",
-                    value: restTimerLabel(at: .now),
-                    systemImage: "timer",
-                    tone: restTone(at: .now)
-                )
-            }
-
-            HStack(spacing: 12) {
-                Button {
-                    appStore.clearRestTimer()
-                } label: {
-                    Label("Clear Rest", systemImage: "timer")
-                        .frame(maxWidth: .infinity)
+                    MetricBadge(
+                        label: "Rest",
+                        value: restTimerLabel(at: context.date),
+                        systemImage: "timer",
+                        tone: restTone(at: context.date)
+                    )
                 }
-                .buttonStyle(.bordered)
-                .buttonBorderShape(.roundedRectangle(radius: 16))
-                .tint(AppToneStyle.warning.accent)
-                .disabled(state.restTimerEndsAt == nil)
 
-                Button {
-                    appStore.finishActiveSession()
-                    dismiss()
-                } label: {
-                    Label("Finish Workout", systemImage: "checkmark.circle.fill")
-                        .frame(maxWidth: .infinity)
+                HStack(spacing: 12) {
+                    Button {
+                        appStore.clearRestTimer()
+                    } label: {
+                        Label("Clear Rest", systemImage: "timer")
+                            .frame(maxWidth: .infinity)
+                    }
+                    .buttonStyle(.bordered)
+                    .buttonBorderShape(.roundedRectangle(radius: 16))
+                    .tint(AppToneStyle.warning.accent)
+                    .disabled(state.restTimerEndsAt == nil)
+
+                    Button {
+                        if appStore.finishActiveSession() {
+                            dismiss()
+                        }
+                    } label: {
+                        Label("Finish Workout", systemImage: "checkmark.circle.fill")
+                            .frame(maxWidth: .infinity)
+                    }
+                    .buttonStyle(.borderedProminent)
+                    .buttonBorderShape(.roundedRectangle(radius: 16))
+                    .tint(AppToneStyle.success.accent)
+                    .disabled(state.completedSetCount == 0)
+                    .accessibilityIdentifier("session.finishButton")
                 }
-                .buttonStyle(.borderedProminent)
-                .buttonBorderShape(.roundedRectangle(radius: 16))
-                .tint(AppToneStyle.success.accent)
-                .accessibilityIdentifier("session.finishButton")
             }
         }
         .padding(.horizontal, 16)

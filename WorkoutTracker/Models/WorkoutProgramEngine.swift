@@ -218,23 +218,27 @@ enum SessionEngine {
         draft: inout SessionDraft,
         completedAt: Date = .now
     ) {
+        var nextRestTimerEndsAt: Date?
+
         draft.mutateBlock(blockID) { block in
+            let blockRestSeconds = block.restSeconds
             block.mutatingSet(setID) { row in
                 if row.log.isCompleted {
                     row.log.completedAt = nil
+                    nextRestTimerEndsAt = nil
                 } else {
                     row.log.weight = row.log.weight ?? row.target.targetWeight
                     row.log.reps = row.log.reps ?? row.target.repRange.upperBound
                     row.log.rir = row.log.rir ?? row.target.rir
                     row.log.completedAt = completedAt
+                    let seconds = row.target.restSeconds ?? blockRestSeconds
+                    nextRestTimerEndsAt = completedAt.addingTimeInterval(TimeInterval(max(1, seconds)))
                 }
             }
         }
 
-        draft.touch(
-            restTimerEndsAtFor(blockID, setID: setID, now: completedAt, in: draft),
-            now: completedAt
-        )
+        draft.restTimerEndsAt = nextRestTimerEndsAt
+        draft.touch(now: completedAt)
     }
 
     static func adjustWeight(
@@ -433,22 +437,6 @@ enum SessionEngine {
         return warmups + workingTargets
     }
 
-    static func restTimerEndsAtFor(
-        _ blockID: UUID,
-        setID: UUID,
-        now: Date,
-        in draft: SessionDraft
-    ) -> Date? {
-        guard let block = draft.blocks.first(where: { $0.id == blockID }),
-            let row = block.sets.first(where: { $0.id == setID }),
-            row.log.isCompleted
-        else {
-            return draft.restTimerEndsAt
-        }
-
-        let seconds = row.target.restSeconds ?? block.restSeconds
-        return now.addingTimeInterval(TimeInterval(max(1, seconds)))
-    }
 }
 
 private extension ExerciseBlock {
