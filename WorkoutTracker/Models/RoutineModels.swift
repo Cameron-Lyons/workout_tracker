@@ -867,6 +867,49 @@ struct SessionFinishSummary: Identifiable, Equatable, Sendable {
 }
 
 enum TemplateReferenceSelection {
+    private struct Lookup {
+        var referencesByTemplateID: [UUID: TemplateReference]
+        var recentTemplateIDs: [UUID]
+        var lastCompletedTemplateIDByPlan: [UUID: UUID]
+
+        init(references: [TemplateReference], sessions: [CompletedSession]) {
+            referencesByTemplateID = Dictionary(uniqueKeysWithValues: references.map { ($0.templateID, $0) })
+            recentTemplateIDs = Array(sessions.reversed().map(\.templateID))
+
+            var latestSessionByPlanID: [UUID: (completedAt: Date, templateID: UUID)] = [:]
+            for session in sessions {
+                guard let planID = session.planID else {
+                    continue
+                }
+
+                if let existing = latestSessionByPlanID[planID], existing.completedAt > session.completedAt {
+                    continue
+                }
+
+                latestSessionByPlanID[planID] = (session.completedAt, session.templateID)
+            }
+
+            lastCompletedTemplateIDByPlan = latestSessionByPlanID.reduce(into: [:]) { partialResult, entry in
+                partialResult[entry.key] = entry.value.templateID
+            }
+        }
+    }
+
+    static func todaySelection(
+        plans: [Plan],
+        references: [TemplateReference],
+        sessions: [CompletedSession],
+        now: Date,
+        limit: Int = AnalyticsDefaults.quickStartLimit,
+        calendar: Calendar = .autoupdatingCurrent
+    ) -> (pinnedTemplate: TemplateReference?, quickStartTemplates: [TemplateReference]) {
+        let lookup = Lookup(references: references, sessions: sessions)
+        return (
+            pinnedTemplate: pinnedTemplate(from: plans, references: references, lookup: lookup, now: now, calendar: calendar),
+            quickStartTemplates: quickStarts(references: references, lookup: lookup, limit: limit)
+        )
+    }
+
     static func pinnedTemplate(
         from plans: [Plan],
         references: [TemplateReference],
@@ -874,33 +917,13 @@ enum TemplateReferenceSelection {
         now: Date,
         calendar: Calendar = .autoupdatingCurrent
     ) -> TemplateReference? {
-        let referencesByTemplateID = Dictionary(uniqueKeysWithValues: references.map { ($0.templateID, $0) })
-        let weekday = Weekday(rawValue: calendar.component(.weekday, from: now))
-
-        for plan in plans {
-            if let scheduledToday = scheduledTemplate(
-                for: plan,
-                referencesByTemplateID: referencesByTemplateID,
-                sessions: sessions,
-                weekday: weekday
-            ) {
-                return scheduledToday
-            }
-        }
-
-        for plan in plans {
-            if let pinned = preferredPinnedTemplate(
-                for: plan,
-                referencesByTemplateID: referencesByTemplateID,
-                sessions: sessions
-            ) {
-                return pinned
-            }
-        }
-
-        return references.max(by: {
-            ($0.lastStartedAt ?? .distantPast) < ($1.lastStartedAt ?? .distantPast)
-        }) ?? references.first
+        pinnedTemplate(
+            from: plans,
+            references: references,
+            lookup: Lookup(references: references, sessions: sessions),
+            now: now,
+            calendar: calendar
+        )
     }
 
     static func isStartingStrengthPlan(_ plan: Plan?) -> Bool {
@@ -931,13 +954,56 @@ enum TemplateReferenceSelection {
         sessions: [CompletedSession],
         limit: Int = AnalyticsDefaults.quickStartLimit
     ) -> [TemplateReference] {
-        let referencesByTemplateID = Dictionary(uniqueKeysWithValues: references.map { ($0.templateID, $0) })
-        let recentTemplateIDs = sessions.reversed().map(\.templateID)
+        quickStarts(
+            references: references,
+            lookup: Lookup(references: references, sessions: sessions),
+            limit: limit
+        )
+    }
+
+    private static func pinnedTemplate(
+        from plans: [Plan],
+        references: [TemplateReference],
+        lookup: Lookup,
+        now: Date,
+        calendar: Calendar
+    ) -> TemplateReference? {
+        let weekday = Weekday(rawValue: calendar.component(.weekday, from: now))
+
+        for plan in plans {
+            if let scheduledToday = scheduledTemplate(
+                for: plan,
+                lookup: lookup,
+                weekday: weekday
+            ) {
+                return scheduledToday
+            }
+        }
+
+        for plan in plans {
+            if let pinned = preferredPinnedTemplate(
+                for: plan,
+                lookup: lookup
+            ) {
+                return pinned
+            }
+        }
+
+        return references.max(by: {
+            ($0.lastStartedAt ?? .distantPast) < ($1.lastStartedAt ?? .distantPast)
+        }) ?? references.first
+    }
+
+    private static func quickStarts(
+        references: [TemplateReference],
+        lookup: Lookup,
+        limit: Int
+    ) -> [TemplateReference] {
         var resolved: [TemplateReference] = []
         var seenTemplateIDs: Set<UUID> = []
 
-        for templateID in recentTemplateIDs {
-            guard let match = referencesByTemplateID[templateID],
+        for templateID in lookup.recentTemplateIDs {
+            guard let match = lookup.referencesByTemplateID[templateID],
                 seenTemplateIDs.insert(match.templateID).inserted
             else {
                 continue
@@ -961,8 +1027,7 @@ enum TemplateReferenceSelection {
 
     private static func scheduledTemplate(
         for plan: Plan,
-        referencesByTemplateID: [UUID: TemplateReference],
-        sessions: [CompletedSession],
+        lookup: Lookup,
         weekday: Weekday?
     ) -> TemplateReference? {
         guard let weekday else {
@@ -974,46 +1039,43 @@ enum TemplateReferenceSelection {
                 return nil
             }
 
-            guard let templateID = nextStartingStrengthTemplateID(in: plan, sessions: sessions) else {
+            guard let templateID = nextStartingStrengthTemplateID(in: plan, lookup: lookup) else {
                 return nil
             }
 
-            return referencesByTemplateID[templateID]
+            return lookup.referencesByTemplateID[templateID]
         }
 
         guard let template = plan.templates.first(where: { $0.scheduledWeekdays.contains(weekday) }) else {
             return nil
         }
 
-        return referencesByTemplateID[template.id]
+        return lookup.referencesByTemplateID[template.id]
     }
 
     private static func preferredPinnedTemplate(
         for plan: Plan,
-        referencesByTemplateID: [UUID: TemplateReference],
-        sessions: [CompletedSession]
+        lookup: Lookup
     ) -> TemplateReference? {
-        if let templateID = nextStartingStrengthTemplateID(in: plan, sessions: sessions) {
-            return referencesByTemplateID[templateID]
+        if let templateID = nextStartingStrengthTemplateID(in: plan, lookup: lookup) {
+            return lookup.referencesByTemplateID[templateID]
         }
 
         guard let pinnedTemplateID = plan.pinnedTemplateID else {
             return nil
         }
 
-        return referencesByTemplateID[pinnedTemplateID]
+        return lookup.referencesByTemplateID[pinnedTemplateID]
     }
 
-    private static func nextStartingStrengthTemplateID(in plan: Plan, sessions: [CompletedSession]) -> UUID? {
+    private static func nextStartingStrengthTemplateID(in plan: Plan, lookup: Lookup) -> UUID? {
+        nextStartingStrengthTemplateID(in: plan, lastCompletedTemplateID: lookup.lastCompletedTemplateIDByPlan[plan.id])
+    }
+
+    private static func nextStartingStrengthTemplateID(in plan: Plan, lastCompletedTemplateID: UUID?) -> UUID? {
         guard let pair = startingStrengthTemplatePair(in: plan) else {
             return nil
         }
-
-        let lastCompletedTemplateID =
-            sessions
-            .filter { $0.planID == plan.id }
-            .max(by: { $0.completedAt < $1.completedAt })?
-            .templateID
 
         switch lastCompletedTemplateID {
         case pair.dayA.id:

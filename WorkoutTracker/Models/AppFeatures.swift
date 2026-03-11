@@ -39,6 +39,7 @@ final class AppDerivedStateController {
         let references = plansStore.templateReferences()
         let sessions = sessionStore.completedSessions
         let selectedExerciseID = progressStore.selectedExerciseID
+        let selectedDay = progressStore.selectedDay
 
         let sessionAnalytics = await sessionAnalyticsSnapshot(
             plansStore: plansStore,
@@ -46,16 +47,22 @@ final class AppDerivedStateController {
             now: now
         )
 
-        let snapshot = analytics.makeDerivedStoreSnapshot(
+        let todaySnapshot = analytics.makeTodaySnapshot(
             plans: plans,
             references: references,
             sessions: sessions,
             sessionAnalytics: sessionAnalytics,
-            selectedExerciseID: selectedExerciseID,
             now: now
         )
 
-        apply(snapshot, completedSessions: sessions)
+        let progressState = await preparedProgressState(
+            sessionAnalytics: sessionAnalytics,
+            completedSessions: sessions,
+            selectedExerciseID: selectedExerciseID,
+            selectedDay: selectedDay
+        )
+
+        apply(todaySnapshot: todaySnapshot, progressState: progressState)
     }
 
     func refreshToday(plansStore: PlansStore, sessionStore: SessionStore, now: Date = .now) {
@@ -83,40 +90,43 @@ final class AppDerivedStateController {
         priority: TaskPriority = .utility
     ) {
         let selectedExerciseID = progressStore.selectedExerciseID
+        let selectedDay = progressStore.selectedDay
+        let completedSessions = sessionStore.completedSessions
         progressRefreshGeneration += 1
         let generation = progressRefreshGeneration
 
         progressRefreshTask?.cancel()
-
-        if let sessionAnalytics = cachedSessionAnalyticsSnapshot(
-            plansStore: plansStore,
-            sessionStore: sessionStore
-        ) {
-            progressStore.apply(
-                analytics.makeProgressSnapshot(
-                    sessionAnalytics: sessionAnalytics,
-                    selectedExerciseID: selectedExerciseID
-                ),
-                completedSessions: sessionStore.completedSessions
-            )
-            progressRefreshTask = nil
-            return
-        }
 
         progressRefreshTask = Task { [weak self, analytics] in
             guard let self else {
                 return
             }
 
-            let sessionAnalytics = await self.sessionAnalyticsSnapshot(
-                plansStore: plansStore,
-                sessionStore: sessionStore,
-                priority: priority
-            )
-            let snapshot = analytics.makeProgressSnapshot(
+            let sessionAnalytics: AnalyticsRepository.SessionAnalyticsSnapshot
+            if let cachedSessionAnalytics = self.cachedSessionAnalyticsSnapshot(
+                    plansStore: plansStore,
+                    sessionStore: sessionStore
+                ) {
+                sessionAnalytics = cachedSessionAnalytics
+            } else {
+                sessionAnalytics = await self.sessionAnalyticsSnapshot(
+                    plansStore: plansStore,
+                    sessionStore: sessionStore,
+                    priority: priority
+                )
+            }
+
+            let progressSnapshot = analytics.makeProgressSnapshot(
                 sessionAnalytics: sessionAnalytics,
                 selectedExerciseID: selectedExerciseID
             )
+            let progressState = await Task.detached(priority: priority) {
+                ProgressStore.prepareState(
+                    progressSnapshot,
+                    completedSessions: completedSessions,
+                    selectedDay: selectedDay
+                )
+            }.value
 
             guard !Task.isCancelled else {
                 return
@@ -127,7 +137,7 @@ final class AppDerivedStateController {
                     return
                 }
 
-                self.progressStore.apply(snapshot, completedSessions: sessionStore.completedSessions)
+                self.progressStore.apply(progressState)
                 self.progressRefreshTask = nil
             }
         }
@@ -157,6 +167,16 @@ final class AppDerivedStateController {
             catalogByID: plansStore.catalogByID,
             finishSummary: finishSummary
         )
+        cacheSessionAnalytics(
+            AnalyticsRepository.SessionAnalyticsSnapshot(
+                overview: progressStore.overview,
+                personalRecords: Array(progressStore.personalRecords.reversed()),
+                exerciseSummaries: progressStore.exerciseSummaries,
+                recentPersonalRecords: todayStore.recentPersonalRecords,
+                recentSessions: todayStore.recentSessions
+            ),
+            key: sessionAnalyticsCacheKey(plansStore: plansStore, sessionStore: sessionStore)
+        )
     }
 
     func finishSummary(
@@ -171,11 +191,32 @@ final class AppDerivedStateController {
     }
 
     private func apply(
-        _ snapshot: AnalyticsRepository.DerivedStoreSnapshot,
-        completedSessions: [CompletedSession]
+        todaySnapshot: AnalyticsRepository.TodaySnapshot,
+        progressState: ProgressStore.PreparedState
     ) {
-        todayStore.apply(snapshot.today)
-        progressStore.apply(snapshot.progress, completedSessions: completedSessions)
+        todayStore.apply(todaySnapshot)
+        progressStore.apply(progressState)
+    }
+
+    private func preparedProgressState(
+        sessionAnalytics: AnalyticsRepository.SessionAnalyticsSnapshot,
+        completedSessions: [CompletedSession],
+        selectedExerciseID: UUID?,
+        selectedDay: Date?,
+        priority: TaskPriority = .utility
+    ) async -> ProgressStore.PreparedState {
+        let snapshot = analytics.makeProgressSnapshot(
+            sessionAnalytics: sessionAnalytics,
+            selectedExerciseID: selectedExerciseID
+        )
+
+        return await Task.detached(priority: priority) {
+            ProgressStore.prepareState(
+                snapshot,
+                completedSessions: completedSessions,
+                selectedDay: selectedDay
+            )
+        }.value
     }
 
     private func resolvedSessionAnalyticsSnapshot(
@@ -298,7 +339,9 @@ final class AppPlanCoordinator {
 
     func completeOnboarding(with presetPack: PresetPack?) {
         if let presetPack {
+            let signpost = PerformanceSignpost.begin("Onboarding Preset Application")
             plansStore.addPresetPack(presetPack, settings: settingsStore)
+            PerformanceSignpost.end(signpost)
         }
 
         settingsStore.hasCompletedOnboarding = true
@@ -389,6 +432,9 @@ final class AppSessionCoordinator {
         templateID: UUID,
         discardingActiveSession: Bool = false
     ) {
+        let signpost = PerformanceSignpost.begin("Session Start")
+        defer { PerformanceSignpost.end(signpost) }
+
         guard let plan = plansStore.plan(for: planID),
             let template = plan.templates.first(where: { $0.id == templateID })
         else {
@@ -485,6 +531,9 @@ final class AppSessionCoordinator {
 
     @discardableResult
     func finishActiveSession() -> Bool {
+        let signpost = PerformanceSignpost.begin("Session Finish")
+        defer { PerformanceSignpost.end(signpost) }
+
         let catalogByID = plansStore.catalogByID
         let finishedBlocks = sessionStore.activeDraft?.blocks
         guard let completedSession = sessionStore.completeSession() else {

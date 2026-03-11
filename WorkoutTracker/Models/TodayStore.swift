@@ -34,15 +34,13 @@ final class TodayStore {
             )
         }
 
-        pinnedTemplate = TemplateReferenceSelection.pinnedTemplate(
-            from: plans,
+        let selection = TemplateReferenceSelection.todaySelection(
+            plans: plans,
             references: references,
             sessions: allSessions,
             now: now
         )
-        quickStartTemplates = TemplateReferenceSelection.quickStarts(
-            references: references,
-            sessions: allSessions
-        )
+        pinnedTemplate = selection.pinnedTemplate
+        quickStartTemplates = selection.quickStartTemplates
     }
 }

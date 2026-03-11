@@ -50,27 +50,41 @@ struct AnalyticsRepository: Sendable {
         var newRecords: [PersonalRecord]
     }
 
+    private struct SessionAnalysis {
+        var completedSetCount = 0
+        var totalVolume = 0.0
+        var trackedVolume = 0.0
+        var newRecords: [PersonalRecord] = []
+        var fallbackDisplayNamesByExerciseID: [UUID: String] = [:]
+        var totalVolumeByExerciseID: [UUID: Double] = [:]
+        var payloadsByExerciseID: [UUID: SessionExercisePayload] = [:]
+        var orderedExerciseIDs: [UUID] = []
+
+        var payloads: [SessionExercisePayload] {
+            orderedExerciseIDs.compactMap { payloadsByExerciseID[$0] }
+        }
+    }
+
     func finishSummary(
         for session: CompletedSession,
         previousBestByExerciseID: [UUID: Double],
         catalogByID: [UUID: ExerciseCatalogItem]
     ) -> SessionFinishSummary {
         var bestOneRepMaxByExerciseID = previousBestByExerciseID
-        let newRecords = session.blocks.flatMap { block in
-            analyze(
-                block,
-                in: session,
-                displayName: catalogByID[block.exerciseID]?.name ?? block.exerciseNameSnapshot,
-                bestOneRepMaxByExerciseID: &bestOneRepMaxByExerciseID
-            ).newRecords
-        }
+        let analysis = analyzeSession(
+            session,
+            displayNameForBlock: { block in
+                catalogByID[block.exerciseID]?.name ?? block.exerciseNameSnapshot
+            },
+            bestOneRepMaxByExerciseID: &bestOneRepMaxByExerciseID
+        )
 
         return SessionFinishSummary(
             templateName: session.templateNameSnapshot,
             completedAt: session.completedAt,
-            completedSetCount: completedSetCount(for: session),
-            totalVolume: volume(for: session),
-            personalRecords: newRecords
+            completedSetCount: analysis.completedSetCount,
+            totalVolume: analysis.trackedVolume,
+            personalRecords: analysis.newRecords
         )
     }
 
@@ -94,7 +108,7 @@ struct AnalyticsRepository: Sendable {
         let startOfToday = calendar.startOfDay(for: now)
         let startOfWeek = calendar.dateInterval(of: .weekOfYear, for: startOfToday)?.start ?? startOfToday
         let last30Days = AnalyticsDefaults.rollingWindowStart(from: startOfToday, calendar: calendar)
-        let firstSessionDate = sessions.first?.completedAt ?? startOfToday
+        let firstSessionDate = chronologicalSessions.first?.completedAt ?? startOfToday
 
         var totalVolume = 0.0
         var sessionsThisWeek = 0
@@ -112,34 +126,37 @@ struct AnalyticsRepository: Sendable {
                 sessionsLast30Days += 1
             }
 
-            var sessionVolume = 0.0
+            let analysis = analyzeSession(
+                session,
+                displayNameForBlock: { block in
+                    catalogByID[block.exerciseID]?.name ?? block.exerciseNameSnapshot
+                },
+                bestOneRepMaxByExerciseID: &bestOneRepMaxByExerciseID
+            )
+            personalRecords.append(contentsOf: analysis.newRecords)
 
-            for block in session.blocks {
-                let displayName = catalogByID[block.exerciseID]?.name ?? block.exerciseNameSnapshot
-                let blockAnalysis = analyze(
-                    block,
-                    in: session,
-                    displayName: displayName,
-                    bestOneRepMaxByExerciseID: &bestOneRepMaxByExerciseID
-                )
-                personalRecords.append(contentsOf: blockAnalysis.newRecords)
-
+            for (exerciseID, fallbackDisplayName) in analysis.fallbackDisplayNamesByExerciseID {
                 var accumulator =
-                    exerciseAccumulatorsByID[block.exerciseID]
+                    exerciseAccumulatorsByID[exerciseID]
                     ?? ExerciseAnalyticsAccumulator(
-                        exerciseID: block.exerciseID,
-                        fallbackDisplayName: block.exerciseNameSnapshot
+                        exerciseID: exerciseID,
+                        fallbackDisplayName: fallbackDisplayName
                     )
-                accumulator.fallbackDisplayName = block.exerciseNameSnapshot
-                for record in blockAnalysis.newRecords {
-                    accumulator.currentPR = record
-                }
-                sessionVolume += blockAnalysis.volume
-                accumulator.totalVolume += blockAnalysis.volume
-                exerciseAccumulatorsByID[block.exerciseID] = accumulator
+                accumulator.fallbackDisplayName = fallbackDisplayName
+                accumulator.totalVolume += analysis.totalVolumeByExerciseID[exerciseID] ?? 0
+                exerciseAccumulatorsByID[exerciseID] = accumulator
             }
 
-            for payload in sessionExercisePayloads(from: session) {
+            for record in analysis.newRecords {
+                guard var accumulator = exerciseAccumulatorsByID[record.exerciseID] else {
+                    continue
+                }
+
+                accumulator.currentPR = record
+                exerciseAccumulatorsByID[record.exerciseID] = accumulator
+            }
+
+            for payload in analysis.payloads {
                 guard var accumulator = exerciseAccumulatorsByID[payload.exerciseID] else {
                     continue
                 }
@@ -156,7 +173,7 @@ struct AnalyticsRepository: Sendable {
                 exerciseAccumulatorsByID[payload.exerciseID] = accumulator
             }
 
-            totalVolume += sessionVolume
+            totalVolume += analysis.totalVolume
         }
 
         let weeksSpan = AnalyticsDefaults.weeksSpan(from: firstSessionDate, to: startOfToday)
@@ -184,7 +201,7 @@ struct AnalyticsRepository: Sendable {
             personalRecords: personalRecords,
             exerciseSummaries: exerciseSummaries,
             recentPersonalRecords: Array(personalRecords.suffix(AnalyticsDefaults.recentActivityLimit).reversed()),
-            recentSessions: Array(sessions.suffix(AnalyticsDefaults.recentActivityLimit).reversed())
+            recentSessions: Array(chronologicalSessions.suffix(AnalyticsDefaults.recentActivityLimit).reversed())
         )
     }
 
@@ -218,17 +235,16 @@ struct AnalyticsRepository: Sendable {
         sessionAnalytics: SessionAnalyticsSnapshot,
         now: Date = .now
     ) -> TodaySnapshot {
-        TodaySnapshot(
-            pinnedTemplate: TemplateReferenceSelection.pinnedTemplate(
-                from: plans,
-                references: references,
-                sessions: sessions,
-                now: now
-            ),
-            quickStartTemplates: TemplateReferenceSelection.quickStarts(
-                references: references,
-                sessions: sessions
-            ),
+        let selection = TemplateReferenceSelection.todaySelection(
+            plans: plans,
+            references: references,
+            sessions: sessions,
+            now: now
+        )
+
+        return TodaySnapshot(
+            pinnedTemplate: selection.pinnedTemplate,
+            quickStartTemplates: selection.quickStartTemplates,
             recentPersonalRecords: sessionAnalytics.recentPersonalRecords,
             recentSessions: sessionAnalytics.recentSessions
         )
@@ -250,7 +266,12 @@ struct AnalyticsRepository: Sendable {
     }
 
     func volume(for session: CompletedSession) -> Double {
-        sessionExercisePayloads(from: session).reduce(0) { $0 + $1.volume }
+        var bestOneRepMaxByExerciseID: [UUID: Double] = [:]
+        return analyzeSession(
+            session,
+            displayNameForBlock: { $0.exerciseNameSnapshot },
+            bestOneRepMaxByExerciseID: &bestOneRepMaxByExerciseID
+        ).trackedVolume
     }
 
     func completedSetCount(for session: CompletedSession) -> Int {
@@ -269,30 +290,51 @@ struct AnalyticsRepository: Sendable {
 
     func sessionExercisePayloads(from session: CompletedSession) -> [SessionExercisePayload] {
         var bestOneRepMaxByExerciseID: [UUID: Double] = [:]
-        var payloadsByExerciseID: [UUID: SessionExercisePayload] = [:]
-        var orderedExerciseIDs: [UUID] = []
+        return analyzeSession(
+            session,
+            displayNameForBlock: { $0.exerciseNameSnapshot },
+            bestOneRepMaxByExerciseID: &bestOneRepMaxByExerciseID
+        ).payloads
+    }
+
+    private func analyzeSession(
+        _ session: CompletedSession,
+        displayNameForBlock: (CompletedSessionBlock) -> String,
+        bestOneRepMaxByExerciseID: inout [UUID: Double]
+    ) -> SessionAnalysis {
+        var sessionAnalysis = SessionAnalysis()
 
         for block in session.blocks {
+            let displayName = displayNameForBlock(block)
             let blockAnalysis = analyze(
                 block,
                 in: session,
-                displayName: block.exerciseNameSnapshot,
+                displayName: displayName,
                 bestOneRepMaxByExerciseID: &bestOneRepMaxByExerciseID
             )
+
+            sessionAnalysis.completedSetCount += block.sets.reduce(0) { partialResult, row in
+                partialResult + (row.log.isCompleted ? 1 : 0)
+            }
+            sessionAnalysis.totalVolume += blockAnalysis.volume
+            sessionAnalysis.newRecords.append(contentsOf: blockAnalysis.newRecords)
+            sessionAnalysis.fallbackDisplayNamesByExerciseID[block.exerciseID] = block.exerciseNameSnapshot
+            sessionAnalysis.totalVolumeByExerciseID[block.exerciseID, default: 0] += blockAnalysis.volume
 
             guard let payload = blockAnalysis.payload else {
                 continue
             }
 
-            if let existingPayload = payloadsByExerciseID[payload.exerciseID] {
-                payloadsByExerciseID[payload.exerciseID] = mergedSessionPayload(existingPayload, with: payload)
+            sessionAnalysis.trackedVolume += blockAnalysis.volume
+            if let existingPayload = sessionAnalysis.payloadsByExerciseID[payload.exerciseID] {
+                sessionAnalysis.payloadsByExerciseID[payload.exerciseID] = mergedSessionPayload(existingPayload, with: payload)
             } else {
-                payloadsByExerciseID[payload.exerciseID] = payload
-                orderedExerciseIDs.append(payload.exerciseID)
+                sessionAnalysis.payloadsByExerciseID[payload.exerciseID] = payload
+                sessionAnalysis.orderedExerciseIDs.append(payload.exerciseID)
             }
         }
 
-        return orderedExerciseIDs.compactMap { payloadsByExerciseID[$0] }
+        return sessionAnalysis
     }
 
     private func analyze(

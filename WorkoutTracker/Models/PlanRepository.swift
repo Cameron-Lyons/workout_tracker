@@ -1,7 +1,6 @@
 import Foundation
 import SwiftData
 
-@MainActor
 class RepositoryBase {
     let modelContext: ModelContext
 
@@ -37,7 +36,6 @@ class RepositoryBase {
     }
 }
 
-@MainActor
 final class PlanRepository: RepositoryBase {
     private let emptyArrayData = Data("[]".utf8)
 
@@ -112,6 +110,51 @@ final class PlanRepository: RepositoryBase {
         return saveContext("plans")
     }
 
+    @discardableResult
+    func upsertPlans(_ plans: [Plan]) -> Bool {
+        var recordsByID = Dictionary(uniqueKeysWithValues: loadPlanRecords().map { ($0.id, $0) })
+
+        for plan in plans {
+            let record: StoredPlan
+            if let existing = recordsByID.removeValue(forKey: plan.id) {
+                record = existing
+            } else {
+                record = StoredPlan(
+                    id: plan.id,
+                    name: plan.name,
+                    createdAt: plan.createdAt,
+                    pinnedTemplateID: plan.pinnedTemplateID
+                )
+                modelContext.insert(record)
+            }
+
+            apply(plan, to: record)
+            syncTemplates(of: record, with: plan.templates)
+        }
+
+        return saveContext("plans")
+    }
+
+    @discardableResult
+    func markTemplateStarted(planID: UUID, templateID: UUID, startedAt: Date) -> Bool {
+        let descriptor = FetchDescriptor<StoredPlan>(
+            predicate: #Predicate<StoredPlan> { $0.id == planID }
+        )
+
+        guard let record = (try? modelContext.fetch(descriptor))?.first,
+            let template = record.templates.first(where: { $0.id == templateID })
+        else {
+            return false
+        }
+
+        guard template.lastStartedAt != startedAt else {
+            return true
+        }
+
+        template.lastStartedAt = startedAt
+        return saveContext("template start")
+    }
+
     func loadProfiles() -> [ExerciseProfile] {
         let records = (try? modelContext.fetch(FetchDescriptor<StoredExerciseProfile>())) ?? []
         return records.compactMap(profile(from:))
@@ -139,6 +182,30 @@ final class PlanRepository: RepositoryBase {
         }
 
         recordsByID.values.forEach(modelContext.delete)
+        return saveContext("profiles")
+    }
+
+    @discardableResult
+    func upsertProfiles(_ profiles: [ExerciseProfile]) -> Bool {
+        var recordsByID = Dictionary(uniqueKeysWithValues: loadProfileRecords().map { ($0.id, $0) })
+
+        for profile in profiles {
+            let record: StoredExerciseProfile
+            if let existing = recordsByID.removeValue(forKey: profile.id) {
+                record = existing
+            } else {
+                record = StoredExerciseProfile(
+                    id: profile.id,
+                    exerciseID: profile.exerciseID,
+                    trainingMax: profile.trainingMax,
+                    preferredIncrement: profile.preferredIncrement
+                )
+                modelContext.insert(record)
+            }
+
+            apply(profile, to: record)
+        }
+
         return saveContext("profiles")
     }
 

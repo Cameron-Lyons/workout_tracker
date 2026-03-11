@@ -7,6 +7,7 @@ import SwiftData
 final class AppStore {
     @ObservationIgnored private let launchArguments: Set<String>
     @ObservationIgnored private var hasHydrated = false
+    @ObservationIgnored private let hydrationLoader: PersistenceHydrationLoader
     @ObservationIgnored private let derivedStateController: AppDerivedStateController
     @ObservationIgnored private let planCoordinator: AppPlanCoordinator
     @ObservationIgnored private let sessionCoordinator: AppSessionCoordinator
@@ -29,10 +30,23 @@ final class AppStore {
         self.launchArguments = launchArguments
         let context = ModelContext(modelContainer)
         context.autosaveEnabled = false
+        let planPersistenceController = PlanPersistenceControllerRegistry.controller(for: modelContainer)
+        let sessionPersistenceController = SessionPersistenceControllerRegistry.controller(for: modelContainer)
+        let hydrationLoader = PersistenceHydrationLoader(
+            modelContainer: modelContainer,
+            planPersistenceController: planPersistenceController,
+            sessionPersistenceController: sessionPersistenceController
+        )
 
         let settingsStore = SettingsStore()
-        let plansStore = PlansStore(repository: PlanRepository(modelContext: context))
-        let sessionStore = SessionStore(repository: SessionRepository(modelContext: context))
+        let plansStore = PlansStore(
+            repository: PlanRepository(modelContext: context),
+            persistenceController: planPersistenceController
+        )
+        let sessionStore = SessionStore(
+            repository: SessionRepository(modelContext: context),
+            persistenceController: sessionPersistenceController
+        )
         let todayStore = TodayStore()
         let progressStore = ProgressStore()
         let derivedStateController = AppDerivedStateController(
@@ -45,6 +59,7 @@ final class AppStore {
         self.sessionStore = sessionStore
         self.todayStore = todayStore
         self.progressStore = progressStore
+        self.hydrationLoader = hydrationLoader
         persistenceStartupIssue = WorkoutModelContainerFactory.consumeStartupIssue()
         self.derivedStateController = derivedStateController
         self.planCoordinator = AppPlanCoordinator(
@@ -80,8 +95,9 @@ final class AppStore {
             resetAllDataForFreshStart()
         }
 
-        plansStore.hydrate()
-        sessionStore.hydrate()
+        let hydrationSnapshot = await hydrationLoader.load()
+        plansStore.hydrate(with: hydrationSnapshot.plans)
+        sessionStore.hydrate(with: hydrationSnapshot.sessions)
         await derivedStateController.hydrate(plansStore: plansStore, sessionStore: sessionStore)
         isHydrated = true
     }
@@ -214,5 +230,9 @@ final class AppStore {
 
     func flushPendingSessionPersistence() {
         sessionCoordinator.flushPendingDraftPersistence()
+    }
+
+    func flushPendingPlanPersistence() {
+        plansStore.flushPendingPersistence()
     }
 }

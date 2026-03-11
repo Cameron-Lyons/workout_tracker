@@ -1,7 +1,6 @@
 import Foundation
 import SwiftData
 
-@MainActor
 final class SessionRepository: RepositoryBase {
     override init(modelContext: ModelContext) {
         super.init(modelContext: modelContext)
@@ -86,6 +85,22 @@ final class SessionRepository: RepositoryBase {
 
         apply(session, to: record)
         syncCompletedBlocks(of: record, with: session.blocks)
+        return saveContext("completed session")
+    }
+
+    @discardableResult
+    func persistCompletedSessionAndClearActiveDraft(_ session: CompletedSession) -> Bool {
+        let descriptor = FetchDescriptor<StoredCompletedSession>(
+            predicate: #Predicate<StoredCompletedSession> { $0.id == session.id }
+        )
+        let record = (try? modelContext.fetch(descriptor))?.first ?? makeCompletedSessionRecord(from: session)
+        if record.modelContext == nil {
+            modelContext.insert(record)
+        }
+
+        apply(session, to: record)
+        syncCompletedBlocks(of: record, with: session.blocks)
+        loadActiveDraftRecords().forEach(modelContext.delete)
         return saveContext("completed session")
     }
 

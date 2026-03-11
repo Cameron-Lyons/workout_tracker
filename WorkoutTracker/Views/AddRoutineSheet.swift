@@ -91,7 +91,7 @@ struct OnboardingView: View {
 
                         ForEach(presetPacks) { pack in
                             Button {
-                                appStore.completeOnboarding(with: pack)
+                                beginPresetOnboarding(pack)
                             } label: {
                                 OnboardingPresetCard(pack: pack)
                             }
@@ -134,6 +134,21 @@ struct OnboardingView: View {
                 .padding(.vertical, 18)
             }
             .scrollIndicators(.hidden)
+        }
+    }
+
+    private func beginPresetOnboarding(_ pack: PresetPack) {
+        guard appStore.settingsStore.isCompletingOnboarding == false else {
+            return
+        }
+
+        appStore.settingsStore.isCompletingOnboarding = true
+        appStore.settingsStore.hasCompletedOnboarding = true
+
+        Task { @MainActor in
+            await Task.yield()
+            appStore.completeOnboarding(with: pack)
+            appStore.settingsStore.isCompletingOnboarding = false
         }
     }
 }

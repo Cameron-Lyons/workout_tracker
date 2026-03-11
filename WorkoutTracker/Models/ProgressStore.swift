@@ -15,6 +15,21 @@ private enum ExerciseChartDefaults {
 @MainActor
 @Observable
 final class ProgressStore {
+    struct PreparedState: Sendable {
+        var overview: ProgressOverview
+        var personalRecords: [PersonalRecord]
+        var exerciseSummaries: [ExerciseAnalyticsSummary]
+        var selectedExerciseID: UUID?
+        var selectedDay: Date?
+        var historySessions: [CompletedSession]
+        var workoutDays: Set<Date>
+        var allSessionsDescending: [CompletedSession]
+        var sessionsByDay: [Date: [CompletedSession]]
+        var exerciseSummariesByID: [UUID: ExerciseAnalyticsSummary]
+        var exerciseChartSeriesByID: [UUID: ExerciseChartSeries]
+        var personalBestByExerciseID: [UUID: Double]
+    }
+
     @ObservationIgnored private let calendar = Calendar.autoupdatingCurrent
     @ObservationIgnored private var allSessionsDescending: [CompletedSession] = []
     @ObservationIgnored private var sessionsByDay: [Date: [CompletedSession]] = [:]
@@ -38,12 +53,22 @@ final class ProgressStore {
         _ snapshot: AnalyticsRepository.ProgressSnapshot,
         completedSessions: [CompletedSession]
     ) {
-        overview = snapshot.overview
-        personalRecords = snapshot.personalRecords
-        exerciseSummaries = snapshot.exerciseSummaries
-        rebuildExerciseSummaryCache()
-        selectedExerciseID = snapshot.selectedExerciseID
-        rebuildHistoryCaches(from: completedSessions)
+        apply(Self.prepareState(snapshot, completedSessions: completedSessions, selectedDay: selectedDay))
+    }
+
+    func apply(_ state: PreparedState) {
+        overview = state.overview
+        personalRecords = state.personalRecords
+        exerciseSummaries = state.exerciseSummaries
+        selectedExerciseID = state.selectedExerciseID
+        selectedDay = state.selectedDay
+        historySessions = state.historySessions
+        workoutDays = state.workoutDays
+        allSessionsDescending = state.allSessionsDescending
+        sessionsByDay = state.sessionsByDay
+        exerciseSummariesByID = state.exerciseSummariesByID
+        exerciseChartSeriesByID = state.exerciseChartSeriesByID
+        personalBestByExerciseID = state.personalBestByExerciseID
     }
 
     func recordCompletedSession(
@@ -57,7 +82,7 @@ final class ProgressStore {
             session,
             sessionCount: completedSessions.count,
             firstSessionDate: completedSessions.first?.completedAt,
-            addedVolume: analytics.volume(for: session)
+            addedVolume: finishSummary?.totalVolume ?? analytics.volume(for: session)
         )
 
         if let finishSummary, !finishSummary.personalRecords.isEmpty {
@@ -153,6 +178,58 @@ final class ProgressStore {
         historySessions = resolvedHistorySessions(for: selectedDay)
     }
 
+    nonisolated static func prepareState(
+        _ snapshot: AnalyticsRepository.ProgressSnapshot,
+        completedSessions: [CompletedSession],
+        selectedDay: Date?
+    ) -> PreparedState {
+        let exerciseSummariesByID = Dictionary(uniqueKeysWithValues: snapshot.exerciseSummaries.map { ($0.exerciseID, $0) })
+        let exerciseChartSeriesByID = Dictionary(
+            uniqueKeysWithValues: exerciseSummariesByID.map { exerciseID, summary in
+                (exerciseID, makeChartSeries(from: summary.points))
+            }
+        )
+        let personalBestByExerciseID: [UUID: Double] = Dictionary(
+            uniqueKeysWithValues: exerciseSummariesByID.compactMap { exerciseID, summary in
+                guard let currentPR = summary.currentPR else {
+                    return nil
+                }
+
+                return (exerciseID, currentPR.estimatedOneRepMax)
+            }
+        )
+
+        let calendar = Calendar.autoupdatingCurrent
+        let normalizedSelectedDay = selectedDay.map { calendar.startOfDay(for: $0) }
+        let allSessionsDescending = Array(completedSessions.reversed())
+        let workoutDays = Set(allSessionsDescending.map { calendar.startOfDay(for: $0.completedAt) })
+
+        var sessionsByDay: [Date: [CompletedSession]] = [:]
+        for session in allSessionsDescending {
+            let day = calendar.startOfDay(for: session.completedAt)
+            sessionsByDay[day, default: []].append(session)
+        }
+
+        return PreparedState(
+            overview: snapshot.overview,
+            personalRecords: snapshot.personalRecords,
+            exerciseSummaries: snapshot.exerciseSummaries,
+            selectedExerciseID: snapshot.selectedExerciseID,
+            selectedDay: normalizedSelectedDay,
+            historySessions: resolvedHistorySessions(
+                for: normalizedSelectedDay,
+                allSessionsDescending: allSessionsDescending,
+                sessionsByDay: sessionsByDay
+            ),
+            workoutDays: workoutDays,
+            allSessionsDescending: allSessionsDescending,
+            sessionsByDay: sessionsByDay,
+            exerciseSummariesByID: exerciseSummariesByID,
+            exerciseChartSeriesByID: exerciseChartSeriesByID,
+            personalBestByExerciseID: personalBestByExerciseID
+        )
+    }
+
     private func rebuildHistoryCaches(from completedSessions: [CompletedSession]) {
         allSessionsDescending = Array(completedSessions.reversed())
         workoutDays = Set(allSessionsDescending.map { calendar.startOfDay(for: $0.completedAt) })
@@ -176,6 +253,18 @@ final class ProgressStore {
     }
 
     private func resolvedHistorySessions(for selectedDay: Date?) -> [CompletedSession] {
+        Self.resolvedHistorySessions(
+            for: selectedDay,
+            allSessionsDescending: allSessionsDescending,
+            sessionsByDay: sessionsByDay
+        )
+    }
+
+    private nonisolated static func resolvedHistorySessions(
+        for selectedDay: Date?,
+        allSessionsDescending: [CompletedSession],
+        sessionsByDay: [Date: [CompletedSession]]
+    ) -> [CompletedSession] {
         guard let selectedDay else {
             return allSessionsDescending
         }
@@ -246,7 +335,7 @@ final class ProgressStore {
         summary.points.append(contentsOf: newPoints)
     }
 
-    private static func makeChartSeries(from points: [ProgressPoint]) -> ExerciseChartSeries {
+    private nonisolated static func makeChartSeries(from points: [ProgressPoint]) -> ExerciseChartSeries {
         let trendPoints = sampledPoints(from: points, maxCount: ExerciseChartDefaults.maxTrendPointCount)
         return ExerciseChartSeries(
             trendPoints: trendPoints,
@@ -255,7 +344,7 @@ final class ProgressStore {
         )
     }
 
-    private static func sampledPoints(
+    private nonisolated static func sampledPoints(
         from points: [ProgressPoint],
         maxCount: Int
     ) -> [ProgressPoint] {

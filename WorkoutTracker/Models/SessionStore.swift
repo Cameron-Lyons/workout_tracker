@@ -4,12 +4,18 @@ import Observation
 @MainActor
 @Observable
 final class SessionStore {
+    struct HydrationSnapshot: Sendable {
+        var activeDraft: SessionDraft?
+        var completedSessions: [CompletedSession]
+    }
+
     enum DraftPersistenceBehavior {
         case immediate
         case deferred
     }
 
     @ObservationIgnored private let repository: SessionRepository
+    @ObservationIgnored private let persistenceController: SessionPersistenceController
     @ObservationIgnored private var draftSaveTask: Task<Void, Never>?
     @ObservationIgnored private let draftSaveDebounceNanoseconds: UInt64 = 400_000_000
     @ObservationIgnored private let maxUndoSnapshots = 50
@@ -21,8 +27,9 @@ final class SessionStore {
     var lastFinishedSummary: SessionFinishSummary?
     var undoStack: [SessionDraft] = []
 
-    init(repository: SessionRepository) {
+    init(repository: SessionRepository, persistenceController: SessionPersistenceController) {
         self.repository = repository
+        self.persistenceController = persistenceController
     }
 
     deinit {
@@ -30,14 +37,23 @@ final class SessionStore {
     }
 
     func hydrate() {
-        activeDraft = repository.loadActiveDraft()
-        completedSessions = repository.loadCompletedSessions().sorted(by: { $0.completedAt < $1.completedAt })
+        hydrate(
+            with: HydrationSnapshot(
+                activeDraft: repository.loadActiveDraft(),
+                completedSessions: repository.loadCompletedSessions()
+            )
+        )
+    }
+
+    func hydrate(with snapshot: HydrationSnapshot) {
+        activeDraft = snapshot.activeDraft
+        completedSessions = snapshot.completedSessions
         bumpCompletedSessionsRevision()
     }
 
     func resetAllData() {
         cancelPendingDraftSave()
-        repository.deleteEverything()
+        persistenceController.scheduleDeleteEverything()
         activeDraft = nil
         completedSessions = []
         bumpCompletedSessionsRevision()
@@ -62,7 +78,7 @@ final class SessionStore {
         cancelPendingDraftSave()
         activeDraft = draft
         undoStack = []
-        repository.saveActiveDraft(draft)
+        persistActiveDraft(using: .immediate)
         isPresentingSession = true
     }
 
@@ -92,7 +108,7 @@ final class SessionStore {
 
         cancelPendingDraftSave()
         activeDraft = previousDraft
-        repository.saveActiveDraft(previousDraft)
+        persistActiveDraft(using: .immediate)
     }
 
     func clearRestTimer() {
@@ -103,16 +119,16 @@ final class SessionStore {
         activeDraft.restTimerEndsAt = nil
         self.activeDraft = activeDraft
         cancelPendingDraftSave()
-        repository.saveActiveDraft(activeDraft)
+        persistActiveDraft(using: .immediate)
     }
 
     func flushPendingDraftSave() {
-        guard draftSaveTask != nil else {
-            return
+        if draftSaveTask != nil {
+            cancelPendingDraftSave()
+            persistenceController.scheduleSaveActiveDraft(activeDraft)
         }
 
-        cancelPendingDraftSave()
-        repository.saveActiveDraft(activeDraft)
+        persistenceController.flush()
     }
 
     func completeSession() -> CompletedSession? {
@@ -130,11 +146,9 @@ final class SessionStore {
 
         cancelPendingDraftSave()
         let completedSession = SessionEngine.finishSession(draft: activeDraft)
-        completedSessions.append(completedSession)
-        completedSessions.sort(by: { $0.completedAt < $1.completedAt })
+        insertCompletedSession(completedSession)
         bumpCompletedSessionsRevision()
-        repository.saveCompletedSession(completedSession)
-        repository.saveActiveDraft(nil)
+        persistenceController.schedulePersistCompletedSession(completedSession)
         self.activeDraft = nil
         isPresentingSession = false
         undoStack = []
@@ -146,7 +160,7 @@ final class SessionStore {
         activeDraft = nil
         undoStack = []
         isPresentingSession = false
-        repository.saveActiveDraft(nil)
+        persistenceController.scheduleSaveActiveDraft(nil)
     }
 
     func updateExerciseNameSnapshots(exerciseID: UUID, name: String) {
@@ -170,7 +184,7 @@ final class SessionStore {
 
         self.activeDraft = activeDraft
         cancelPendingDraftSave()
-        repository.saveActiveDraft(activeDraft)
+        persistActiveDraft(using: .immediate)
     }
 
     private func appendUndoSnapshot(_ draft: SessionDraft) {
@@ -185,11 +199,19 @@ final class SessionStore {
         completedSessionsRevision &+= 1
     }
 
+    private func insertCompletedSession(_ session: CompletedSession) {
+        if let index = completedSessions.firstIndex(where: { $0.completedAt > session.completedAt }) {
+            completedSessions.insert(session, at: index)
+        } else {
+            completedSessions.append(session)
+        }
+    }
+
     private func persistActiveDraft(using behavior: DraftPersistenceBehavior) {
         switch behavior {
         case .immediate:
             cancelPendingDraftSave()
-            repository.saveActiveDraft(activeDraft)
+            persistenceController.scheduleSaveActiveDraft(activeDraft)
         case .deferred:
             scheduleDraftSave()
         }
@@ -216,6 +238,6 @@ final class SessionStore {
 
     private func persistDeferredDraft() {
         draftSaveTask = nil
-        repository.saveActiveDraft(activeDraft)
+        persistenceController.scheduleSaveActiveDraft(activeDraft)
     }
 }

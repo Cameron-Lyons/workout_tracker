@@ -1,0 +1,51 @@
+import SwiftData
+
+struct AppHydrationSnapshot: Sendable {
+    var plans: PlansStore.HydrationSnapshot
+    var sessions: SessionStore.HydrationSnapshot
+}
+
+actor PersistenceHydrationLoader {
+    private let modelContainer: ModelContainer
+    private let planPersistenceController: PlanPersistenceController
+    private let sessionPersistenceController: SessionPersistenceController
+
+    init(
+        modelContainer: ModelContainer,
+        planPersistenceController: PlanPersistenceController,
+        sessionPersistenceController: SessionPersistenceController
+    ) {
+        self.modelContainer = modelContainer
+        self.planPersistenceController = planPersistenceController
+        self.sessionPersistenceController = sessionPersistenceController
+    }
+
+    func load() -> AppHydrationSnapshot {
+        planPersistenceController.flush()
+        sessionPersistenceController.flush()
+
+        let context = ModelContext(modelContainer)
+        context.autosaveEnabled = false
+
+        let planRepository = PlanRepository(modelContext: context)
+        let sessionRepository = SessionRepository(modelContext: context)
+
+        var catalog = planRepository.loadCatalog()
+        if catalog.isEmpty {
+            catalog = CatalogSeed.defaultCatalog()
+            planRepository.saveCatalog(catalog)
+        }
+
+        return AppHydrationSnapshot(
+            plans: PlansStore.HydrationSnapshot(
+                catalog: catalog,
+                plans: planRepository.loadPlans(),
+                profiles: planRepository.loadProfiles()
+            ),
+            sessions: SessionStore.HydrationSnapshot(
+                activeDraft: sessionRepository.loadActiveDraft(),
+                completedSessions: sessionRepository.loadCompletedSessions()
+            )
+        )
+    }
+}

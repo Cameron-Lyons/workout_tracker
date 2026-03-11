@@ -46,6 +46,8 @@ final class SettingsStore {
         }
     }
 
+    var isCompletingOnboarding = false
+
     var warmupRamp: [WarmupRampStep] {
         didSet {
             if let data = try? encoder.encode(warmupRamp) {

@@ -69,6 +69,7 @@ struct WorkoutTrackerApp: App {
 
                 case .inactive, .background:
                     appStore.flushPendingSessionPersistence()
+                    appStore.flushPendingPlanPersistence()
 
                 @unknown default:
                     break

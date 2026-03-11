@@ -37,4 +37,6 @@ Native SwiftUI iPhone app for logging workouts with routines.
 - `swift-format lint --recursive --configuration .swift-format WorkoutTracker WorkoutTrackerTests WorkoutTrackerUITests`
 - `swift-format format --in-place --recursive --configuration .swift-format WorkoutTracker WorkoutTrackerTests WorkoutTrackerUITests`
 - `xcodebuild build -project "WorkoutTracker.xcodeproj" -scheme "WorkoutTracker" -destination "platform=iOS Simulator,name=iPhone 17"`
-- The same checks run automatically in GitHub Actions on pushes to `main` and on pull requests.
+- `xcodebuild test -project "WorkoutTracker.xcodeproj" -scheme "WorkoutTracker" -destination "platform=iOS Simulator,name=iPhone 17" -parallel-testing-enabled NO -only-testing:WorkoutTrackerTests`
+- `xcodebuild test -project "WorkoutTracker.xcodeproj" -scheme "WorkoutTracker" -destination "platform=iOS Simulator,name=iPhone 17" -parallel-testing-enabled NO -only-testing:WorkoutTrackerUITests`
+- The same lint, build, and test jobs run automatically in GitHub Actions on pushes to `main` and on pull requests.

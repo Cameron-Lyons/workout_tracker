@@ -55,6 +55,8 @@ private enum WeeklyMomentumState {
 struct ProgressDashboardView: View {
     @Environment(ProgressStore.self) private var progressStore
 
+    var onDisplayed: (() -> Void)?
+
     @State private var displayedMonth = Calendar.autoupdatingCurrent.startOfDay(for: .now)
 
     var body: some View {
@@ -86,6 +88,9 @@ struct ProgressDashboardView: View {
             .navigationTitle("Progress")
             .toolbarBackground(AppColors.chrome, for: .navigationBar)
             .toolbarBackground(.visible, for: .navigationBar)
+            .onAppear {
+                onDisplayed?()
+            }
         }
     }
 }

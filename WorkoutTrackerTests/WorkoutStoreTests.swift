@@ -994,7 +994,10 @@ final class WorkoutStoreTests: XCTestCase {
         let context = ModelContext(container)
         context.autosaveEnabled = false
         let repository = SessionRepository(modelContext: context)
-        let store = SessionStore(repository: repository)
+        let store = SessionStore(
+            repository: repository,
+            persistenceController: SessionPersistenceControllerRegistry.controller(for: container)
+        )
         let row = SessionSetRow(
             target: SetTarget(
                 setKind: .working,

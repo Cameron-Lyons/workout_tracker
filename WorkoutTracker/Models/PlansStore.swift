@@ -4,7 +4,14 @@ import Observation
 @MainActor
 @Observable
 final class PlansStore {
+    struct HydrationSnapshot: Sendable {
+        var catalog: [ExerciseCatalogItem]
+        var plans: [Plan]
+        var profiles: [ExerciseProfile]
+    }
+
     @ObservationIgnored private let repository: PlanRepository
+    @ObservationIgnored private let persistenceController: PlanPersistenceController
     @ObservationIgnored private(set) var catalogByID: [UUID: ExerciseCatalogItem] = [:]
     @ObservationIgnored private(set) var catalogRevision = 0
     @ObservationIgnored private var plansByID: [UUID: Plan] = [:]
@@ -15,25 +22,32 @@ final class PlansStore {
     var plans: [Plan] = []
     var profiles: [ExerciseProfile] = []
 
-    init(repository: PlanRepository) {
+    init(repository: PlanRepository, persistenceController: PlanPersistenceController) {
         self.repository = repository
+        self.persistenceController = persistenceController
     }
 
     func hydrate() {
-        catalog = repository.loadCatalog()
-        if catalog.isEmpty {
-            catalog = CatalogSeed.defaultCatalog()
-            repository.saveCatalog(catalog)
-        }
+        hydrate(
+            with: HydrationSnapshot(
+                catalog: repository.loadCatalog(),
+                plans: repository.loadPlans(),
+                profiles: repository.loadProfiles()
+            )
+        )
+    }
 
-        plans = repository.loadPlans().sorted(by: { $0.createdAt < $1.createdAt })
-        profiles = repository.loadProfiles()
+    func hydrate(with snapshot: HydrationSnapshot) {
+        catalog = snapshot.catalog
+        plans = snapshot.plans
+        profiles = snapshot.profiles
         rebuildCaches()
         bumpCatalogRevision()
     }
 
     func resetAllData() {
-        repository.deleteEverything()
+        persistenceController.scheduleDeleteEverything()
+        persistenceController.flush()
         catalog = CatalogSeed.defaultCatalog()
         plans = []
         profiles = []
@@ -43,20 +57,16 @@ final class PlansStore {
     }
 
     func savePlan(_ plan: Plan) {
-        if let index = plans.firstIndex(where: { $0.id == plan.id }) {
-            plans[index] = plan
-        } else {
-            plans.append(plan)
-        }
-
-        plans.sort(by: { $0.createdAt < $1.createdAt })
+        upsertPlan(plan)
         rebuildPlanCaches()
+        flushPendingPlanPersistence()
         repository.savePlans(plans)
     }
 
     func deletePlan(_ planID: UUID) {
         plans.removeAll(where: { $0.id == planID })
         rebuildPlanCaches()
+        flushPendingPlanPersistence()
         repository.savePlans(plans)
     }
 
@@ -81,16 +91,11 @@ final class PlansStore {
         }
 
         for plan in generatedPlans {
-            if let index = plans.firstIndex(where: { $0.id == plan.id }) {
-                plans[index] = plan
-            } else {
-                plans.append(plan)
-            }
+            upsertPlan(plan)
         }
 
-        plans.sort(by: { $0.createdAt < $1.createdAt })
         rebuildPlanCaches()
-        repository.savePlans(plans)
+        persistenceController.scheduleUpsertPlans(generatedPlans)
     }
 
     func exerciseName(for exerciseID: UUID) -> String {
@@ -114,14 +119,19 @@ final class PlansStore {
     }
 
     func markTemplateStarted(planID: UUID, templateID: UUID, startedAt: Date) {
-        guard var plan = plan(for: planID),
-            let templateIndex = plan.templates.firstIndex(where: { $0.id == templateID })
+        guard let planIndex = plans.firstIndex(where: { $0.id == planID }),
+            let templateIndex = plans[planIndex].templates.firstIndex(where: { $0.id == templateID })
         else {
             return
         }
 
-        plan.templates[templateIndex].lastStartedAt = startedAt
-        savePlan(plan)
+        guard plans[planIndex].templates[templateIndex].lastStartedAt != startedAt else {
+            return
+        }
+
+        plans[planIndex].templates[templateIndex].lastStartedAt = startedAt
+        rebuildPlanCaches()
+        persistenceController.scheduleMarkTemplateStarted(planID: planID, templateID: templateID, startedAt: startedAt)
     }
 
     func updateTemplate(
@@ -177,6 +187,7 @@ final class PlansStore {
         }
 
         rebuildPlanCaches()
+        flushPendingPlanPersistence()
         repository.savePlans(plans)
     }
 
@@ -210,6 +221,7 @@ final class PlansStore {
         }
 
         rebuildProfileCaches()
+        flushPendingPlanPersistence()
         repository.saveProfiles(profiles)
     }
 
@@ -232,6 +244,7 @@ final class PlansStore {
         synchronizeExerciseNameSnapshots(exerciseID: itemID, name: name)
         rebuildCatalogCaches()
         bumpCatalogRevision()
+        flushPendingPlanPersistence()
         repository.saveCatalog(catalog)
     }
 
@@ -245,6 +258,7 @@ final class PlansStore {
         catalog.sort(by: { $0.name < $1.name })
         rebuildCatalogCaches()
         bumpCatalogRevision()
+        flushPendingPlanPersistence()
         repository.saveCatalog(catalog)
         return item
     }
@@ -261,6 +275,21 @@ final class PlansStore {
 
     private func rebuildCatalogCaches() {
         catalogByID = Dictionary(uniqueKeysWithValues: catalog.map { ($0.id, $0) })
+    }
+
+    private func upsertPlan(_ plan: Plan) {
+        if let existingIndex = plans.firstIndex(where: { $0.id == plan.id }) {
+            let createdAt = plans[existingIndex].createdAt
+            plans.remove(at: existingIndex)
+
+            if createdAt == plan.createdAt {
+                plans.insert(plan, at: min(existingIndex, plans.endIndex))
+                return
+            }
+        }
+
+        let insertionIndex = plans.firstIndex(where: { $0.createdAt > plan.createdAt }) ?? plans.endIndex
+        plans.insert(plan, at: insertionIndex)
     }
 
     private func rebuildPlanCaches() {
@@ -319,6 +348,7 @@ final class PlansStore {
         }
 
         rebuildPlanCaches()
+        flushPendingPlanPersistence()
         repository.savePlans(plans)
     }
 
@@ -360,7 +390,7 @@ final class PlansStore {
             }
         }
 
-        saveProfiles(updatedProfiles)
+        mergeProfilesInMemory(updatedProfiles)
 
         if let nextStartingStrengthTemplateID = TemplateReferenceSelection.nextStartingStrengthTemplateID(
             in: plan,
@@ -370,7 +400,9 @@ final class PlansStore {
         }
 
         plan.templates[templateIndex] = template
-        savePlan(plan)
+        upsertPlan(plan)
+        rebuildPlanCaches()
+        persistenceController.schedulePersistProgression(plan: plan, updatedProfiles: updatedProfiles)
     }
 
     private func templateBlockIndex(in template: WorkoutTemplate, matching finishedBlock: SessionBlock) -> Int? {
@@ -394,5 +426,29 @@ final class PlansStore {
             progressionRule: finishedBlock.progressionRule,
             sets: finishedBlock.sets
         )
+    }
+
+    private func mergeProfilesInMemory(_ updatedProfiles: [ExerciseProfile]) {
+        guard !updatedProfiles.isEmpty else {
+            return
+        }
+
+        for profile in updatedProfiles {
+            if let index = profiles.firstIndex(where: { $0.id == profile.id }) {
+                profiles[index] = profile
+            } else {
+                profiles.append(profile)
+            }
+        }
+
+        rebuildProfileCaches()
+    }
+
+    func flushPendingPersistence() {
+        flushPendingPlanPersistence()
+    }
+
+    private func flushPendingPlanPersistence() {
+        persistenceController.flush()
     }
 }

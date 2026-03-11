@@ -473,6 +473,7 @@ struct MetricBadge: View {
 
 struct RootAppView: View {
     @Environment(AppStore.self) private var appStore
+    @State private var loggerPresentationSignpost: PerformanceSignpost.Interval?
 
     init() {
         AppAppearance.configureIfNeeded()
@@ -484,6 +485,8 @@ struct RootAppView: View {
         Group {
             if appStore.shouldShowOnboarding {
                 OnboardingView()
+            } else if appStore.settingsStore.isCompletingOnboarding {
+                OnboardingSetupView()
             } else {
                 RootTabView()
                     .environment(appStore)
@@ -505,11 +508,18 @@ struct RootAppView: View {
                 }
             )
         ) {
-            ActiveSessionView()
+            ActiveSessionView(onDisplayed: endLoggerPresentationSignpost)
                 .environment(appStore)
                 .environment(appStore.settingsStore)
                 .environment(appStore.plansStore)
                 .environment(appStore.sessionStore)
+        }
+        .onChange(of: appStore.sessionStore.isPresentingSession, initial: false) { _, isPresenting in
+            if isPresenting {
+                loggerPresentationSignpost = PerformanceSignpost.begin("Logger Presentation")
+            } else {
+                endLoggerPresentationSignpost()
+            }
         }
         .sheet(
             item: Binding(
@@ -539,22 +549,72 @@ struct RootAppView: View {
             )
         }
     }
+
+    private func endLoggerPresentationSignpost() {
+        guard let loggerPresentationSignpost else {
+            return
+        }
+
+        PerformanceSignpost.end(loggerPresentationSignpost)
+        self.loggerPresentationSignpost = nil
+    }
+}
+
+private struct OnboardingSetupView: View {
+    var body: some View {
+        ZStack {
+            AppBackground()
+
+            VStack(spacing: 18) {
+                ProgressView()
+                    .controlSize(.large)
+                    .tint(AppToneStyle.today.accent)
+
+                VStack(spacing: 8) {
+                    Text("Setting Up Your Plans")
+                        .font(.system(.title2, design: .rounded).weight(.bold))
+                        .foregroundStyle(AppColors.textPrimary)
+
+                    Text("Bringing your preset pack into the app so Today is ready when it appears.")
+                        .font(.subheadline)
+                        .multilineTextAlignment(.center)
+                        .foregroundStyle(AppColors.textSecondary)
+                }
+            }
+            .padding(28)
+            .frame(maxWidth: 340)
+            .appFeatureSurface()
+        }
+        .preferredColorScheme(.dark)
+    }
 }
 
 struct RootTabView: View {
+    private enum Tab: Hashable {
+        case today
+        case plans
+        case progress
+    }
+
+    @State private var selectedTab: Tab = .today
+    @State private var progressSelectionSignpost: PerformanceSignpost.Interval?
+
     var body: some View {
-        TabView {
+        TabView(selection: $selectedTab) {
             TodayView()
+                .tag(Tab.today)
                 .tabItem {
                     Label("Today", systemImage: "sun.max")
                 }
 
             PlansView()
+                .tag(Tab.plans)
                 .tabItem {
                     Label("Plans", systemImage: "list.bullet.rectangle")
                 }
 
-            ProgressDashboardView()
+            ProgressDashboardView(onDisplayed: endProgressSelectionSignpost)
+                .tag(Tab.progress)
                 .tabItem {
                     Label("Progress", systemImage: "chart.line.uptrend.xyaxis")
                 }
@@ -562,6 +622,22 @@ struct RootTabView: View {
         .tint(AppColors.accent)
         .toolbarBackground(AppColors.chrome, for: .tabBar)
         .toolbarBackground(.visible, for: .tabBar)
+        .onChange(of: selectedTab) { _, newValue in
+            if newValue == .progress {
+                progressSelectionSignpost = PerformanceSignpost.begin("Progress Tab Selection")
+            } else {
+                endProgressSelectionSignpost()
+            }
+        }
+    }
+
+    private func endProgressSelectionSignpost() {
+        guard let progressSelectionSignpost else {
+            return
+        }
+
+        PerformanceSignpost.end(progressSelectionSignpost)
+        self.progressSelectionSignpost = nil
     }
 }
 
