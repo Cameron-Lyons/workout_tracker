@@ -141,7 +141,8 @@ enum ProgressionEngine {
             wave.cycle += 1
 
             if let trainingMax = profile?.trainingMax ?? wave.trainingMax {
-                let updatedTrainingMax = trainingMax + max(wave.cycleIncrement, fallbackIncrement)
+                let cycleIncrement = wave.cycleIncrement > 0 ? wave.cycleIncrement : fallbackIncrement
+                let updatedTrainingMax = trainingMax + cycleIncrement
                 wave.trainingMax = updatedTrainingMax
 
                 if var updatedProfile = profile {

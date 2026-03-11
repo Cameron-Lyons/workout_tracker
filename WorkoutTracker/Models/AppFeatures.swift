@@ -348,6 +348,11 @@ final class AppPlanCoordinator {
         derivedStateController.refreshToday(plansStore: plansStore, sessionStore: sessionStore)
     }
 
+    func pinTemplate(planID: UUID, templateID: UUID) {
+        plansStore.pinTemplate(planID: planID, templateID: templateID)
+        derivedStateController.refreshToday(plansStore: plansStore, sessionStore: sessionStore)
+    }
+
     func saveProfiles(_ profiles: [ExerciseProfile]) {
         plansStore.saveProfiles(profiles)
     }

@@ -105,7 +105,8 @@ struct OnboardingView: View {
                             AppSectionHeader(
                                 title: "Start Blank",
                                 systemImage: "square.and.pencil",
-                                subtitle: "Prefer to build your own structure? Start empty and add plans, templates, and exercises as you go.",
+                                subtitle:
+                                    "Prefer to build your own structure? Start empty and add plans, templates, and exercises as you go.",
                                 tone: .today
                             )
 
@@ -240,7 +241,8 @@ struct ExercisePickerSheet: View {
                                     AppSectionHeader(
                                         title: "Create Custom Exercise",
                                         systemImage: "plus.circle.fill",
-                                        subtitle: "Add a movement that is not in the library and use it immediately in this template or session.",
+                                        subtitle:
+                                            "Add a movement that is not in the library and use it immediately in this template or session.",
                                         tone: .plans
                                     )
 
@@ -528,7 +530,7 @@ private extension PresetPack {
     var onboardingHighlights: [String] {
         switch self {
         case .generalGym:
-            ["Upper/Lower", "PPL", "StrongLifts"]
+            ["Upper/Lower", "Balanced", "Flexible"]
         case .startingStrength:
             ["A/B Days", "Barbell", "Linear"]
         case .fiveThreeOne:

@@ -175,6 +175,10 @@ final class AppStore {
         planCoordinator.deleteTemplate(planID: planID, templateID: templateID)
     }
 
+    func pinTemplate(planID: UUID, templateID: UUID) {
+        planCoordinator.pinTemplate(planID: planID, templateID: templateID)
+    }
+
     func saveProfiles(_ profiles: [ExerciseProfile]) {
         planCoordinator.saveProfiles(profiles)
     }

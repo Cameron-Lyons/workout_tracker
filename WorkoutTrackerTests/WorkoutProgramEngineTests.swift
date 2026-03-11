@@ -202,6 +202,51 @@ final class WorkoutProgramEngineTests: XCTestCase {
         XCTAssertEqual(updated.block.targets, block.targets)
     }
 
+    func testPercentageWaveWrapRespectsCustomCycleIncrementBelowFallback() {
+        let wave = PercentageWaveRule(
+            trainingMax: 200,
+            weeks: [
+                PercentageWaveWeek(name: "Week 1", sets: [PercentageWaveSet(percentage: 0.65, repRange: RepRange(5, 5))]),
+                PercentageWaveWeek(name: "Week 2", sets: [PercentageWaveSet(percentage: 0.70, repRange: RepRange(3, 3))]),
+            ],
+            currentWeekIndex: 1,
+            cycle: 1,
+            cycleIncrement: 5
+        )
+        let block = ExerciseBlock(
+            exerciseID: CatalogSeed.deadlift,
+            exerciseNameSnapshot: "Deadlift",
+            progressionRule: ProgressionRule(kind: .percentageWave, percentageWave: wave),
+            targets: []
+        )
+        let completedTarget = SetTarget(setKind: .working, targetWeight: 140, repRange: RepRange(3, 3))
+        let completedBlock = CompletedSessionBlock(
+            exerciseID: CatalogSeed.deadlift,
+            exerciseNameSnapshot: "Deadlift",
+            blockNote: "",
+            restSeconds: 180,
+            supersetGroup: nil,
+            progressionRule: block.progressionRule,
+            sets: [
+                SessionSetRow(
+                    target: completedTarget,
+                    log: SetLog(setTargetID: completedTarget.id, weight: 140, reps: 3, completedAt: .now)
+                )
+            ]
+        )
+        let profile = ExerciseProfile(exerciseID: CatalogSeed.deadlift, trainingMax: 200, preferredIncrement: 10)
+
+        let updated = ProgressionEngine.applyCompletion(
+            to: block,
+            using: completedBlock,
+            profile: profile,
+            fallbackIncrement: 10
+        )
+
+        XCTAssertEqual(updated.profile?.trainingMax, 205)
+        XCTAssertEqual(updated.block.progressionRule.percentageWave?.trainingMax, 205)
+    }
+
     func testDoubleProgressionDoesNotAdvanceWithoutWorkingSets() {
         let block = ExerciseBlock(
             exerciseID: CatalogSeed.backSquat,

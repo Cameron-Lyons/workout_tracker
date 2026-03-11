@@ -258,6 +258,35 @@ final class WorkoutStoreTests: XCTestCase {
         XCTAssertEqual(payload?.topWeight, 225)
     }
 
+    func testAnalyticsCurrentPRPrefersHigherEstimatedOneRepMaxOverHeavierSingle() throws {
+        let analytics = AnalyticsRepository()
+        let catalog = [
+            CatalogSeed.benchPress: ExerciseCatalogItem(id: CatalogSeed.benchPress, name: "Bench Press", category: .chest)
+        ]
+        let sessions = [
+            makeCompletedSession(
+                date: .now.addingTimeInterval(-86_400),
+                exerciseID: CatalogSeed.benchPress,
+                exerciseName: "Bench Press",
+                rows: [makeRow(kind: .working, weight: 225, reps: 1)]
+            ),
+            makeCompletedSession(
+                date: .now,
+                exerciseID: CatalogSeed.benchPress,
+                exerciseName: "Bench Press",
+                rows: [makeRow(kind: .working, weight: 215, reps: 5)]
+            ),
+        ]
+
+        let snapshot = analytics.makeSessionAnalyticsSnapshot(sessions: sessions, catalogByID: catalog)
+        let summary = try XCTUnwrap(snapshot.exerciseSummaries.first)
+        let currentPR = try XCTUnwrap(summary.currentPR)
+
+        XCTAssertEqual(currentPR.weight, 215)
+        XCTAssertEqual(currentPR.reps, 5)
+        XCTAssertGreaterThan(currentPR.estimatedOneRepMax, 225)
+    }
+
     func testAnalyticsReserveRecordsAndProgressPointsForWorkingSets() {
         let analytics = AnalyticsRepository()
         let session = makeCompletedSession(
@@ -535,6 +564,35 @@ final class WorkoutStoreTests: XCTestCase {
         )
 
         XCTAssertEqual(pinned.templateName, "Workout B")
+    }
+
+    @MainActor
+    func testPinningTemplateMakesItTodayDefaultAndClearsOlderPins() async throws {
+        let store = makeStore()
+        await store.hydrateIfNeeded()
+        store.completeOnboarding(with: nil)
+
+        let firstPlan = makeSingleTemplatePlan(
+            name: "Plan A",
+            templateName: "Bench Day",
+            store: store,
+            weight: 185
+        )
+        let secondPlan = makeSingleTemplatePlan(
+            name: "Plan B",
+            templateName: "Press Day",
+            store: store,
+            weight: 135
+        )
+        store.savePlan(firstPlan)
+        store.savePlan(secondPlan)
+
+        let secondTemplateID = try XCTUnwrap(secondPlan.templates.first?.id)
+        store.pinTemplate(planID: secondPlan.id, templateID: secondTemplateID)
+
+        XCTAssertEqual(store.todayStore.pinnedTemplate?.templateID, secondTemplateID)
+        XCTAssertNil(store.plansStore.plan(for: firstPlan.id)?.pinnedTemplateID)
+        XCTAssertEqual(store.plansStore.plan(for: secondPlan.id)?.pinnedTemplateID, secondTemplateID)
     }
 
     @MainActor

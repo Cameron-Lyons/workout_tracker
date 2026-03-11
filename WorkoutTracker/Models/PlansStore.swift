@@ -61,7 +61,21 @@ final class PlansStore {
     }
 
     func addPresetPack(_ pack: PresetPack, settings: SettingsStore) {
-        let generatedPlans = PresetPackBuilder.makePlans(for: pack, settings: settings)
+        let existingPinnedPlanIDs = Set(
+            plans.compactMap { plan in
+                plan.pinnedTemplateID == nil ? nil : plan.id
+            })
+        let generatedPlans = PresetPackBuilder.makePlans(for: pack, settings: settings).map { generatedPlan in
+            guard !existingPinnedPlanIDs.isEmpty,
+                existingPinnedPlanIDs.contains(generatedPlan.id) == false
+            else {
+                return generatedPlan
+            }
+
+            var updatedPlan = generatedPlan
+            updatedPlan.pinnedTemplateID = nil
+            return updatedPlan
+        }
         guard !generatedPlans.isEmpty else {
             return
         }
@@ -124,11 +138,46 @@ final class PlansStore {
             plan.templates.append(template)
         }
 
-        if plan.pinnedTemplateID == nil {
+        if plan.pinnedTemplateID == nil,
+            hasPinnedTemplate(excluding: plan.id) == false
+        {
             plan.pinnedTemplateID = template.id
         }
 
         savePlan(plan)
+    }
+
+    func pinTemplate(planID: UUID, templateID: UUID) {
+        guard
+            plans.contains(where: { plan in
+                plan.id == planID && plan.templates.contains(where: { $0.id == templateID })
+            })
+        else {
+            return
+        }
+
+        var didUpdate = false
+
+        for index in plans.indices {
+            if plans[index].id == planID {
+                guard plans[index].pinnedTemplateID != templateID else {
+                    continue
+                }
+
+                plans[index].pinnedTemplateID = templateID
+                didUpdate = true
+            } else if plans[index].pinnedTemplateID != nil {
+                plans[index].pinnedTemplateID = nil
+                didUpdate = true
+            }
+        }
+
+        guard didUpdate else {
+            return
+        }
+
+        rebuildPlanCaches()
+        repository.savePlans(plans)
     }
 
     func deleteTemplate(planID: UUID, templateID: UUID) {
@@ -138,7 +187,7 @@ final class PlansStore {
 
         plan.templates.removeAll(where: { $0.id == templateID })
         if plan.pinnedTemplateID == templateID {
-            plan.pinnedTemplateID = plan.templates.first?.id
+            plan.pinnedTemplateID = hasPinnedTemplate(excluding: plan.id) ? nil : plan.templates.first?.id
         }
         savePlan(plan)
     }
@@ -236,6 +285,16 @@ final class PlansStore {
 
     private func bumpCatalogRevision() {
         catalogRevision &+= 1
+    }
+
+    private func hasPinnedTemplate(excluding planID: UUID? = nil) -> Bool {
+        plans.contains { plan in
+            guard plan.id != planID else {
+                return false
+            }
+
+            return plan.pinnedTemplateID != nil
+        }
     }
 
     private func synchronizeExerciseNameSnapshots(exerciseID: UUID, name: String) {

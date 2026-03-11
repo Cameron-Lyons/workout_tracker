@@ -266,7 +266,7 @@ private struct ProgressChartSectionView: View {
                             systemImage: "chart.xyaxis.line",
                             subtitle: "Solid line shows top logged load. Dashed line estimates one-rep max from the same sessions.",
                             trailing: summary.currentPR.map {
-                                "PR \(WeightFormatter.displayString($0.weight, unit: settingsStore.weightUnit)) \(settingsStore.weightUnit.symbol)"
+                                "e1RM PR \(WeightFormatter.displayString($0.estimatedOneRepMax, unit: settingsStore.weightUnit)) \(settingsStore.weightUnit.symbol)"
                             },
                             tone: .progress
                         )
@@ -309,11 +309,11 @@ private struct ProgressChartSectionView: View {
                             }
 
                             if let currentPR = summary.currentPR {
-                                RuleMark(y: .value("PR Weight", currentPR.weight))
+                                RuleMark(y: .value("PR e1RM", currentPR.estimatedOneRepMax))
                                     .foregroundStyle(AppColors.success.opacity(0.44))
                                     .lineStyle(StrokeStyle(lineWidth: 1.2, dash: [4, 4]))
                                     .annotation(position: .top, alignment: .trailing) {
-                                        Text("Current PR")
+                                        Text("Current e1RM PR")
                                             .font(.caption2.weight(.semibold))
                                             .foregroundStyle(AppColors.success)
                                             .padding(.horizontal, 8)
@@ -395,7 +395,7 @@ private struct ProgressChartSectionView: View {
 
                             if let currentPR = summary.currentPR {
                                 MetricBadge(
-                                    label: "PR",
+                                    label: "e1RM PR",
                                     value: WeightFormatter.displayString(currentPR.estimatedOneRepMax, unit: settingsStore.weightUnit),
                                     systemImage: "rosette",
                                     tone: .success
@@ -647,7 +647,8 @@ private struct ProgressExerciseSummaryCardView: View {
                         )
                         MetricBadge(
                             label: "Latest 1RM",
-                            value: "\(WeightFormatter.displayString(latestPoint.estimatedOneRepMax, unit: weightUnit)) \(weightUnit.symbol)",
+                            value:
+                                "\(WeightFormatter.displayString(latestPoint.estimatedOneRepMax, unit: weightUnit)) \(weightUnit.symbol)",
                             systemImage: "waveform.path.ecg",
                             tone: .success
                         )

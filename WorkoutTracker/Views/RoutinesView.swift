@@ -316,13 +316,13 @@ struct TodayView: View {
             AppSectionHeader(
                 title: "Quick Start",
                 systemImage: "bolt",
-                subtitle: "The templates you launch most often stay close.",
+                subtitle: "Templates you launched recently stay close.",
                 trailing: todayStore.quickStartTemplates.isEmpty ? nil : "\(todayStore.quickStartTemplates.count)",
                 tone: .today
             )
 
             if todayStore.quickStartTemplates.isEmpty {
-                Text("Templates you start most often will show up here.")
+                Text("Templates you launch recently will show up here.")
                     .font(.subheadline)
                     .foregroundStyle(AppColors.textSecondary)
                     .frame(maxWidth: .infinity, alignment: .leading)
@@ -686,7 +686,7 @@ struct PlansView: View {
             eyebrow: "Plan Builder",
             title: "\(plansStore.plans.count) plans",
             subtitle:
-                "Templates define your future sessions. Schedule them loosely, pin the important ones, and start from Today whenever you want.",
+                "Templates define your future sessions. Schedule them loosely, pin your Today favorite, and start whenever you want.",
             systemImage: "list.bullet.rectangle",
             metrics: [
                 AppHeroMetric(
@@ -805,6 +805,18 @@ struct PlansView: View {
                 }
 
                 Spacer()
+
+                Button {
+                    appStore.pinTemplate(planID: plan.id, templateID: template.id)
+                } label: {
+                    Image(systemName: plan.pinnedTemplateID == template.id ? "pin.fill" : "pin")
+                        .font(.subheadline.weight(.semibold))
+                }
+                .buttonStyle(.bordered)
+                .buttonBorderShape(.roundedRectangle(radius: 12))
+                .tint(plan.pinnedTemplateID == template.id ? AppToneStyle.plans.accent : AppColors.textSecondary)
+                .accessibilityLabel(plan.pinnedTemplateID == template.id ? "Pinned to Today" : "Pin to Today")
+                .accessibilityIdentifier("plans.pinTemplate.\(template.id.uuidString)")
             }
 
             if !template.scheduledWeekdays.isEmpty {
