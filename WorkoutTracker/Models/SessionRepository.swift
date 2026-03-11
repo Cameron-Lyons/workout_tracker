@@ -108,8 +108,6 @@ final class SessionRepository: RepositoryBase {
     func deleteEverything() -> Bool {
         loadActiveDraftRecords().forEach(modelContext.delete)
         loadCompletedSessionRecords().forEach(modelContext.delete)
-        loadLegacyActiveDraftRecords().forEach(modelContext.delete)
-        loadLegacyCompletedSessionRecords().forEach(modelContext.delete)
         return saveContext("sessions reset")
     }
 
@@ -593,15 +591,6 @@ final class SessionRepository: RepositoryBase {
     private func loadCompletedSessionRecords() -> [StoredCompletedSession] {
         (try? modelContext.fetch(FetchDescriptor<StoredCompletedSession>())) ?? []
     }
-
-    private func loadLegacyActiveDraftRecords() -> [StoredActiveSessionRecord] {
-        (try? modelContext.fetch(FetchDescriptor<StoredActiveSessionRecord>())) ?? []
-    }
-
-    private func loadLegacyCompletedSessionRecords() -> [StoredCompletedSessionRecord] {
-        (try? modelContext.fetch(FetchDescriptor<StoredCompletedSessionRecord>())) ?? []
-    }
-
 }
 
 private protocol StoredSessionRecord: AnyObject {

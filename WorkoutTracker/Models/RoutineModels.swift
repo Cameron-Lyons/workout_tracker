@@ -44,7 +44,7 @@ enum WeightUnit: String, CaseIterable, Codable, Sendable {
     case pounds
     case kilograms
 
-    static let settingsKey = "workout_tracker_v2_weight_unit"
+    static let settingsKey = "workout_tracker_weight_unit"
 
     private static let poundsPerKilogram = 2.2046226218
     private static let minimumRoundingIncrement = 0.000_1

@@ -47,7 +47,7 @@ struct OnboardingView: View {
             ScrollView {
                 LazyVStack(spacing: 18) {
                     AppHeroCard(
-                        eyebrow: "WorkoutTracker v2",
+                        eyebrow: "WorkoutTracker",
                         title: "Choose your starting setup",
                         subtitle: "Install a preset pack for a faster launch, or start blank and build your own system from Plans.",
                         systemImage: "sparkles.rectangle.stack",

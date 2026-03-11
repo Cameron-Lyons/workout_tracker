@@ -5,11 +5,11 @@ import Observation
 @Observable
 final class SettingsStore {
     private enum Keys {
-        static let upperIncrement = "workout_tracker_v2_upper_increment"
-        static let lowerIncrement = "workout_tracker_v2_lower_increment"
-        static let defaultRestSeconds = "workout_tracker_v2_default_rest"
-        static let completedOnboarding = "workout_tracker_v2_completed_onboarding"
-        static let warmupRamp = "workout_tracker_v2_warmup_ramp"
+        static let upperIncrement = "workout_tracker_upper_increment"
+        static let lowerIncrement = "workout_tracker_lower_increment"
+        static let defaultRestSeconds = "workout_tracker_default_rest"
+        static let completedOnboarding = "workout_tracker_completed_onboarding"
+        static let warmupRamp = "workout_tracker_warmup_ramp"
     }
 
     @ObservationIgnored private let defaults: UserDefaults

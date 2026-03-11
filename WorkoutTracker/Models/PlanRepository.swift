@@ -214,9 +214,6 @@ final class PlanRepository: RepositoryBase {
         loadCatalogRecords().forEach(modelContext.delete)
         loadPlanRecords().forEach(modelContext.delete)
         loadProfileRecords().forEach(modelContext.delete)
-        loadLegacyCatalogRecords().forEach(modelContext.delete)
-        loadLegacyPlanRecords().forEach(modelContext.delete)
-        loadLegacyProfileRecords().forEach(modelContext.delete)
         return saveContext("plans reset")
     }
 
@@ -547,17 +544,4 @@ final class PlanRepository: RepositoryBase {
     private func loadProfileRecords() -> [StoredExerciseProfile] {
         (try? modelContext.fetch(FetchDescriptor<StoredExerciseProfile>())) ?? []
     }
-
-    private func loadLegacyCatalogRecords() -> [StoredExerciseCatalogRecord] {
-        (try? modelContext.fetch(FetchDescriptor<StoredExerciseCatalogRecord>())) ?? []
-    }
-
-    private func loadLegacyPlanRecords() -> [StoredPlanRecord] {
-        (try? modelContext.fetch(FetchDescriptor<StoredPlanRecord>())) ?? []
-    }
-
-    private func loadLegacyProfileRecords() -> [StoredExerciseProfileRecord] {
-        (try? modelContext.fetch(FetchDescriptor<StoredExerciseProfileRecord>())) ?? []
-    }
-
 }

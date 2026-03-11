@@ -25,8 +25,6 @@ final class AppStore {
         modelContainer: ModelContainer = WorkoutModelContainerFactory.makeContainer(),
         launchArguments: Set<String> = Set(ProcessInfo.processInfo.arguments)
     ) {
-        PersistenceMigrationCoordinator.prepareIfNeeded(modelContainer: modelContainer)
-
         self.launchArguments = launchArguments
         let context = ModelContext(modelContainer)
         context.autosaveEnabled = false
