@@ -146,18 +146,28 @@ enum ProgressionEngine {
 
                 if var updatedProfile = profile {
                     updatedProfile.trainingMax = updatedTrainingMax
-                    return (block.updatingWave(wave), updatedProfile)
+                    return (updatedWaveBlock(from: block, wave: wave, profile: updatedProfile), updatedProfile)
                 }
             }
         } else {
             wave.currentWeekIndex += 1
         }
 
-        return (block.updatingWave(wave), profile)
+        return (updatedWaveBlock(from: block, wave: wave, profile: profile), profile)
     }
 
     private static func roundToGymIncrement(_ value: Double) -> Double {
         (value / defaultWaveRounding).rounded() * defaultWaveRounding
+    }
+
+    private static func updatedWaveBlock(
+        from block: ExerciseBlock,
+        wave: PercentageWaveRule,
+        profile: ExerciseProfile?
+    ) -> ExerciseBlock {
+        var updatedBlock = block.updatingWave(wave)
+        updatedBlock.targets = resolvedTargets(for: updatedBlock, profile: profile)
+        return updatedBlock
     }
 }
 

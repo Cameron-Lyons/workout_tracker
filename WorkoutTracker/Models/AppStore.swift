@@ -98,6 +98,10 @@ final class AppStore {
         sessionCoordinator.startSession(planID: planID, templateID: templateID)
     }
 
+    func replaceActiveSessionAndStart(planID: UUID, templateID: UUID) {
+        sessionCoordinator.replaceActiveSessionAndStart(planID: planID, templateID: templateID)
+    }
+
     func resumeActiveSession() {
         sessionCoordinator.resumeActiveSession()
     }

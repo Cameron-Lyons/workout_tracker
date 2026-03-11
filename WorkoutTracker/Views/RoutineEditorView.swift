@@ -429,8 +429,12 @@ struct TemplateEditorSheet: View {
 
         blocks = existingTemplate.blocks.map { block in
             let profile = appStore.plansStore.profile(for: block.exerciseID)
-            let targetWeight = block.targets.first?.targetWeight
-            let repRange = block.targets.first?.repRange ?? ExerciseBlockDefaults.repRange
+            let previewTargets =
+                block.progressionRule.kind == .percentageWave
+                ? ProgressionEngine.resolvedTargets(for: block, profile: profile)
+                : block.targets
+            let targetWeight = previewTargets.first?.targetWeight
+            let repRange = previewTargets.first?.repRange ?? ExerciseBlockDefaults.repRange
 
             return TemplateDraftBlock(
                 id: block.id,
@@ -438,7 +442,7 @@ struct TemplateEditorSheet: View {
                 exerciseName: block.exerciseNameSnapshot,
                 blockNote: block.blockNote,
                 restSeconds: block.restSeconds,
-                setCount: max(1, block.targets.count),
+                setCount: max(1, previewTargets.count),
                 repLower: repRange.lowerBound,
                 repUpper: repRange.upperBound,
                 targetWeightText: WeightFormatter.displayString(targetWeight, unit: weightUnit),
@@ -455,7 +459,7 @@ struct TemplateEditorSheet: View {
                 ),
                 preferredIncrementText: WeightFormatter.displayString(profile?.preferredIncrement, unit: weightUnit),
                 allowsAutoWarmups: block.allowsAutoWarmups,
-                setKind: block.targets.first?.setKind ?? .working
+                setKind: previewTargets.first?.setKind ?? .working
             )
         }
     }
@@ -467,7 +471,7 @@ struct TemplateEditorSheet: View {
 
         blocks[index].exerciseID = exercise.id
         blocks[index].exerciseName = exercise.name
-        if blocks[index].progressionKind == .doubleProgression && blocks[index].incrementText.isEmpty {
+        if blocks[index].progressionKind != .manual && blocks[index].incrementText.isEmpty {
             let increment = appStore.settingsStore.preferredIncrement(for: exercise.name)
             blocks[index].incrementText = WeightFormatter.displayString(
                 displayValue: appStore.settingsStore.weightUnit.displayValue(fromStoredPounds: increment),
@@ -547,16 +551,7 @@ struct TemplateEditorSheet: View {
                 )
             }
 
-            let targets = (0..<max(1, block.setCount)).map { _ in
-                SetTarget(
-                    setKind: block.setKind,
-                    targetWeight: block.progressionKind == .percentageWave ? nil : targetWeight,
-                    repRange: repRange,
-                    restSeconds: block.restSeconds
-                )
-            }
-
-            return ExerciseBlock(
+            var exerciseBlock = ExerciseBlock(
                 id: block.id,
                 exerciseID: exerciseID,
                 exerciseNameSnapshot: exerciseName,
@@ -564,9 +559,24 @@ struct TemplateEditorSheet: View {
                 restSeconds: block.restSeconds,
                 supersetGroup: block.supersetGroup.nonEmptyTrimmed,
                 progressionRule: progressionRule,
-                targets: targets,
+                targets: [],
                 allowsAutoWarmups: block.allowsAutoWarmups
             )
+
+            if block.progressionKind == .percentageWave {
+                exerciseBlock.targets = ProgressionEngine.resolvedTargets(for: exerciseBlock, profile: profile)
+            } else {
+                exerciseBlock.targets = (0..<max(1, block.setCount)).map { _ in
+                    SetTarget(
+                        setKind: block.setKind,
+                        targetWeight: targetWeight,
+                        repRange: repRange,
+                        restSeconds: block.restSeconds
+                    )
+                }
+            }
+
+            return exerciseBlock
         }
 
         let template = WorkoutTemplate(
@@ -612,8 +622,24 @@ private struct TemplateDraftBlockEditorView: View {
         block.exerciseID == nil ? .warning : .plans
     }
 
+    private var usesWavePrescription: Bool {
+        block.progressionKind == .percentageWave
+    }
+
     private var prescriptionSummary: String {
-        "\(block.setCount) set\(block.setCount == 1 ? "" : "s") • \(block.repLower)-\(block.repUpper) reps"
+        if usesWavePrescription {
+            return "\(block.setCount) working sets - 5/3/1 wave"
+        }
+
+        return "\(block.setCount) set\(block.setCount == 1 ? "" : "s") • \(block.repLower)-\(block.repUpper) reps"
+    }
+
+    private var wavePrescriptionDetail: String {
+        if block.trainingMaxText.isEmpty {
+            return "5/3/1 sets and reps are generated automatically. Add a TM below to unlock target weights."
+        }
+
+        return "5/3/1 sets and reps are generated automatically from the current week and your TM."
     }
 
     private var advancedSummary: String {
@@ -622,7 +648,7 @@ private struct TemplateDraftBlockEditorView: View {
         if block.progressionKind != .manual {
             labels.append(block.progressionKind.displayLabel)
         }
-        if block.setKind != .working {
+        if !usesWavePrescription && block.setKind != .working {
             labels.append(block.setKind.rawValue.capitalized)
         }
         if block.supersetGroup.nonEmptyTrimmed != nil {
@@ -695,32 +721,51 @@ private struct TemplateDraftBlockEditorView: View {
                 AppSectionHeader(
                     title: "Prescription",
                     systemImage: "figure.strengthtraining.traditional",
-                    subtitle: "Set the default workload you want this block to start with.",
+                    subtitle: usesWavePrescription
+                        ? "Wave blocks generate their working sets automatically from the current 5/3/1 week."
+                        : "Set the default workload you want this block to start with.",
                     tone: .today
                 )
 
-                LazyVGrid(
-                    columns: [
-                        GridItem(.flexible(minimum: 70), spacing: 10),
-                        GridItem(.flexible(minimum: 70), spacing: 10),
-                        GridItem(.flexible(minimum: 70), spacing: 10),
-                    ],
-                    spacing: 10
-                ) {
-                    NumericInputField(title: "Sets", text: $block.setCountTextBinding, keyboardType: .numberPad)
-                    NumericInputField(title: "Rep Min", text: $block.repLowerTextBinding, keyboardType: .numberPad)
-                    NumericInputField(title: "Rep Max", text: $block.repUpperTextBinding, keyboardType: .numberPad)
-                }
+                if usesWavePrescription {
+                    VStack(alignment: .leading, spacing: 8) {
+                        AppStatePill(title: "TM Driven", systemImage: "waveform.path.ecg", tone: .progress)
 
-                LazyVGrid(
-                    columns: [
-                        GridItem(.flexible(minimum: 120), spacing: 10),
-                        GridItem(.flexible(minimum: 120), spacing: 10),
-                    ],
-                    spacing: 10
-                ) {
-                    NumericInputField(title: "Target Weight (\(weightUnit.symbol))", text: $block.targetWeightText)
+                        Text(wavePrescriptionDetail)
+                            .font(.subheadline)
+                            .foregroundStyle(AppColors.textSecondary)
+                    }
+                    .frame(maxWidth: .infinity, alignment: .leading)
+                    .appInsetContentCard(
+                        fill: AppToneStyle.progress.softFill.opacity(0.45),
+                        border: AppToneStyle.progress.softBorder
+                    )
+
                     NumericInputField(title: "Rest (sec)", text: $block.restSecondsTextBinding, keyboardType: .numberPad)
+                } else {
+                    LazyVGrid(
+                        columns: [
+                            GridItem(.flexible(minimum: 70), spacing: 10),
+                            GridItem(.flexible(minimum: 70), spacing: 10),
+                            GridItem(.flexible(minimum: 70), spacing: 10),
+                        ],
+                        spacing: 10
+                    ) {
+                        NumericInputField(title: "Sets", text: $block.setCountTextBinding, keyboardType: .numberPad)
+                        NumericInputField(title: "Rep Min", text: $block.repLowerTextBinding, keyboardType: .numberPad)
+                        NumericInputField(title: "Rep Max", text: $block.repUpperTextBinding, keyboardType: .numberPad)
+                    }
+
+                    LazyVGrid(
+                        columns: [
+                            GridItem(.flexible(minimum: 120), spacing: 10),
+                            GridItem(.flexible(minimum: 120), spacing: 10),
+                        ],
+                        spacing: 10
+                    ) {
+                        NumericInputField(title: "Target Weight (\(weightUnit.symbol))", text: $block.targetWeightText)
+                        NumericInputField(title: "Rest (sec)", text: $block.restSecondsTextBinding, keyboardType: .numberPad)
+                    }
                 }
             }
 
@@ -775,20 +820,22 @@ private struct TemplateDraftBlockEditorView: View {
                                 .appInputField()
                         }
 
-                        VStack(alignment: .leading, spacing: 6) {
-                            Text("Set Type")
-                                .font(.caption.weight(.semibold))
-                                .foregroundStyle(AppColors.textSecondary)
+                        if !usesWavePrescription {
+                            VStack(alignment: .leading, spacing: 6) {
+                                Text("Set Type")
+                                    .font(.caption.weight(.semibold))
+                                    .foregroundStyle(AppColors.textSecondary)
 
-                            Picker("Set Type", selection: $block.setKind) {
-                                Text("Working").tag(SetKind.working)
-                                Text("Dropset").tag(SetKind.dropSet)
-                                Text("Warmup").tag(SetKind.warmup)
+                                Picker("Set Type", selection: $block.setKind) {
+                                    Text("Working").tag(SetKind.working)
+                                    Text("Dropset").tag(SetKind.dropSet)
+                                    Text("Warmup").tag(SetKind.warmup)
+                                }
+                                .pickerStyle(.menu)
+                                .tint(AppColors.textPrimary)
+                                .frame(maxWidth: .infinity, alignment: .leading)
+                                .appInputField()
                             }
-                            .pickerStyle(.menu)
-                            .tint(AppColors.textPrimary)
-                            .frame(maxWidth: .infinity, alignment: .leading)
-                            .appInputField()
                         }
                     }
 
@@ -813,6 +860,11 @@ private struct TemplateDraftBlockEditorView: View {
             .tint(AppToneStyle.progress.accent)
         }
         .appEditorInsetCard(borderOpacity: 0.78)
+        .onChange(of: block.progressionKind) { _, newValue in
+            if newValue == .percentageWave {
+                block.setKind = .working
+            }
+        }
     }
 
     private static func shouldStartExpanded(for block: TemplateDraftBlock) -> Bool {

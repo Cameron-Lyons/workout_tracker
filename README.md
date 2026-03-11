@@ -5,9 +5,8 @@
 Native SwiftUI iPhone app for logging workouts with routines.
 
 ## Features
-- Create/delete workout routines
-- Edit and reorder routines
-- Add, edit, and reorder exercises inside each routine
+- Create, edit, and delete workout routines
+- Add, edit, and remove exercises inside each routine
 - Log multiple sets per exercise (manual-first flow)
 - One-tap program templates: Starting Strength, 5/3/1, Boring But Big
 - Popular online routine packs: Push/Pull/Legs, Upper/Lower, StrongLifts 5x5, Arnold Split, PHUL
@@ -18,7 +17,7 @@ Native SwiftUI iPhone app for logging workouts with routines.
 - Workout history view with timestamped sessions
 - Historical lift record storage (per set) for trend analysis
 - Progress-over-time chart by exercise (top set per workout)
-- Rest timer in the workout logger (presets + pause/resume/reset + optional auto-start)
+- Rest timer in the workout logger (optional auto-start + clear)
 - Local persistence via SwiftData (v2 fast storage path)
 
 ## Project Structure

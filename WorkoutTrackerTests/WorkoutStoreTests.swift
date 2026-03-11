@@ -79,6 +79,101 @@ final class WorkoutStoreTests: XCTestCase {
         XCTAssertTrue(store.plansStore.exerciseItem(for: CatalogSeed.benchPress)?.aliases.contains("Bench Press") == true)
     }
 
+    @MainActor
+    func testExerciseRenameUpdatesTemplateAndActiveDraftSnapshots() async throws {
+        let store = makeStore()
+        await store.hydrateIfNeeded()
+        store.completeOnboarding(with: nil)
+
+        let plan = makeSingleTemplatePlan(
+            name: "Pressing",
+            templateName: "Bench Day",
+            store: store,
+            weight: 185
+        )
+        store.savePlan(plan)
+        let templateID = try XCTUnwrap(plan.templates.first?.id)
+
+        store.startSession(planID: plan.id, templateID: templateID)
+        store.updateCatalogItem(
+            itemID: CatalogSeed.benchPress,
+            name: "Competition Bench Press",
+            aliases: ["Barbell Bench"],
+            category: .chest
+        )
+
+        let updatedPlan = try XCTUnwrap(store.plansStore.plan(for: plan.id))
+
+        XCTAssertEqual(updatedPlan.templates.first?.blocks.first?.exerciseNameSnapshot, "Competition Bench Press")
+        XCTAssertEqual(store.sessionStore.activeDraft?.blocks.first?.exerciseNameSnapshot, "Competition Bench Press")
+    }
+
+    @MainActor
+    func testStartingAnotherTemplateResumesCurrentDraftUntilUserReplacesIt() async throws {
+        let store = makeStore()
+        await store.hydrateIfNeeded()
+        store.completeOnboarding(with: nil)
+
+        let firstPlan = makeSingleTemplatePlan(
+            name: "Plan A",
+            templateName: "Bench Day",
+            store: store,
+            weight: 185
+        )
+        let secondPlan = makeSingleTemplatePlan(
+            name: "Plan B",
+            templateName: "Press Day",
+            store: store,
+            weight: 135
+        )
+        store.savePlan(firstPlan)
+        store.savePlan(secondPlan)
+
+        let firstTemplateID = try XCTUnwrap(firstPlan.templates.first?.id)
+        let secondTemplateID = try XCTUnwrap(secondPlan.templates.first?.id)
+
+        store.startSession(planID: firstPlan.id, templateID: firstTemplateID)
+        store.updateActiveSessionNotes("Keep me")
+        store.startSession(planID: secondPlan.id, templateID: secondTemplateID)
+
+        XCTAssertEqual(store.sessionStore.activeDraft?.templateID, firstTemplateID)
+        XCTAssertEqual(store.sessionStore.activeDraft?.templateNameSnapshot, "Bench Day")
+        XCTAssertEqual(store.sessionStore.activeDraft?.notes, "Keep me")
+        XCTAssertNil(store.plansStore.plan(for: secondPlan.id)?.templates.first?.lastStartedAt)
+
+        store.replaceActiveSessionAndStart(planID: secondPlan.id, templateID: secondTemplateID)
+
+        XCTAssertEqual(store.sessionStore.activeDraft?.templateID, secondTemplateID)
+        XCTAssertEqual(store.sessionStore.activeDraft?.templateNameSnapshot, "Press Day")
+        XCTAssertEqual(store.sessionStore.activeDraft?.notes, "")
+        XCTAssertNotNil(store.plansStore.plan(for: secondPlan.id)?.templates.first?.lastStartedAt)
+    }
+
+    @MainActor
+    func testWavePresetPacksSeedDefaultTrainingMaxTargets() async throws {
+        let store = makeStore()
+        await store.hydrateIfNeeded()
+        store.completeOnboarding(with: nil)
+
+        store.plansStore.addPresetPack(.fiveThreeOne, settings: store.settingsStore)
+        store.plansStore.addPresetPack(.boringButBig, settings: store.settingsStore)
+        await store.refreshDerivedStores()
+
+        for planName in [PresetPack.fiveThreeOne.displayName, PresetPack.boringButBig.displayName] {
+            let plan = try XCTUnwrap(store.plansStore.plans.first(where: { $0.name == planName }))
+            let template = try XCTUnwrap(plan.templates.first)
+            let waveBlock = try XCTUnwrap(template.blocks.first)
+
+            XCTAssertNotNil(waveBlock.progressionRule.percentageWave?.trainingMax)
+            XCTAssertFalse(waveBlock.targets.isEmpty)
+            XCTAssertNotNil(waveBlock.targets.first?.targetWeight)
+
+            store.startSession(planID: plan.id, templateID: template.id)
+            XCTAssertNotNil(store.sessionStore.activeDraft?.blocks.first?.sets.first?.target.targetWeight)
+            store.discardActiveSession()
+        }
+    }
+
     func testAnalyticsSummariesHandleWarmupsAndVolume() {
         let analytics = AnalyticsRepository()
         let catalog = [

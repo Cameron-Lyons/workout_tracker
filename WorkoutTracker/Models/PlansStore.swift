@@ -180,6 +180,7 @@ final class PlansStore {
         updatedItem.aliases = Array(Set(aliases + [previousName]).subtracting([name])).sorted()
         updatedItem.category = category
         catalog[index] = updatedItem
+        synchronizeExerciseNameSnapshots(exerciseID: itemID, name: name)
         rebuildCatalogCaches()
         bumpCatalogRevision()
         repository.saveCatalog(catalog)
@@ -235,6 +236,31 @@ final class PlansStore {
 
     private func bumpCatalogRevision() {
         catalogRevision &+= 1
+    }
+
+    private func synchronizeExerciseNameSnapshots(exerciseID: UUID, name: String) {
+        var didUpdatePlans = false
+
+        for planIndex in plans.indices {
+            for templateIndex in plans[planIndex].templates.indices {
+                for blockIndex in plans[planIndex].templates[templateIndex].blocks.indices
+                where plans[planIndex].templates[templateIndex].blocks[blockIndex].exerciseID == exerciseID {
+                    guard plans[planIndex].templates[templateIndex].blocks[blockIndex].exerciseNameSnapshot != name else {
+                        continue
+                    }
+
+                    plans[planIndex].templates[templateIndex].blocks[blockIndex].exerciseNameSnapshot = name
+                    didUpdatePlans = true
+                }
+            }
+        }
+
+        guard didUpdatePlans else {
+            return
+        }
+
+        rebuildPlanCaches()
+        repository.savePlans(plans)
     }
 
     func updatePlanProgression(

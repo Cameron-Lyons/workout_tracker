@@ -45,6 +45,11 @@ final class WeightLogicTests: XCTestCase {
         XCTAssertEqual(WeightUnit.pounds.roundedForGymDisplay(227.4), 227.5)
     }
 
+    func testKilogramDisplayRoundingUsesOnePointTwoFiveIncrement() {
+        XCTAssertEqual(WeightUnit.kilograms.roundedForGymDisplay(81.8), 81.25)
+        XCTAssertEqual(WeightFormatter.displayString(displayValue: 81.3, unit: .kilograms), "81.25")
+    }
+
     func testExerciseClassificationDetectsLowerBodyNames() {
         XCTAssertTrue(ExerciseClassification.isLowerBody("Front Squat"))
         XCTAssertTrue(ExerciseClassification.isLowerBody("Romanian Deadlift"))

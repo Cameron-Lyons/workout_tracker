@@ -76,6 +76,15 @@ enum WeightUnit: String, CaseIterable, Codable, Sendable {
         }
     }
 
+    private var defaultDisplayRoundingIncrement: Double {
+        switch self {
+        case .pounds:
+            return StrengthProgressionDefaults.gymRoundingIncrement
+        case .kilograms:
+            return defaultUpperBodyIncrement
+        }
+    }
+
     func storedPounds(fromDisplayValue value: Double) -> Double {
         switch self {
         case .pounds:
@@ -102,8 +111,8 @@ enum WeightUnit: String, CaseIterable, Codable, Sendable {
         return converted
     }
 
-    func roundedForGymDisplay(_ value: Double, increment: Double = StrengthProgressionDefaults.gymRoundingIncrement) -> Double {
-        let safeIncrement = max(increment, Self.minimumRoundingIncrement)
+    func roundedForGymDisplay(_ value: Double, increment: Double? = nil) -> Double {
+        let safeIncrement = max(increment ?? defaultDisplayRoundingIncrement, Self.minimumRoundingIncrement)
         return (value / safeIncrement).rounded() * safeIncrement
     }
 }
@@ -127,9 +136,8 @@ enum WeightFormatter {
             return String(Int(roundedValue))
         }
 
-        let oneDecimalValue = (roundedValue * 10).rounded() / 10
-        if (oneDecimalValue * 10).rounded() == oneDecimalValue * 10 {
-            return String(format: "%.1f", oneDecimalValue)
+        if (roundedValue * 10).rounded() == roundedValue * 10 {
+            return String(format: "%.1f", roundedValue)
         }
 
         return String(format: "%.2f", roundedValue)

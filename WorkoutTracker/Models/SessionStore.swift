@@ -141,6 +141,30 @@ final class SessionStore {
         repository.saveActiveDraft(nil)
     }
 
+    func updateExerciseNameSnapshots(exerciseID: UUID, name: String) {
+        guard var activeDraft else {
+            return
+        }
+
+        var didUpdate = false
+        for index in activeDraft.blocks.indices where activeDraft.blocks[index].exerciseID == exerciseID {
+            guard activeDraft.blocks[index].exerciseNameSnapshot != name else {
+                continue
+            }
+
+            activeDraft.blocks[index].exerciseNameSnapshot = name
+            didUpdate = true
+        }
+
+        guard didUpdate else {
+            return
+        }
+
+        self.activeDraft = activeDraft
+        cancelPendingDraftSave()
+        repository.saveActiveDraft(activeDraft)
+    }
+
     private func appendUndoSnapshot(_ draft: SessionDraft) {
         undoStack.append(draft)
 

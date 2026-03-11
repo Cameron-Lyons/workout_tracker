@@ -364,6 +364,7 @@ final class AppPlanCoordinator {
             aliases: aliases,
             category: category
         )
+        sessionStore.updateExerciseNameSnapshots(exerciseID: itemID, name: name)
         derivedStateController.refreshToday(plansStore: plansStore, sessionStore: sessionStore)
         derivedStateController.scheduleProgressRefresh(plansStore: plansStore, sessionStore: sessionStore)
     }
@@ -389,10 +390,31 @@ final class AppSessionCoordinator {
     }
 
     func startSession(planID: UUID, templateID: UUID) {
+        guard sessionStore.activeDraft == nil else {
+            sessionStore.presentActiveSession()
+            return
+        }
+
+        beginSession(planID: planID, templateID: templateID)
+    }
+
+    func replaceActiveSessionAndStart(planID: UUID, templateID: UUID) {
+        beginSession(planID: planID, templateID: templateID, discardingActiveSession: true)
+    }
+
+    private func beginSession(
+        planID: UUID,
+        templateID: UUID,
+        discardingActiveSession: Bool = false
+    ) {
         guard let plan = plansStore.plan(for: planID),
             let template = plan.templates.first(where: { $0.id == templateID })
         else {
             return
+        }
+
+        if discardingActiveSession {
+            sessionStore.discardActiveSession()
         }
 
         let draft = SessionEngine.startSession(

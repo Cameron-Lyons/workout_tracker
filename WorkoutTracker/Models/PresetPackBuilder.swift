@@ -37,6 +37,13 @@ enum PresetPackBuilder {
         static let boringButBig = "BBB 5x10"
     }
 
+    private enum PresetPackTrainingMax {
+        static let benchPress = 135.0
+        static let overheadPress = 95.0
+        static let backSquat = 185.0
+        static let deadlift = 225.0
+    }
+
     static func makePlans(for pack: PresetPack, settings: SettingsStore) -> [Plan] {
         switch pack {
         case .generalGym:
@@ -401,23 +408,42 @@ enum PresetPackBuilder {
         )
     }
 
-    private static func waveProgressionRule(for exerciseName: String) -> ProgressionRule {
+    private static func waveProgressionRule(for exerciseID: UUID, exerciseName: String) -> ProgressionRule {
         ProgressionRule(
             kind: .percentageWave,
             percentageWave: PercentageWaveRule.fiveThreeOne(
+                trainingMax: defaultTrainingMax(for: exerciseID),
                 cycleIncrement: ExerciseClassification.isLowerBody(exerciseName) ? 10 : 5
             )
         )
     }
 
     private static func waveMainBlock(exerciseID: UUID, exerciseName: String) -> ExerciseBlock {
-        ExerciseBlock(
+        var block = ExerciseBlock(
             exerciseID: exerciseID,
             exerciseNameSnapshot: exerciseName,
             restSeconds: PresetPackRest.waveMainLift,
-            progressionRule: waveProgressionRule(for: exerciseName),
+            progressionRule: waveProgressionRule(for: exerciseID, exerciseName: exerciseName),
             targets: []
         )
+
+        block.targets = ProgressionEngine.resolvedTargets(for: block, profile: nil)
+        return block
+    }
+
+    private static func defaultTrainingMax(for exerciseID: UUID) -> Double? {
+        switch exerciseID {
+        case CatalogSeed.benchPress:
+            return PresetPackTrainingMax.benchPress
+        case CatalogSeed.overheadPress:
+            return PresetPackTrainingMax.overheadPress
+        case CatalogSeed.backSquat:
+            return PresetPackTrainingMax.backSquat
+        case CatalogSeed.deadlift:
+            return PresetPackTrainingMax.deadlift
+        default:
+            return nil
+        }
     }
 
     private static func waveTemplate(

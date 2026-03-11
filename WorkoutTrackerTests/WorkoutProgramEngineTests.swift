@@ -149,6 +149,9 @@ final class WorkoutProgramEngineTests: XCTestCase {
         XCTAssertEqual(updated.block.progressionRule.percentageWave?.currentWeekIndex, 0)
         XCTAssertEqual(updated.block.progressionRule.percentageWave?.cycle, 2)
         XCTAssertEqual(updated.profile?.trainingMax, 210)
+        XCTAssertEqual(updated.block.targets.count, 1)
+        XCTAssertEqual(updated.block.targets.first?.targetWeight, 137.5)
+        XCTAssertEqual(updated.block.targets.first?.repRange, RepRange(5, 5))
     }
 
     func testPercentageWaveDoesNotAdvanceWhenWorkingSetsRemainIncomplete() {
@@ -196,6 +199,7 @@ final class WorkoutProgramEngineTests: XCTestCase {
         XCTAssertEqual(updated.block.progressionRule.percentageWave?.currentWeekIndex, 1)
         XCTAssertEqual(updated.block.progressionRule.percentageWave?.cycle, 1)
         XCTAssertEqual(updated.profile?.trainingMax, 200)
+        XCTAssertEqual(updated.block.targets, block.targets)
     }
 
     func testDoubleProgressionDoesNotAdvanceWithoutWorkingSets() {
