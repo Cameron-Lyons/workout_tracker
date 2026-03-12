@@ -58,13 +58,14 @@ final class SettingsStore {
 
     init(defaults: UserDefaults = .standard) {
         self.defaults = defaults
-        self.weightUnit = WeightUnit(rawValue: defaults.string(forKey: WeightUnit.settingsKey) ?? "") ?? .pounds
+        let weightUnit = WeightUnit(rawValue: defaults.string(forKey: WeightUnit.settingsKey) ?? "") ?? .pounds
+        self.weightUnit = weightUnit
         self.upperBodyIncrement =
             defaults.object(forKey: Keys.upperIncrement) as? Double
-            ?? WeightUnit.pounds.defaultUpperBodyIncrement
+            ?? weightUnit.defaultUpperBodyIncrement
         self.lowerBodyIncrement =
             defaults.object(forKey: Keys.lowerIncrement) as? Double
-            ?? WeightUnit.pounds.defaultLowerBodyIncrement
+            ?? weightUnit.defaultLowerBodyIncrement
         self.defaultRestSeconds =
             defaults.object(forKey: Keys.defaultRestSeconds) as? Int
             ?? ExerciseBlockDefaults.restSeconds
@@ -83,14 +84,4 @@ final class SettingsStore {
         ExerciseClassification.isLowerBody(exerciseName) ? lowerBodyIncrement : upperBodyIncrement
     }
 
-    nonisolated static func resetPersistedSettings(defaults: UserDefaults = .standard) {
-        [
-            WeightUnit.settingsKey,
-            Keys.upperIncrement,
-            Keys.lowerIncrement,
-            Keys.defaultRestSeconds,
-            Keys.completedOnboarding,
-            Keys.warmupRamp,
-        ].forEach { defaults.removeObject(forKey: $0) }
-    }
 }

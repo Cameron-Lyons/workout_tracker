@@ -58,6 +58,45 @@ private struct ActiveSessionActions {
 
 private enum ActiveSessionViewMetrics {
     static let statControlHeight: CGFloat = 104
+    static let detailedChromeRevealDelayNanoseconds: UInt64 = 120_000_000
+}
+
+private struct ActiveSessionRestTimerPresentation {
+    let tone: AppToneStyle
+    let label: String
+    let eyebrow: String
+    let subtitle: String
+
+    init(endDate: Date?, now: Date) {
+        guard let endDate else {
+            tone = .today
+            label = "Off"
+            eyebrow = "Active Session"
+            subtitle = "Tap complete to auto-start rest timers, then use +/- controls to adjust each set."
+            return
+        }
+
+        let remaining = max(0, Int(endDate.timeIntervalSince(now)))
+        if remaining == 0 {
+            tone = .success
+            label = "Ready"
+            eyebrow = "Next Set Ready"
+            subtitle = "Rest timer complete. Start the next set whenever you are ready."
+            return
+        }
+
+        let durationText = Self.durationText(remaining)
+        tone = .warning
+        label = durationText
+        eyebrow = "Rest Timer Live"
+        subtitle = "Rest timer running: \(durationText) remaining."
+    }
+
+    private static func durationText(_ totalSeconds: Int) -> String {
+        let minutes = totalSeconds / 60
+        let seconds = totalSeconds % 60
+        return "\(minutes):\(String(format: "%02d", seconds))"
+    }
 }
 
 enum ActiveSessionWeightStep {
@@ -233,7 +272,7 @@ struct ActiveSessionView: View {
         chromeRevealTask?.cancel()
         chromeRevealTask = Task { @MainActor in
             await Task.yield()
-            try? await Task.sleep(nanoseconds: 120_000_000)
+            try? await Task.sleep(nanoseconds: ActiveSessionViewMetrics.detailedChromeRevealDelayNanoseconds)
             guard !Task.isCancelled else {
                 return
             }
@@ -780,6 +819,8 @@ private struct ActiveSessionFooterView: View {
 
     @ViewBuilder
     private func footerContent(now: Date) -> some View {
+        let restTimerPresentation = ActiveSessionRestTimerPresentation(endDate: state.restTimerEndsAt, now: now)
+
         VStack(spacing: 12) {
             HStack {
                 MetricBadge(
@@ -793,9 +834,9 @@ private struct ActiveSessionFooterView: View {
 
                 MetricBadge(
                     label: "Rest",
-                    value: restTimerLabel(at: now),
+                    value: restTimerPresentation.label,
                     systemImage: "timer",
-                    tone: restTone(at: now)
+                    tone: restTimerPresentation.tone
                 )
             }
 
@@ -825,29 +866,6 @@ private struct ActiveSessionFooterView: View {
             }
         }
     }
-
-    private func restTone(at now: Date) -> AppToneStyle {
-        guard let endDate = state.restTimerEndsAt else {
-            return .today
-        }
-
-        return endDate.timeIntervalSince(now) <= 0 ? .success : .warning
-    }
-
-    private func restTimerLabel(at now: Date) -> String {
-        guard let endDate = state.restTimerEndsAt else {
-            return "Off"
-        }
-
-        let remaining = max(0, Int(endDate.timeIntervalSince(now)))
-        if remaining == 0 {
-            return "Ready"
-        }
-
-        let minutes = remaining / 60
-        let seconds = remaining % 60
-        return "\(minutes):\(String(format: "%02d", seconds))"
-    }
 }
 
 private struct ActiveSessionHeaderView: View, Equatable {
@@ -868,10 +886,12 @@ private struct ActiveSessionHeaderView: View, Equatable {
     }
 
     private func heroCard(now: Date) -> some View {
-        AppHeroCard(
-            eyebrow: headerEyebrow(at: now),
+        let restTimerPresentation = ActiveSessionRestTimerPresentation(endDate: state.restTimerEndsAt, now: now)
+
+        return AppHeroCard(
+            eyebrow: restTimerPresentation.eyebrow,
             title: state.templateName,
-            subtitle: restTimerSubtitle(at: now),
+            subtitle: restTimerPresentation.subtitle,
             systemImage: "figure.strengthtraining.traditional",
             metrics: [
                 AppHeroMetric(
@@ -895,59 +915,11 @@ private struct ActiveSessionHeaderView: View, Equatable {
                 AppHeroMetric(
                     id: "timer",
                     label: "Rest",
-                    value: restTimerLabel(at: now),
+                    value: restTimerPresentation.label,
                     systemImage: "timer"
                 ),
             ],
-            tone: headerTone(at: now)
+            tone: restTimerPresentation.tone
         )
-    }
-
-    private func headerEyebrow(at now: Date) -> String {
-        guard let endDate = state.restTimerEndsAt else {
-            return "Active Session"
-        }
-
-        return endDate.timeIntervalSince(now) <= 0 ? "Next Set Ready" : "Rest Timer Live"
-    }
-
-    private func headerTone(at now: Date) -> AppToneStyle {
-        guard let endDate = state.restTimerEndsAt else {
-            return .today
-        }
-
-        return endDate.timeIntervalSince(now) <= 0 ? .success : .warning
-    }
-
-    private func restTimerLabel(at now: Date) -> String {
-        guard let endDate = state.restTimerEndsAt else {
-            return "Off"
-        }
-
-        let remaining = max(0, Int(endDate.timeIntervalSince(now)))
-        if remaining == 0 {
-            return "Ready"
-        }
-
-        return durationText(remaining)
-    }
-
-    private func restTimerSubtitle(at now: Date) -> String {
-        guard let endDate = state.restTimerEndsAt else {
-            return "Tap complete to auto-start rest timers, then use +/- controls to adjust each set."
-        }
-
-        let remaining = max(0, Int(endDate.timeIntervalSince(now)))
-        if remaining == 0 {
-            return "Rest timer complete. Start the next set whenever you are ready."
-        }
-
-        return "Rest timer running: \(durationText(remaining)) remaining."
-    }
-
-    private func durationText(_ totalSeconds: Int) -> String {
-        let minutes = totalSeconds / 60
-        let seconds = totalSeconds % 60
-        return "\(minutes):\(String(format: "%02d", seconds))"
     }
 }

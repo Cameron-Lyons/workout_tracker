@@ -392,11 +392,11 @@ final class PlansStore {
 
         mergeProfilesInMemory(updatedProfiles)
 
-        if let nextStartingStrengthTemplateID = TemplateReferenceSelection.nextStartingStrengthTemplateID(
+        if let nextAlternatingTemplateID = TemplateReferenceSelection.nextAlternatingTemplateID(
             in: plan,
             after: templateID
         ) {
-            plan.pinnedTemplateID = nextStartingStrengthTemplateID
+            plan.pinnedTemplateID = nextAlternatingTemplateID
         }
 
         plan.templates[templateIndex] = template

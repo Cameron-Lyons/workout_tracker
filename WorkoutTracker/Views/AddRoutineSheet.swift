@@ -520,12 +520,22 @@ private extension PresetPack {
         switch self {
         case .generalGym:
             .today
+        case .phul:
+            .success
         case .startingStrength:
             .warning
+        case .strongLiftsFiveByFive:
+            .warning
+        case .greyskullLP:
+            .plans
         case .fiveThreeOne:
             .progress
         case .boringButBig:
             .success
+        case .madcowFiveByFive:
+            .progress
+        case .gzclp:
+            .plans
         }
     }
 
@@ -533,12 +543,22 @@ private extension PresetPack {
         switch self {
         case .generalGym:
             "Most Flexible"
+        case .phul:
+            "4-Day Split"
         case .startingStrength:
             "Simple Strength"
+        case .strongLiftsFiveByFive:
+            "Novice 5x5"
+        case .greyskullLP:
+            "AMRAP Linear"
         case .fiveThreeOne:
             "Cycle Based"
         case .boringButBig:
             "Volume Focus"
+        case .madcowFiveByFive:
+            "Intermediate"
+        case .gzclp:
+            "Tiered Progression"
         }
     }
 
@@ -546,12 +566,22 @@ private extension PresetPack {
         switch self {
         case .generalGym:
             ["Upper/Lower", "Balanced", "Flexible"]
+        case .phul:
+            ["Power", "Hypertrophy", "Upper/Lower"]
         case .startingStrength:
             ["A/B Days", "Barbell", "Linear"]
+        case .strongLiftsFiveByFive:
+            ["A/B Days", "5x5", "Barbell"]
+        case .greyskullLP:
+            ["A/B Days", "AMRAP", "Linear"]
         case .fiveThreeOne:
             ["4 Main Lifts", "Wave", "Cycles"]
         case .boringButBig:
             ["5/3/1", "5x10", "Supplemental"]
+        case .madcowFiveByFive:
+            ["3 Days", "Ramp Sets", "Weekly"]
+        case .gzclp:
+            ["T1/T2/T3", "4 Days", "Powerbuilding"]
         }
     }
 }

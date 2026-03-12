@@ -28,6 +28,11 @@ struct AnalyticsRepository: Sendable {
         var recentSessions: [CompletedSession]
     }
 
+    struct CompletedSessionResult: Sendable {
+        var finishSummary: SessionFinishSummary
+        var payloads: [SessionExercisePayload]
+    }
+
     private struct ExerciseAnalyticsAccumulator {
         var exerciseID: UUID
         var fallbackDisplayName: String
@@ -70,6 +75,18 @@ struct AnalyticsRepository: Sendable {
         previousBestByExerciseID: [UUID: Double],
         catalogByID: [UUID: ExerciseCatalogItem]
     ) -> SessionFinishSummary {
+        completedSessionResult(
+            for: session,
+            previousBestByExerciseID: previousBestByExerciseID,
+            catalogByID: catalogByID
+        ).finishSummary
+    }
+
+    func completedSessionResult(
+        for session: CompletedSession,
+        previousBestByExerciseID: [UUID: Double],
+        catalogByID: [UUID: ExerciseCatalogItem]
+    ) -> CompletedSessionResult {
         var bestOneRepMaxByExerciseID = previousBestByExerciseID
         let analysis = analyzeSession(
             session,
@@ -79,12 +96,15 @@ struct AnalyticsRepository: Sendable {
             bestOneRepMaxByExerciseID: &bestOneRepMaxByExerciseID
         )
 
-        return SessionFinishSummary(
-            templateName: session.templateNameSnapshot,
-            completedAt: session.completedAt,
-            completedSetCount: analysis.completedSetCount,
-            totalVolume: analysis.trackedVolume,
-            personalRecords: analysis.newRecords
+        return CompletedSessionResult(
+            finishSummary: SessionFinishSummary(
+                templateName: session.templateNameSnapshot,
+                completedAt: session.completedAt,
+                completedSetCount: analysis.completedSetCount,
+                totalVolume: analysis.trackedVolume,
+                personalRecords: analysis.newRecords
+            ),
+            payloads: analysis.payloads
         )
     }
 

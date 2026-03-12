@@ -196,6 +196,216 @@ final class WorkoutStoreTests: XCTestCase {
         }
     }
 
+    @MainActor
+    func testNewPresetPacksGenerateExpectedTemplateStructures() throws {
+        let settings = SettingsStore()
+
+        let phul = try XCTUnwrap(PresetPackBuilder.makePlans(for: .phul, settings: settings).first)
+        XCTAssertEqual(phul.templates.map(\.name), ["Upper Power", "Lower Power", "Upper Hypertrophy", "Lower Hypertrophy"])
+
+        let strongLifts = try XCTUnwrap(PresetPackBuilder.makePlans(for: .strongLiftsFiveByFive, settings: settings).first)
+        XCTAssertEqual(strongLifts.templates.count, 2)
+        XCTAssertTrue(TemplateReferenceSelection.isAlternatingPlan(strongLifts))
+        XCTAssertEqual(strongLifts.templates.first?.blocks.map(\.targets.count), [5, 5, 5])
+        XCTAssertEqual(strongLifts.templates.last?.blocks.last?.targets.count, 1)
+
+        let greyskull = try XCTUnwrap(PresetPackBuilder.makePlans(for: .greyskullLP, settings: settings).first)
+        XCTAssertEqual(greyskull.templates.count, 2)
+        XCTAssertEqual(greyskull.templates.first?.blocks.first?.targets.last?.note, "AMRAP+")
+        XCTAssertEqual(greyskull.templates.last?.blocks.last?.targets.last?.note, "AMRAP+")
+
+        let madcow = try XCTUnwrap(PresetPackBuilder.makePlans(for: .madcowFiveByFive, settings: settings).first)
+        XCTAssertEqual(madcow.templates.map(\.name), ["Volume Day", "Recovery Day", "Intensity Day"])
+        XCTAssertEqual(madcow.templates.last?.blocks.first?.targets.map(\.note), [nil, nil, nil, "Top triple", "Backoff set"])
+
+        let gzclp = try XCTUnwrap(PresetPackBuilder.makePlans(for: .gzclp, settings: settings).first)
+        XCTAssertEqual(gzclp.templates.count, 4)
+        XCTAssertFalse(TemplateReferenceSelection.isAlternatingPlan(gzclp))
+        XCTAssertEqual(gzclp.templates.first?.blocks.map(\.blockNote), ["T1 Main Lift", "T2 Secondary Lift", "T3 Accessories"])
+    }
+
+    @MainActor
+    func testHydrateIfNeededWithUITestingEmptyStoreResetsPersistedData() async throws {
+        let container = WorkoutModelContainerFactory.makeContainer(isStoredInMemoryOnly: true)
+        let seededStore = makeStore(container: container)
+        await seededStore.hydrateIfNeeded()
+        seededStore.completeOnboarding(with: .generalGym)
+
+        let pinnedTemplate = try XCTUnwrap(seededStore.todayStore.pinnedTemplate)
+        seededStore.startSession(planID: pinnedTemplate.planID, templateID: pinnedTemplate.templateID)
+        let firstBlock = try XCTUnwrap(seededStore.sessionStore.activeDraft?.blocks.first)
+        let firstRow = try XCTUnwrap(firstBlock.sets.first(where: { $0.target.setKind == .working }))
+        seededStore.toggleSetCompletion(blockID: firstBlock.id, setID: firstRow.id)
+        XCTAssertTrue(seededStore.finishActiveSession())
+
+        seededStore.startSession(planID: pinnedTemplate.planID, templateID: pinnedTemplate.templateID)
+        seededStore.flushPendingSessionPersistence()
+        seededStore.flushPendingPlanPersistence()
+
+        XCTAssertFalse(seededStore.plansStore.plans.isEmpty)
+        XCTAssertNotNil(seededStore.sessionStore.activeDraft)
+        XCTAssertEqual(seededStore.sessionStore.completedSessions.count, 1)
+        XCTAssertFalse(seededStore.shouldShowOnboarding)
+
+        let resetStore = makeStore(
+            container: container,
+            launchArguments: ["--uitesting-empty-store"]
+        )
+        await resetStore.hydrateIfNeeded()
+
+        XCTAssertTrue(resetStore.shouldShowOnboarding)
+        XCTAssertTrue(resetStore.plansStore.plans.isEmpty)
+        XCTAssertNil(resetStore.sessionStore.activeDraft)
+        XCTAssertTrue(resetStore.sessionStore.completedSessions.isEmpty)
+        XCTAssertEqual(resetStore.plansStore.catalog.count, CatalogSeed.defaultCatalog().count)
+
+        let rehydratedStore = makeStore(container: container)
+        await rehydratedStore.hydrateIfNeeded()
+
+        XCTAssertTrue(rehydratedStore.plansStore.plans.isEmpty)
+        XCTAssertNil(rehydratedStore.sessionStore.activeDraft)
+        XCTAssertTrue(rehydratedStore.sessionStore.completedSessions.isEmpty)
+        XCTAssertTrue(rehydratedStore.shouldShowOnboarding)
+    }
+
+    @MainActor
+    func testSessionMutationCommandsUndoAndPersistDraftChanges() async throws {
+        let container = WorkoutModelContainerFactory.makeContainer(isStoredInMemoryOnly: true)
+        let store = makeStore(container: container)
+        await store.hydrateIfNeeded()
+        store.completeOnboarding(with: nil)
+
+        let plan = makeSingleTemplatePlan(
+            name: "Bench Focus",
+            templateName: "Bench Day",
+            store: store,
+            weight: 185
+        )
+        store.savePlan(plan)
+        store.startSession(planID: plan.id, templateID: try XCTUnwrap(plan.templates.first?.id))
+
+        store.sessionStore.dismissSessionPresentation()
+        store.resumeActiveSession()
+        XCTAssertTrue(store.sessionStore.isPresentingSession)
+
+        let initialBlock = try XCTUnwrap(store.sessionStore.activeDraft?.blocks.first)
+        let initialRow = try XCTUnwrap(initialBlock.sets.first(where: { $0.target.setKind == .working }))
+
+        store.toggleSetCompletion(blockID: initialBlock.id, setID: initialRow.id)
+        XCTAssertNotNil(store.sessionStore.activeDraft?.restTimerEndsAt)
+
+        store.clearRestTimer()
+        XCTAssertNil(store.sessionStore.activeDraft?.restTimerEndsAt)
+
+        store.adjustSetWeight(blockID: initialBlock.id, setID: initialRow.id, delta: 5)
+        store.adjustSetReps(blockID: initialBlock.id, setID: initialRow.id, delta: 1)
+        store.addSet(to: initialBlock.id)
+        store.copyLastSet(in: initialBlock.id)
+        store.updateActiveBlockNotes(blockID: initialBlock.id, note: "Heavy top set")
+        store.addExerciseToActiveSession(exerciseID: CatalogSeed.backSquat)
+
+        let blockCountAfterCatalogExercise = try XCTUnwrap(store.sessionStore.activeDraft?.blocks.count)
+        store.addCustomExerciseToActiveSession(name: "  Cable Row  ")
+        XCTAssertEqual(store.sessionStore.activeDraft?.blocks.last?.exerciseNameSnapshot, "Cable Row")
+
+        store.undoSessionMutation()
+
+        let updatedDraft = try XCTUnwrap(store.sessionStore.activeDraft)
+        let updatedPrimaryBlock = try XCTUnwrap(updatedDraft.blocks.first(where: { $0.id == initialBlock.id }))
+        let updatedWorkingRows = updatedPrimaryBlock.sets.filter { $0.target.setKind == .working }
+
+        XCTAssertEqual(updatedDraft.blocks.count, blockCountAfterCatalogExercise)
+        XCTAssertFalse(updatedDraft.blocks.contains(where: { $0.exerciseNameSnapshot == "Cable Row" }))
+        XCTAssertEqual(updatedPrimaryBlock.blockNote, "Heavy top set")
+        XCTAssertEqual(updatedPrimaryBlock.sets.count, 5)
+        XCTAssertEqual(updatedWorkingRows.count, 3)
+        XCTAssertEqual(updatedWorkingRows[0].log.weight, 190)
+        XCTAssertEqual(updatedWorkingRows[0].log.reps, 6)
+        XCTAssertEqual(updatedWorkingRows[1].log.weight, 190)
+        XCTAssertEqual(updatedWorkingRows[1].log.reps, 6)
+        XCTAssertEqual(updatedWorkingRows[2].log.weight, 190)
+        XCTAssertEqual(updatedWorkingRows[2].log.reps, 6)
+        XCTAssertEqual(updatedDraft.blocks.last?.exerciseID, CatalogSeed.backSquat)
+
+        store.flushPendingSessionPersistence()
+        store.flushPendingPlanPersistence()
+
+        let rehydratedStore = makeStore(container: container)
+        await rehydratedStore.hydrateIfNeeded()
+        let persistedDraft = try XCTUnwrap(rehydratedStore.sessionStore.activeDraft)
+        let persistedPrimaryBlock = try XCTUnwrap(persistedDraft.blocks.first(where: { $0.id == initialBlock.id }))
+        let persistedWorkingRows = persistedPrimaryBlock.sets.filter { $0.target.setKind == .working }
+
+        XCTAssertEqual(persistedDraft.blocks.count, blockCountAfterCatalogExercise)
+        XCTAssertEqual(persistedPrimaryBlock.blockNote, "Heavy top set")
+        XCTAssertEqual(persistedPrimaryBlock.sets.count, 5)
+        XCTAssertEqual(persistedWorkingRows.count, 3)
+        XCTAssertEqual(persistedWorkingRows[0].log.weight, 190)
+        XCTAssertEqual(persistedWorkingRows[0].log.reps, 6)
+        XCTAssertTrue(rehydratedStore.plansStore.catalog.contains(where: { $0.name == "Cable Row" }))
+    }
+
+    @MainActor
+    func testTemplateCrudAndProfilesPersistThroughFlushes() async throws {
+        let container = WorkoutModelContainerFactory.makeContainer(isStoredInMemoryOnly: true)
+        let store = makeStore(container: container)
+        await store.hydrateIfNeeded()
+        store.completeOnboarding(with: nil)
+
+        let primaryPlan = store.makePlan(name: "Editable Plan")
+        store.savePlan(primaryPlan)
+
+        let template = WorkoutTemplate(
+            name: "Upper Builder",
+            blocks: [
+                ExerciseBlock(
+                    exerciseID: CatalogSeed.benchPress,
+                    exerciseNameSnapshot: store.plansStore.exerciseName(for: CatalogSeed.benchPress),
+                    progressionRule: .manual,
+                    targets: [
+                        SetTarget(
+                            setKind: .working,
+                            targetWeight: 185,
+                            repRange: RepRange(5, 5)
+                        )
+                    ]
+                )
+            ]
+        )
+        store.saveTemplate(planID: primaryPlan.id, template: template)
+
+        let throwawayPlan = store.makePlan(name: "Throwaway Plan")
+        store.savePlan(throwawayPlan)
+
+        let profile = ExerciseProfile(
+            exerciseID: CatalogSeed.benchPress,
+            trainingMax: 235,
+            preferredIncrement: 5
+        )
+        store.saveProfiles([profile])
+        store.refreshTodayStore()
+
+        XCTAssertEqual(store.plansStore.plan(for: primaryPlan.id)?.pinnedTemplateID, template.id)
+        XCTAssertEqual(store.todayStore.pinnedTemplate?.templateID, template.id)
+        XCTAssertEqual(store.plansStore.profile(for: CatalogSeed.benchPress)?.trainingMax, 235)
+
+        store.deleteTemplate(planID: primaryPlan.id, templateID: template.id)
+        XCTAssertTrue(store.plansStore.plan(for: primaryPlan.id)?.templates.isEmpty == true)
+
+        store.deletePlan(throwawayPlan.id)
+        XCTAssertNil(store.plansStore.plan(for: throwawayPlan.id))
+
+        store.flushPendingPlanPersistence()
+
+        let rehydratedStore = makeStore(container: container)
+        await rehydratedStore.hydrateIfNeeded()
+
+        XCTAssertTrue(rehydratedStore.plansStore.plan(for: primaryPlan.id)?.templates.isEmpty == true)
+        XCTAssertNil(rehydratedStore.plansStore.plan(for: throwawayPlan.id))
+        XCTAssertEqual(rehydratedStore.plansStore.profile(for: CatalogSeed.benchPress)?.trainingMax, 235)
+        XCTAssertEqual(rehydratedStore.plansStore.profile(for: CatalogSeed.benchPress)?.preferredIncrement, 5)
+    }
+
     func testAnalyticsSummariesHandleWarmupsAndVolume() {
         let analytics = AnalyticsRepository()
         let catalog = [
@@ -981,6 +1191,28 @@ final class WorkoutStoreTests: XCTestCase {
     }
 
     @MainActor
+    func testFinishingStrongLiftsSessionPinsTheAlternateWorkout() async throws {
+        let store = makeStore()
+        await store.hydrateIfNeeded()
+        store.completeOnboarding(with: .strongLiftsFiveByFive)
+
+        let initialPinned = try XCTUnwrap(store.todayStore.pinnedTemplate)
+        XCTAssertEqual(initialPinned.templateName, "Workout A")
+
+        store.startSession(planID: initialPinned.planID, templateID: initialPinned.templateID)
+        let block = try XCTUnwrap(store.sessionStore.activeDraft?.blocks.first)
+        let row = try XCTUnwrap(block.sets.first(where: { $0.target.setKind == .working }))
+        store.toggleSetCompletion(blockID: block.id, setID: row.id)
+        store.finishActiveSession()
+
+        let rotatedPinned = try XCTUnwrap(store.todayStore.pinnedTemplate)
+        let updatedPlan = try XCTUnwrap(store.plansStore.plan(for: initialPinned.planID))
+
+        XCTAssertEqual(rotatedPinned.templateName, "Workout B")
+        XCTAssertEqual(updatedPlan.pinnedTemplateID, rotatedPinned.templateID)
+    }
+
+    @MainActor
     func testQuickStartsStayDeduplicatedAfterRepeatedTemplateCompletion() async throws {
         let store = makeStore()
         await store.hydrateIfNeeded()
@@ -1125,6 +1357,13 @@ final class WorkoutStoreTests: XCTestCase {
     }
 
     private func resetDefaults() {
-        SettingsStore.resetPersistedSettings()
+        [
+            WeightUnit.settingsKey,
+            "workout_tracker_upper_increment",
+            "workout_tracker_lower_increment",
+            "workout_tracker_default_rest",
+            "workout_tracker_completed_onboarding",
+            "workout_tracker_warmup_ramp",
+        ].forEach { UserDefaults.standard.removeObject(forKey: $0) }
     }
 }

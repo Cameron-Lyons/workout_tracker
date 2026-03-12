@@ -21,7 +21,6 @@
 		3D05027CEB739884755AFD1D /* WorkoutPersistence.swift in Sources */ = {isa = PBXBuildFile; fileRef = 766FE65600F8B48524008A8B /* WorkoutPersistence.swift */; };
 		4F6B59DA9375393F95AAA058 /* RoutineModels.swift in Sources */ = {isa = PBXBuildFile; fileRef = BB4441EB8AF6CB932AF74702 /* RoutineModels.swift */; };
 		53F8A6F237DF741FE0F88A0D /* WorkoutLoggerView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 8E4C2EC7BEB1963496CA5BD1 /* WorkoutLoggerView.swift */; };
-		5FF8E0281376A4B6738A3C6A /* PersistenceMigration.swift in Sources */ = {isa = PBXBuildFile; fileRef = 07E8EF5FD2B9EC27D291AA31 /* PersistenceMigration.swift */; };
 		6A96949102BDCB6B14D139BA /* AddRoutineSheet.swift in Sources */ = {isa = PBXBuildFile; fileRef = EC8B8821FDBB7B9901CDB804 /* AddRoutineSheet.swift */; };
 		82F115C443515A21BEBC91D7 /* PlanPersistenceController.swift in Sources */ = {isa = PBXBuildFile; fileRef = 3DABDDB62B39CC0CB62EEACD /* PlanPersistenceController.swift */; };
 		8C2EFF5B1AB210FBAD58136A /* TodayStore.swift in Sources */ = {isa = PBXBuildFile; fileRef = C1763347441E2BBAF5B68512 /* TodayStore.swift */; };
@@ -58,7 +57,6 @@
 
 /* Begin PBXFileReference section */
 		051126D66CEE8C5031D2E955 /* RootTabView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = RootTabView.swift; sourceTree = "<group>"; };
-		07E8EF5FD2B9EC27D291AA31 /* PersistenceMigration.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = PersistenceMigration.swift; sourceTree = "<group>"; };
 		114369B450A456FF1EEED1B1 /* WorkoutProgramEngine.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = WorkoutProgramEngine.swift; sourceTree = "<group>"; };
 		2AB9E215AE2B627588A526E4 /* SessionStore.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SessionStore.swift; sourceTree = "<group>"; };
 		3DABDDB62B39CC0CB62EEACD /* PlanPersistenceController.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = PlanPersistenceController.swift; sourceTree = "<group>"; };
@@ -122,7 +120,6 @@
 				F8747A41744E89B8E743710D /* AppStore.swift */,
 				BC059734B7CFEFC176A208E5 /* PerformanceSignpost.swift */,
 				761DAFCB1870AE4C2CACEF57 /* PersistenceHydrationLoader.swift */,
-				07E8EF5FD2B9EC27D291AA31 /* PersistenceMigration.swift */,
 				3DABDDB62B39CC0CB62EEACD /* PlanPersistenceController.swift */,
 				E6BADD6DC20787BABE5507C5 /* PlanRepository.swift */,
 				6E0E037604004C09AB0B9267 /* PlansStore.swift */,
@@ -308,7 +305,6 @@
 				F98A4FCC1D14FC0F46AB4349 /* HistoryView.swift in Sources */,
 				E4BB25573F6F25D60E7BB071 /* PerformanceSignpost.swift in Sources */,
 				AB7EB8CFBE3A4EE7B75861F9 /* PersistenceHydrationLoader.swift in Sources */,
-				5FF8E0281376A4B6738A3C6A /* PersistenceMigration.swift in Sources */,
 				82F115C443515A21BEBC91D7 /* PlanPersistenceController.swift in Sources */,
 				033F7C3F0E270EFA567BC68A /* PlanRepository.swift in Sources */,
 				3BBC2D3193CD98731B5054D5 /* PlansStore.swift in Sources */,

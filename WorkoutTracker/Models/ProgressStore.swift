@@ -76,7 +76,8 @@ final class ProgressStore {
         completedSessions: [CompletedSession],
         analytics: AnalyticsRepository,
         catalogByID: [UUID: ExerciseCatalogItem],
-        finishSummary: SessionFinishSummary?
+        finishSummary: SessionFinishSummary?,
+        payloads: [SessionExercisePayload]? = nil
     ) {
         overview = overview.recording(
             session,
@@ -92,7 +93,10 @@ final class ProgressStore {
             )
         }
 
-        let payloadsByExerciseID = Dictionary(grouping: analytics.sessionExercisePayloads(from: session), by: \.exerciseID)
+        let payloadsByExerciseID = Dictionary(
+            grouping: payloads ?? analytics.sessionExercisePayloads(from: session),
+            by: \.exerciseID
+        )
         var summariesByExerciseID = exerciseSummariesByID
         let newPersonalRecordsByExerciseID = Dictionary(grouping: finishSummary?.personalRecords ?? [], by: \.exerciseID)
 
@@ -183,30 +187,30 @@ final class ProgressStore {
         completedSessions: [CompletedSession],
         selectedDay: Date?
     ) -> PreparedState {
-        let exerciseSummariesByID = Dictionary(uniqueKeysWithValues: snapshot.exerciseSummaries.map { ($0.exerciseID, $0) })
-        let exerciseChartSeriesByID = Dictionary(
-            uniqueKeysWithValues: exerciseSummariesByID.map { exerciseID, summary in
-                (exerciseID, makeChartSeries(from: summary.points))
-            }
-        )
-        let personalBestByExerciseID: [UUID: Double] = Dictionary(
-            uniqueKeysWithValues: exerciseSummariesByID.compactMap { exerciseID, summary in
-                guard let currentPR = summary.currentPR else {
-                    return nil
-                }
+        var exerciseSummariesByID: [UUID: ExerciseAnalyticsSummary] = [:]
+        exerciseSummariesByID.reserveCapacity(snapshot.exerciseSummaries.count)
+        var exerciseChartSeriesByID: [UUID: ExerciseChartSeries] = [:]
+        exerciseChartSeriesByID.reserveCapacity(snapshot.exerciseSummaries.count)
+        var personalBestByExerciseID: [UUID: Double] = [:]
+        personalBestByExerciseID.reserveCapacity(snapshot.exerciseSummaries.count)
 
-                return (exerciseID, currentPR.estimatedOneRepMax)
+        for summary in snapshot.exerciseSummaries {
+            exerciseSummariesByID[summary.exerciseID] = summary
+            exerciseChartSeriesByID[summary.exerciseID] = makeChartSeries(from: summary.points)
+            if let currentPR = summary.currentPR {
+                personalBestByExerciseID[summary.exerciseID] = currentPR.estimatedOneRepMax
             }
-        )
+        }
 
         let calendar = Calendar.autoupdatingCurrent
         let normalizedSelectedDay = selectedDay.map { calendar.startOfDay(for: $0) }
         let allSessionsDescending = Array(completedSessions.reversed())
-        let workoutDays = Set(allSessionsDescending.map { calendar.startOfDay(for: $0.completedAt) })
-
+        var workoutDays: Set<Date> = []
+        workoutDays.reserveCapacity(allSessionsDescending.count)
         var sessionsByDay: [Date: [CompletedSession]] = [:]
         for session in allSessionsDescending {
             let day = calendar.startOfDay(for: session.completedAt)
+            workoutDays.insert(day)
             sessionsByDay[day, default: []].append(session)
         }
 
@@ -232,14 +236,15 @@ final class ProgressStore {
 
     private func rebuildHistoryCaches(from completedSessions: [CompletedSession]) {
         allSessionsDescending = Array(completedSessions.reversed())
-        workoutDays = Set(allSessionsDescending.map { calendar.startOfDay(for: $0.completedAt) })
-
+        var nextWorkoutDays: Set<Date> = []
         var groupedSessions: [Date: [CompletedSession]] = [:]
         for session in allSessionsDescending {
             let day = calendar.startOfDay(for: session.completedAt)
+            nextWorkoutDays.insert(day)
             groupedSessions[day, default: []].append(session)
         }
 
+        workoutDays = nextWorkoutDays
         sessionsByDay = groupedSessions
         historySessions = resolvedHistorySessions(for: selectedDay)
     }

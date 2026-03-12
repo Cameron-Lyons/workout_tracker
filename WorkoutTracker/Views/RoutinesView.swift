@@ -280,7 +280,7 @@ struct TodayView: View {
     }
 
     private func pinnedTemplateCard(_ reference: TemplateReference) -> some View {
-        let usesStartingStrengthRotation = TemplateReferenceSelection.isStartingStrengthPlan(
+        let usesAlternatingRotation = TemplateReferenceSelection.isAlternatingPlan(
             plansStore.plan(for: reference.planID)
         )
 
@@ -308,8 +308,8 @@ struct TodayView: View {
                         .appInsetCard(cornerRadius: 16, fill: AppToneStyle.plans.softFill, border: AppToneStyle.plans.softBorder)
                 }
 
-                if usesStartingStrengthRotation {
-                    Text("A/B rotation keeps this aligned with the last Starting Strength session you finished.")
+                if usesAlternatingRotation {
+                    Text("A/B rotation keeps this aligned with the last alternating workout you finished.")
                         .font(.subheadline)
                         .foregroundStyle(AppColors.textSecondary)
                 } else if reference.scheduledWeekdays.isEmpty {

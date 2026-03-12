@@ -147,7 +147,8 @@ final class AppDerivedStateController {
         _ session: CompletedSession,
         plansStore: PlansStore,
         sessionStore: SessionStore,
-        finishSummary: SessionFinishSummary?
+        finishSummary: SessionFinishSummary?,
+        payloads: [SessionExercisePayload]? = nil
     ) {
         progressRefreshTask?.cancel()
         progressRefreshTask = nil
@@ -165,7 +166,8 @@ final class AppDerivedStateController {
             completedSessions: sessionStore.completedSessions,
             analytics: analytics,
             catalogByID: plansStore.catalogByID,
-            finishSummary: finishSummary
+            finishSummary: finishSummary,
+            payloads: payloads
         )
         cacheSessionAnalytics(
             AnalyticsRepository.SessionAnalyticsSnapshot(
@@ -179,11 +181,11 @@ final class AppDerivedStateController {
         )
     }
 
-    func finishSummary(
+    func completedSessionResult(
         for session: CompletedSession,
         catalogByID: [UUID: ExerciseCatalogItem]
-    ) -> SessionFinishSummary {
-        analytics.finishSummary(
+    ) -> AnalyticsRepository.CompletedSessionResult {
+        analytics.completedSessionResult(
             for: session,
             previousBestByExerciseID: progressStore.personalBestOneRepMaxByExerciseID,
             catalogByID: catalogByID
@@ -540,10 +542,11 @@ final class AppSessionCoordinator {
             return false
         }
 
-        let finishSummary = derivedStateController.finishSummary(
+        let completedSessionResult = derivedStateController.completedSessionResult(
             for: completedSession,
             catalogByID: catalogByID
         )
+        let finishSummary = completedSessionResult.finishSummary
         sessionStore.lastFinishedSummary = finishSummary
 
         if let planID = completedSession.planID,
@@ -561,7 +564,8 @@ final class AppSessionCoordinator {
             completedSession,
             plansStore: plansStore,
             sessionStore: sessionStore,
-            finishSummary: finishSummary
+            finishSummary: finishSummary,
+            payloads: completedSessionResult.payloads
         )
         return true
     }

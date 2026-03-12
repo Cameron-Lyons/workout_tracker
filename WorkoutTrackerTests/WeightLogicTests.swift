@@ -86,4 +86,20 @@ final class WeightLogicTests: XCTestCase {
         XCTAssertEqual(ActiveSessionWeightStep.resolve(for: benchBlock, settings: settings), 5)
         XCTAssertEqual(ActiveSessionWeightStep.resolve(for: squatBlock, settings: settings), 10)
     }
+
+    @MainActor
+    func testSettingsStoreUsesKilogramDefaultsWhenWeightUnitIsKilograms() throws {
+        let suiteName = "WeightLogicTests.SettingsStoreKilogramDefaults.\(UUID().uuidString)"
+        let defaults = try XCTUnwrap(UserDefaults(suiteName: suiteName))
+        defaults.set(WeightUnit.kilograms.rawValue, forKey: WeightUnit.settingsKey)
+        defer {
+            defaults.removePersistentDomain(forName: suiteName)
+        }
+
+        let settings = SettingsStore(defaults: defaults)
+
+        XCTAssertEqual(settings.weightUnit, .kilograms)
+        XCTAssertEqual(settings.upperBodyIncrement, WeightUnit.kilograms.defaultUpperBodyIncrement)
+        XCTAssertEqual(settings.lowerBodyIncrement, WeightUnit.kilograms.defaultLowerBodyIncrement)
+    }
 }

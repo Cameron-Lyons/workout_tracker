@@ -926,16 +926,16 @@ enum TemplateReferenceSelection {
         )
     }
 
-    static func isStartingStrengthPlan(_ plan: Plan?) -> Bool {
+    static func isAlternatingPlan(_ plan: Plan?) -> Bool {
         guard let plan else {
             return false
         }
 
-        return startingStrengthTemplatePair(in: plan) != nil
+        return alternatingTemplatePair(in: plan) != nil
     }
 
-    static func nextStartingStrengthTemplateID(in plan: Plan, after completedTemplateID: UUID) -> UUID? {
-        guard let pair = startingStrengthTemplatePair(in: plan) else {
+    static func nextAlternatingTemplateID(in plan: Plan, after completedTemplateID: UUID) -> UUID? {
+        guard let pair = alternatingTemplatePair(in: plan) else {
             return nil
         }
 
@@ -1034,12 +1034,12 @@ enum TemplateReferenceSelection {
             return nil
         }
 
-        if isStartingStrengthPlan(plan) {
+        if isAlternatingPlan(plan) {
             guard plan.templates.contains(where: { $0.scheduledWeekdays.contains(weekday) }) else {
                 return nil
             }
 
-            guard let templateID = nextStartingStrengthTemplateID(in: plan, lookup: lookup) else {
+            guard let templateID = nextAlternatingTemplateID(in: plan, lookup: lookup) else {
                 return nil
             }
 
@@ -1057,7 +1057,7 @@ enum TemplateReferenceSelection {
         for plan: Plan,
         lookup: Lookup
     ) -> TemplateReference? {
-        if let templateID = nextStartingStrengthTemplateID(in: plan, lookup: lookup) {
+        if let templateID = nextAlternatingTemplateID(in: plan, lookup: lookup) {
             return lookup.referencesByTemplateID[templateID]
         }
 
@@ -1068,12 +1068,12 @@ enum TemplateReferenceSelection {
         return lookup.referencesByTemplateID[pinnedTemplateID]
     }
 
-    private static func nextStartingStrengthTemplateID(in plan: Plan, lookup: Lookup) -> UUID? {
-        nextStartingStrengthTemplateID(in: plan, lastCompletedTemplateID: lookup.lastCompletedTemplateIDByPlan[plan.id])
+    private static func nextAlternatingTemplateID(in plan: Plan, lookup: Lookup) -> UUID? {
+        nextAlternatingTemplateID(in: plan, lastCompletedTemplateID: lookup.lastCompletedTemplateIDByPlan[plan.id])
     }
 
-    private static func nextStartingStrengthTemplateID(in plan: Plan, lastCompletedTemplateID: UUID?) -> UUID? {
-        guard let pair = startingStrengthTemplatePair(in: plan) else {
+    private static func nextAlternatingTemplateID(in plan: Plan, lastCompletedTemplateID: UUID?) -> UUID? {
+        guard let pair = alternatingTemplatePair(in: plan) else {
             return nil
         }
 
@@ -1093,9 +1093,17 @@ enum TemplateReferenceSelection {
         }
     }
 
-    private static func startingStrengthTemplatePair(in plan: Plan) -> (dayA: WorkoutTemplate, dayB: WorkoutTemplate)? {
-        guard let dayA = plan.templates.first(where: isStartingStrengthDayA),
-            let dayB = plan.templates.first(where: isStartingStrengthDayB)
+    private static func alternatingTemplatePair(in plan: Plan) -> (dayA: WorkoutTemplate, dayB: WorkoutTemplate)? {
+        guard plan.templates.count == 2 else {
+            return nil
+        }
+
+        if let namedPair = namedAlternatingTemplatePair(in: plan) {
+            return namedPair
+        }
+
+        guard let dayA = plan.templates.first(where: isStartingStrengthStyleDayA),
+            let dayB = plan.templates.first(where: isStartingStrengthStyleDayB)
         else {
             return nil
         }
@@ -1103,13 +1111,23 @@ enum TemplateReferenceSelection {
         return (dayA, dayB)
     }
 
-    private static func isStartingStrengthDayA(_ template: WorkoutTemplate) -> Bool {
+    private static func namedAlternatingTemplatePair(in plan: Plan) -> (dayA: WorkoutTemplate, dayB: WorkoutTemplate)? {
+        guard let dayA = plan.templates.first(where: { $0.name.localizedCaseInsensitiveCompare("Workout A") == .orderedSame }),
+            let dayB = plan.templates.first(where: { $0.name.localizedCaseInsensitiveCompare("Workout B") == .orderedSame })
+        else {
+            return nil
+        }
+
+        return (dayA, dayB)
+    }
+
+    private static func isStartingStrengthStyleDayA(_ template: WorkoutTemplate) -> Bool {
         let exerciseIDs = Set(template.blocks.map(\.exerciseID))
         let requiredExerciseIDs: Set<UUID> = [CatalogSeed.backSquat, CatalogSeed.benchPress, CatalogSeed.deadlift]
         return requiredExerciseIDs.isSubset(of: exerciseIDs)
     }
 
-    private static func isStartingStrengthDayB(_ template: WorkoutTemplate) -> Bool {
+    private static func isStartingStrengthStyleDayB(_ template: WorkoutTemplate) -> Bool {
         let exerciseIDs = Set(template.blocks.map(\.exerciseID))
         let requiredExerciseIDs: Set<UUID> = [CatalogSeed.backSquat, CatalogSeed.overheadPress, CatalogSeed.powerClean]
         return requiredExerciseIDs.isSubset(of: exerciseIDs)
@@ -1157,9 +1175,14 @@ enum ExerciseAnalyticsSelection {
 
 enum PresetPack: String, CaseIterable, Identifiable, Sendable {
     case generalGym
+    case phul
     case startingStrength
+    case strongLiftsFiveByFive
+    case greyskullLP
     case fiveThreeOne
     case boringButBig
+    case madcowFiveByFive
+    case gzclp
 
     var id: String { rawValue }
 
@@ -1167,12 +1190,22 @@ enum PresetPack: String, CaseIterable, Identifiable, Sendable {
         switch self {
         case .generalGym:
             return "General Gym"
+        case .phul:
+            return "PHUL"
         case .startingStrength:
             return "Starting Strength"
+        case .strongLiftsFiveByFive:
+            return "StrongLifts 5x5"
+        case .greyskullLP:
+            return "Greyskull LP"
         case .fiveThreeOne:
             return "5/3/1"
         case .boringButBig:
             return "Boring But Big"
+        case .madcowFiveByFive:
+            return "Madcow 5x5"
+        case .gzclp:
+            return "GZCLP"
         }
     }
 
@@ -1180,12 +1213,22 @@ enum PresetPack: String, CaseIterable, Identifiable, Sendable {
         switch self {
         case .generalGym:
             return "Balanced upper/lower templates with flexible progression for mixed gym training."
+        case .phul:
+            return "Four-day power and hypertrophy upper/lower split built around simple compound progression."
         case .startingStrength:
             return "Simple barbell-focused A/B sessions using double progression."
+        case .strongLiftsFiveByFive:
+            return "Classic A/B novice barbell split using 5x5 targets and automatic workout rotation."
+        case .greyskullLP:
+            return "A/B linear progression with 3x5 main work and AMRAP cues on the final set."
         case .fiveThreeOne:
             return "Four main-lift days powered by generic percentage-wave progression."
         case .boringButBig:
             return "5/3/1 main work plus 5x10 supplemental volume."
+        case .madcowFiveByFive:
+            return "Intermediate three-day 5x5 templates with weekly ramp and top-set guidance."
+        case .gzclp:
+            return "Tiered T1/T2/T3 strength templates mapped onto the app's existing progression system."
         }
     }
 
@@ -1193,12 +1236,22 @@ enum PresetPack: String, CaseIterable, Identifiable, Sendable {
         switch self {
         case .generalGym:
             return "square.grid.2x2"
+        case .phul:
+            return "dumbbell.fill"
         case .startingStrength:
             return "figure.strengthtraining.traditional"
+        case .strongLiftsFiveByFive:
+            return "dumbbell"
+        case .greyskullLP:
+            return "bolt.fill"
         case .fiveThreeOne:
             return "number"
         case .boringButBig:
             return "chart.bar.doc.horizontal"
+        case .madcowFiveByFive:
+            return "chart.line.uptrend.xyaxis"
+        case .gzclp:
+            return "square.stack.3d.up.fill"
         }
     }
 }
