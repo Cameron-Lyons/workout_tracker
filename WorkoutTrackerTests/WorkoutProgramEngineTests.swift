@@ -130,6 +130,50 @@ final class WorkoutProgramEngineTests: XCTestCase {
         XCTAssertEqual(updated.block.targets.compactMap(\.targetWeight), [230, 230])
     }
 
+    func testDoubleProgressionHandlesDuplicateTargetIDsInCompletedRows() {
+        let target = SetTarget(repRange: RepRange(5, 5))
+        let block = ExerciseBlock(
+            exerciseID: CatalogSeed.backSquat,
+            exerciseNameSnapshot: "Back Squat",
+            progressionRule: ProgressionRule(
+                kind: .doubleProgression,
+                doubleProgression: DoubleProgressionRule(
+                    targetRepRange: RepRange(5, 5),
+                    increment: 5
+                )
+            ),
+            targets: [target]
+        )
+
+        let duplicateRow = SessionSetRow(
+            target: target,
+            log: SetLog(
+                setTargetID: target.id,
+                weight: 135,
+                reps: 5,
+                completedAt: .now
+            )
+        )
+        let completedBlock = CompletedSessionBlock(
+            exerciseID: CatalogSeed.backSquat,
+            exerciseNameSnapshot: "Back Squat",
+            blockNote: "",
+            restSeconds: 90,
+            supersetGroup: nil,
+            progressionRule: block.progressionRule,
+            sets: [duplicateRow, duplicateRow]
+        )
+
+        let updated = ProgressionEngine.applyCompletion(
+            to: block,
+            using: completedBlock,
+            profile: nil,
+            fallbackIncrement: 5
+        )
+
+        XCTAssertEqual(updated.block.targets.compactMap(\.targetWeight), [140])
+    }
+
     func testPercentageWaveUsesTrainingMaxToResolveWorkingSets() {
         let block = ExerciseBlock(
             exerciseID: CatalogSeed.benchPress,
@@ -466,6 +510,29 @@ final class WorkoutProgramEngineTests: XCTestCase {
         XCTAssertEqual(reopenedRow.log.reps, 6)
         XCTAssertEqual(reopenedRow.log.rir, 1)
         XCTAssertNil(draft.restTimerEndsAt)
+    }
+
+    func testAdjustWeightDoesNotMaterializeZeroWhenDecreasingUnsetWeight() throws {
+        let row = SessionSetRow(target: SetTarget(repRange: RepRange(5, 5)))
+        let block = SessionBlock(
+            exerciseID: CatalogSeed.benchPress,
+            exerciseNameSnapshot: "Bench Press",
+            restSeconds: 90,
+            progressionRule: .manual,
+            sets: [row]
+        )
+        var draft = SessionDraft(
+            planID: UUID(),
+            templateID: UUID(),
+            templateNameSnapshot: "Bench Day",
+            blocks: [block]
+        )
+
+        SessionEngine.adjustWeight(by: -5, setID: row.id, in: block.id, draft: &draft)
+
+        let updatedRow = try XCTUnwrap(draft.blocks.first?.sets.first)
+        XCTAssertNil(updatedRow.target.targetWeight)
+        XCTAssertNil(updatedRow.log.weight)
     }
 
     func testAddSetAssignsNewTargetIdentityAndCopiesLastLogValues() throws {

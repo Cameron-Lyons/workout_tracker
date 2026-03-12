@@ -1098,12 +1098,8 @@ enum TemplateReferenceSelection {
             return nil
         }
 
-        if let namedPair = namedAlternatingTemplatePair(in: plan) {
-            return namedPair
-        }
-
-        guard let dayA = plan.templates.first(where: isStartingStrengthStyleDayA),
-            let dayB = plan.templates.first(where: isStartingStrengthStyleDayB)
+        guard let dayA = plan.templates.first(where: isAlternatingDayA),
+            let dayB = plan.templates.first(where: isAlternatingDayB)
         else {
             return nil
         }
@@ -1111,14 +1107,12 @@ enum TemplateReferenceSelection {
         return (dayA, dayB)
     }
 
-    private static func namedAlternatingTemplatePair(in plan: Plan) -> (dayA: WorkoutTemplate, dayB: WorkoutTemplate)? {
-        guard let dayA = plan.templates.first(where: { $0.name.localizedCaseInsensitiveCompare("Workout A") == .orderedSame }),
-            let dayB = plan.templates.first(where: { $0.name.localizedCaseInsensitiveCompare("Workout B") == .orderedSame })
-        else {
-            return nil
-        }
+    private static func isAlternatingDayA(_ template: WorkoutTemplate) -> Bool {
+        isStartingStrengthStyleDayA(template) || isClassicLinearProgressionDayA(template)
+    }
 
-        return (dayA, dayB)
+    private static func isAlternatingDayB(_ template: WorkoutTemplate) -> Bool {
+        isStartingStrengthStyleDayB(template) || isClassicLinearProgressionDayB(template)
     }
 
     private static func isStartingStrengthStyleDayA(_ template: WorkoutTemplate) -> Bool {
@@ -1130,6 +1124,18 @@ enum TemplateReferenceSelection {
     private static func isStartingStrengthStyleDayB(_ template: WorkoutTemplate) -> Bool {
         let exerciseIDs = Set(template.blocks.map(\.exerciseID))
         let requiredExerciseIDs: Set<UUID> = [CatalogSeed.backSquat, CatalogSeed.overheadPress, CatalogSeed.powerClean]
+        return requiredExerciseIDs.isSubset(of: exerciseIDs)
+    }
+
+    private static func isClassicLinearProgressionDayA(_ template: WorkoutTemplate) -> Bool {
+        let exerciseIDs = Set(template.blocks.map(\.exerciseID))
+        let requiredExerciseIDs: Set<UUID> = [CatalogSeed.backSquat, CatalogSeed.benchPress, CatalogSeed.barbellRow]
+        return requiredExerciseIDs.isSubset(of: exerciseIDs)
+    }
+
+    private static func isClassicLinearProgressionDayB(_ template: WorkoutTemplate) -> Bool {
+        let exerciseIDs = Set(template.blocks.map(\.exerciseID))
+        let requiredExerciseIDs: Set<UUID> = [CatalogSeed.backSquat, CatalogSeed.overheadPress, CatalogSeed.deadlift]
         return requiredExerciseIDs.isSubset(of: exerciseIDs)
     }
 }

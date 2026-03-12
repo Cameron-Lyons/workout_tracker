@@ -87,9 +87,9 @@ enum ProgressionEngine {
         }
 
         let increment = profile?.preferredIncrement ?? config.increment
-        let completedRowsByTargetID = Dictionary(
-            uniqueKeysWithValues: workingRows.map { ($0.target.id, $0) }
-        )
+        let completedRowsByTargetID = workingRows.reduce(into: [UUID: SessionSetRow]()) { partialResult, row in
+            partialResult[row.target.id] = row
+        }
         var seededMissingTargetWeight = false
         let updatedTargets = block.targets.map { target in
             guard target.setKind == .working else {
@@ -265,8 +265,11 @@ enum SessionEngine {
     ) {
         draft.mutateBlock(blockID) { block in
             block.mutatingSet(setID) { row in
-                let baseWeight = row.log.weight ?? row.target.targetWeight ?? 0
-                row.log.weight = max(0, baseWeight + delta)
+                if let baseWeight = row.log.weight ?? row.target.targetWeight {
+                    row.log.weight = max(0, baseWeight + delta)
+                } else if delta > 0 {
+                    row.log.weight = delta
+                }
             }
         }
         draft.touch(now: now)

@@ -6,6 +6,7 @@ private struct ActiveSessionHeaderState: Equatable {
     var startedAtLabel: String
     var blockCount: Int
     var completedSetCount: Int
+    var canFinishWorkout: Bool
     var restTimerEndsAt: Date?
 }
 
@@ -136,6 +137,11 @@ struct ActiveSessionView: View {
             completedSetCount: draft.blocks.reduce(0) { partialResult, block in
                 partialResult + block.sets.filter(\.log.isCompleted).count
             },
+            canFinishWorkout: draft.blocks.contains(where: { block in
+                block.sets.contains(where: { row in
+                    row.target.setKind == .working && row.log.isCompleted
+                })
+            }),
             restTimerEndsAt: draft.restTimerEndsAt
         )
     }
@@ -861,7 +867,7 @@ private struct ActiveSessionFooterView: View {
                 .buttonStyle(.borderedProminent)
                 .buttonBorderShape(.roundedRectangle(radius: 16))
                 .tint(AppToneStyle.success.accent)
-                .disabled(state.completedSetCount == 0)
+                .disabled(!state.canFinishWorkout)
                 .accessibilityIdentifier("session.finishButton")
             }
         }

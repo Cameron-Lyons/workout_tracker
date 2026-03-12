@@ -354,6 +354,7 @@ struct AnalyticsRepository: Sendable {
             }
         }
 
+        sessionAnalysis.newRecords = deduplicatedSessionRecords(sessionAnalysis.newRecords)
         return sessionAnalysis
     }
 
@@ -407,7 +408,10 @@ struct AnalyticsRepository: Sendable {
                 )
             }
 
-            if !hasProgressRow || weight > topWeight {
+            if !hasProgressRow
+                || weight > topWeight
+                || (weight == topWeight && reps > topReps)
+            {
                 topWeight = weight
                 topReps = reps
                 hasProgressRow = true
@@ -447,6 +451,24 @@ struct AnalyticsRepository: Sendable {
         var mergedPayload = preferredPayload
         mergedPayload.volume = currentPayload.volume + nextPayload.volume
         return mergedPayload
+    }
+
+    private func deduplicatedSessionRecords(_ records: [PersonalRecord]) -> [PersonalRecord] {
+        var bestRecordIndexByExerciseID: [UUID: Int] = [:]
+        var bestRecords: [PersonalRecord] = []
+
+        for record in records {
+            if let existingIndex = bestRecordIndexByExerciseID[record.exerciseID] {
+                if record.estimatedOneRepMax >= bestRecords[existingIndex].estimatedOneRepMax {
+                    bestRecords[existingIndex] = record
+                }
+            } else {
+                bestRecordIndexByExerciseID[record.exerciseID] = bestRecords.count
+                bestRecords.append(record)
+            }
+        }
+
+        return bestRecords
     }
 
 }

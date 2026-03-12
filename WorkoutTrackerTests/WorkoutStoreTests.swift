@@ -62,6 +62,32 @@ final class WorkoutStoreTests: XCTestCase {
     }
 
     @MainActor
+    func testWarmupOnlySessionDoesNotFinishOrPersist() async throws {
+        let store = makeStore()
+        await store.hydrateIfNeeded()
+        store.completeOnboarding(with: nil)
+
+        let plan = makeSingleTemplatePlan(
+            name: "Test Plan",
+            templateName: "Upper 1",
+            store: store,
+            weight: 185
+        )
+        store.savePlan(plan)
+        let templateID = try XCTUnwrap(plan.templates.first?.id)
+
+        store.startSession(planID: plan.id, templateID: templateID)
+
+        let block = try XCTUnwrap(store.sessionStore.activeDraft?.blocks.first)
+        let warmupRow = try XCTUnwrap(block.sets.first(where: { $0.target.setKind == .warmup }))
+        store.toggleSetCompletion(blockID: block.id, setID: warmupRow.id)
+
+        XCTAssertFalse(store.finishActiveSession())
+        XCTAssertNotNil(store.sessionStore.activeDraft)
+        XCTAssertTrue(store.sessionStore.completedSessions.isEmpty)
+    }
+
+    @MainActor
     func testExerciseRenamePreservesAnalyticsContinuityAndSnapshots() async throws {
         let store = makeStore()
         await store.hydrateIfNeeded()
@@ -222,6 +248,47 @@ final class WorkoutStoreTests: XCTestCase {
         XCTAssertEqual(gzclp.templates.count, 4)
         XCTAssertFalse(TemplateReferenceSelection.isAlternatingPlan(gzclp))
         XCTAssertEqual(gzclp.templates.first?.blocks.map(\.blockNote), ["T1 Main Lift", "T2 Secondary Lift", "T3 Accessories"])
+    }
+
+    @MainActor
+    func testGreyskullPresetUsesAlternatingRotation() throws {
+        var calendar = Calendar(identifier: .gregorian)
+        calendar.timeZone = try XCTUnwrap(TimeZone(secondsFromGMT: 0))
+        let friday = try XCTUnwrap(
+            calendar.date(from: DateComponents(year: 2026, month: 3, day: 13))
+        )
+        let completedAt = try XCTUnwrap(
+            calendar.date(from: DateComponents(year: 2026, month: 3, day: 9))
+        )
+
+        let settings = SettingsStore()
+        let plan = try XCTUnwrap(PresetPackBuilder.makePlans(for: .greyskullLP, settings: settings).first)
+        let references = plan.templates.map { template in
+            makeReference(plan: plan, template: template)
+        }
+        let sessions = [
+            CompletedSession(
+                planID: plan.id,
+                templateID: try XCTUnwrap(plan.templates.first(where: { $0.name == "Workout A" })?.id),
+                templateNameSnapshot: "Workout A",
+                startedAt: completedAt.addingTimeInterval(-5_400),
+                completedAt: completedAt,
+                blocks: []
+            )
+        ]
+
+        let pinned = try XCTUnwrap(
+            TemplateReferenceSelection.pinnedTemplate(
+                from: [plan],
+                references: references,
+                sessions: sessions,
+                now: friday,
+                calendar: calendar
+            )
+        )
+
+        XCTAssertTrue(TemplateReferenceSelection.isAlternatingPlan(plan))
+        XCTAssertEqual(pinned.templateName, "Workout B")
     }
 
     @MainActor
@@ -506,6 +573,24 @@ final class WorkoutStoreTests: XCTestCase {
         XCTAssertEqual(payload?.topWeight, 225)
     }
 
+    func testAnalyticsPayloadPrefersHigherRepSetWhenTopWeightTies() throws {
+        let analytics = AnalyticsRepository()
+        let session = makeCompletedSession(
+            date: .now,
+            exerciseID: CatalogSeed.benchPress,
+            exerciseName: "Bench Press",
+            rows: [
+                makeRow(kind: .working, weight: 225, reps: 5),
+                makeRow(kind: .working, weight: 225, reps: 8),
+            ]
+        )
+
+        let payload = try XCTUnwrap(analytics.sessionExercisePayloads(from: session).first)
+
+        XCTAssertEqual(payload.topWeight, 225)
+        XCTAssertEqual(payload.estimatedOneRepMax, analytics.estimateOneRepMax(weight: 225, reps: 8))
+    }
+
     func testAnalyticsCurrentPRPrefersHigherEstimatedOneRepMaxOverHeavierSingle() throws {
         let analytics = AnalyticsRepository()
         let catalog = [
@@ -616,6 +701,60 @@ final class WorkoutStoreTests: XCTestCase {
         XCTAssertEqual(summary.points.first?.topWeight, 225)
         XCTAssertEqual(summary.points.first?.volume, 2_975)
         XCTAssertEqual(summary.totalVolume, 2_975)
+    }
+
+    func testAnalyticsKeepsOnlyBestSessionPRPerExerciseAcrossDuplicateBlocks() throws {
+        let analytics = AnalyticsRepository()
+        let completedAt = Date(timeIntervalSince1970: 1_741_478_400)
+        let session = CompletedSession(
+            planID: UUID(),
+            templateID: UUID(),
+            templateNameSnapshot: "Bench Focus",
+            startedAt: completedAt.addingTimeInterval(-3_600),
+            completedAt: completedAt,
+            blocks: [
+                CompletedSessionBlock(
+                    exerciseID: CatalogSeed.benchPress,
+                    exerciseNameSnapshot: "Bench Press",
+                    blockNote: "Main work",
+                    restSeconds: 180,
+                    supersetGroup: nil,
+                    progressionRule: .manual,
+                    sets: [makeRow(kind: .working, weight: 225, reps: 5)]
+                ),
+                CompletedSessionBlock(
+                    exerciseID: CatalogSeed.benchPress,
+                    exerciseNameSnapshot: "Bench Press",
+                    blockNote: "Top set",
+                    restSeconds: 180,
+                    supersetGroup: nil,
+                    progressionRule: .manual,
+                    sets: [makeRow(kind: .working, weight: 230, reps: 5)]
+                ),
+            ]
+        )
+
+        let finishSummary = analytics.finishSummary(
+            for: session,
+            previousBestByExerciseID: [:],
+            catalogByID: [:]
+        )
+        let snapshot = analytics.makeSessionAnalyticsSnapshot(
+            sessions: [session],
+            catalogByID: [
+                CatalogSeed.benchPress: ExerciseCatalogItem(
+                    id: CatalogSeed.benchPress,
+                    name: "Bench Press",
+                    category: .chest
+                )
+            ],
+            now: completedAt
+        )
+
+        XCTAssertEqual(finishSummary.personalRecords.count, 1)
+        XCTAssertEqual(finishSummary.personalRecords.first?.weight, 230)
+        XCTAssertEqual(snapshot.personalRecords.count, 1)
+        XCTAssertEqual(snapshot.personalRecords.first?.weight, 230)
     }
 
     func testDerivedStoreSnapshotMatchesStandaloneTodayAndProgressSnapshots() {
@@ -812,6 +951,45 @@ final class WorkoutStoreTests: XCTestCase {
         )
 
         XCTAssertEqual(pinned.templateName, "Workout B")
+    }
+
+    func testCustomWorkoutABNamesUseWeekdayScheduleInsteadOfAlternatingRotation() throws {
+        var calendar = Calendar(identifier: .gregorian)
+        calendar.timeZone = try XCTUnwrap(TimeZone(secondsFromGMT: 0))
+        let friday = try XCTUnwrap(
+            calendar.date(from: DateComponents(year: 2026, month: 3, day: 13))
+        )
+        let completedAt = try XCTUnwrap(
+            calendar.date(from: DateComponents(year: 2026, month: 3, day: 9))
+        )
+
+        let plan = makeCustomNamedWorkoutABPlan()
+        let references = plan.templates.map { template in
+            makeReference(plan: plan, template: template)
+        }
+        let sessions = [
+            CompletedSession(
+                planID: plan.id,
+                templateID: try XCTUnwrap(plan.templates.first(where: { $0.name == "Workout A" })?.id),
+                templateNameSnapshot: "Workout A",
+                startedAt: completedAt.addingTimeInterval(-5_400),
+                completedAt: completedAt,
+                blocks: []
+            )
+        ]
+
+        let pinned = try XCTUnwrap(
+            TemplateReferenceSelection.pinnedTemplate(
+                from: [plan],
+                references: references,
+                sessions: sessions,
+                now: friday,
+                calendar: calendar
+            )
+        )
+
+        XCTAssertFalse(TemplateReferenceSelection.isAlternatingPlan(plan))
+        XCTAssertEqual(pinned.templateName, "Workout A")
     }
 
     @MainActor
@@ -1329,6 +1507,41 @@ final class WorkoutStoreTests: XCTestCase {
 
         return Plan(
             name: PresetPack.startingStrength.displayName,
+            pinnedTemplateID: dayA.id,
+            templates: [dayA, dayB]
+        )
+    }
+
+    private func makeCustomNamedWorkoutABPlan() -> Plan {
+        let dayA = WorkoutTemplate(
+            name: "Workout A",
+            scheduledWeekdays: [.monday, .friday],
+            blocks: [
+                ExerciseBlock(
+                    exerciseID: CatalogSeed.pullUp,
+                    exerciseNameSnapshot: "Pull Up",
+                    restSeconds: 90,
+                    progressionRule: .manual,
+                    targets: []
+                )
+            ]
+        )
+        let dayB = WorkoutTemplate(
+            name: "Workout B",
+            scheduledWeekdays: [.wednesday],
+            blocks: [
+                ExerciseBlock(
+                    exerciseID: CatalogSeed.dips,
+                    exerciseNameSnapshot: "Dips",
+                    restSeconds: 90,
+                    progressionRule: .manual,
+                    targets: []
+                )
+            ]
+        )
+
+        return Plan(
+            name: "Custom A/B",
             pinnedTemplateID: dayA.id,
             templates: [dayA, dayB]
         )

@@ -138,7 +138,9 @@ final class SessionStore {
 
         guard
             activeDraft.blocks.contains(where: { block in
-                block.sets.contains(where: \.log.isCompleted)
+                block.sets.contains(where: { row in
+                    row.target.setKind == .working && row.log.isCompleted
+                })
             })
         else {
             return nil
