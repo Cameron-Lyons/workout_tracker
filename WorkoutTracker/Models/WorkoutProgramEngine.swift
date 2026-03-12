@@ -86,11 +86,11 @@ enum ProgressionEngine {
             return reps >= config.targetRepRange.upperBound
         }
 
-        guard hitAllTargets else {
-            return (block, profile)
-        }
-
         let increment = profile?.preferredIncrement ?? config.increment
+        let completedRowsByTargetID = Dictionary(
+            uniqueKeysWithValues: workingRows.map { ($0.target.id, $0) }
+        )
+        var seededMissingTargetWeight = false
         let updatedTargets = block.targets.map { target in
             guard target.setKind == .working else {
                 return target
@@ -98,10 +98,21 @@ enum ProgressionEngine {
 
             var updatedTarget = target
             if let targetWeight = target.targetWeight {
-                updatedTarget.targetWeight = targetWeight + increment
+                if hitAllTargets {
+                    updatedTarget.targetWeight = targetWeight + increment
+                }
+            } else if let completedWeight = completedRowsByTargetID[target.id]?.log.weight {
+                updatedTarget.targetWeight = hitAllTargets ? completedWeight + increment : completedWeight
+                seededMissingTargetWeight = true
             }
-            updatedTarget.repRange = config.targetRepRange
+            if hitAllTargets {
+                updatedTarget.repRange = config.targetRepRange
+            }
             return updatedTarget
+        }
+
+        guard hitAllTargets || seededMissingTargetWeight else {
+            return (block, profile)
         }
 
         var updatedRule = block.progressionRule
@@ -307,6 +318,8 @@ enum SessionEngine {
             let copiedTarget = block.sets.last?.target ?? SetTarget(repRange: defaultRepRange)
             let copiedLog = block.sets.last?.log
             var newRow = SessionSetRow(target: copiedTarget)
+            newRow.target.id = UUID()
+            newRow.log.setTargetID = newRow.target.id
             if let copiedLog {
                 newRow.log.weight = copiedLog.weight
                 newRow.log.reps = copiedLog.reps

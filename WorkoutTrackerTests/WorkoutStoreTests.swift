@@ -225,6 +225,44 @@ final class WorkoutStoreTests: XCTestCase {
     }
 
     @MainActor
+    func testStrongLiftsCarriesForwardSeededWorkingWeightsAfterCompletionAndRehydration() async throws {
+        let container = WorkoutModelContainerFactory.makeContainer(isStoredInMemoryOnly: true)
+        let store = makeStore(container: container)
+        await store.hydrateIfNeeded()
+        store.completeOnboarding(with: .strongLiftsFiveByFive)
+
+        let pinnedTemplate = try XCTUnwrap(store.todayStore.pinnedTemplate)
+        XCTAssertEqual(pinnedTemplate.templateName, "Workout A")
+
+        store.startSession(planID: pinnedTemplate.planID, templateID: pinnedTemplate.templateID)
+        let draft = try XCTUnwrap(store.sessionStore.activeDraft)
+        let squatBlock = try XCTUnwrap(draft.blocks.first)
+        let workingRows = squatBlock.sets.filter { $0.target.setKind == .working }
+        XCTAssertEqual(workingRows.count, 5)
+        XCTAssertTrue(workingRows.allSatisfy { $0.target.targetWeight == nil })
+
+        for row in workingRows {
+            store.adjustSetWeight(blockID: squatBlock.id, setID: row.id, delta: 135)
+            store.toggleSetCompletion(blockID: squatBlock.id, setID: row.id)
+        }
+
+        XCTAssertTrue(store.finishActiveSession())
+        store.flushPendingSessionPersistence()
+        store.flushPendingPlanPersistence()
+
+        let updatedPlan = try XCTUnwrap(store.plansStore.plan(for: pinnedTemplate.planID))
+        let updatedTemplate = try XCTUnwrap(updatedPlan.templates.first(where: { $0.id == pinnedTemplate.templateID }))
+        XCTAssertEqual(updatedTemplate.blocks.first?.targets.compactMap(\.targetWeight), Array(repeating: 140, count: 5))
+
+        let rehydratedStore = makeStore(container: container)
+        await rehydratedStore.hydrateIfNeeded()
+
+        let rehydratedPlan = try XCTUnwrap(rehydratedStore.plansStore.plan(for: pinnedTemplate.planID))
+        let rehydratedTemplate = try XCTUnwrap(rehydratedPlan.templates.first(where: { $0.id == pinnedTemplate.templateID }))
+        XCTAssertEqual(rehydratedTemplate.blocks.first?.targets.compactMap(\.targetWeight), Array(repeating: 140, count: 5))
+    }
+
+    @MainActor
     func testHydrateIfNeededWithUITestingEmptyStoreResetsPersistedData() async throws {
         let container = WorkoutModelContainerFactory.makeContainer(isStoredInMemoryOnly: true)
         let seededStore = makeStore(container: container)
