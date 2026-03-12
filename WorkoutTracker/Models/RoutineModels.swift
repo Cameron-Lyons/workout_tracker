@@ -874,23 +874,21 @@ enum TemplateReferenceSelection {
 
         init(references: [TemplateReference], sessions: [CompletedSession]) {
             referencesByTemplateID = Dictionary(uniqueKeysWithValues: references.map { ($0.templateID, $0) })
-            recentTemplateIDs = Array(sessions.reversed().map(\.templateID))
+            recentTemplateIDs = []
+            recentTemplateIDs.reserveCapacity(sessions.count)
+            lastCompletedTemplateIDByPlan = [:]
+            lastCompletedTemplateIDByPlan.reserveCapacity(min(sessions.count, references.count))
 
-            var latestSessionByPlanID: [UUID: (completedAt: Date, templateID: UUID)] = [:]
-            for session in sessions {
-                guard let planID = session.planID else {
+            for session in sessions.reversed() {
+                recentTemplateIDs.append(session.templateID)
+
+                guard let planID = session.planID,
+                    lastCompletedTemplateIDByPlan[planID] == nil
+                else {
                     continue
                 }
 
-                if let existing = latestSessionByPlanID[planID], existing.completedAt > session.completedAt {
-                    continue
-                }
-
-                latestSessionByPlanID[planID] = (session.completedAt, session.templateID)
-            }
-
-            lastCompletedTemplateIDByPlan = latestSessionByPlanID.reduce(into: [:]) { partialResult, entry in
-                partialResult[entry.key] = entry.value.templateID
+                lastCompletedTemplateIDByPlan[planID] = session.templateID
             }
         }
     }

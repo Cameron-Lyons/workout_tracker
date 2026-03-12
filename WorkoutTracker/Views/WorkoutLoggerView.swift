@@ -100,6 +100,22 @@ private struct ActiveSessionRestTimerPresentation {
     }
 }
 
+private struct ActiveSessionProgressSummary {
+    var completedSetCount = 0
+    var canFinishWorkout = false
+
+    init(blocks: [SessionBlock]) {
+        for block in blocks {
+            for row in block.sets where row.log.isCompleted {
+                completedSetCount += 1
+                if row.target.setKind == .working {
+                    canFinishWorkout = true
+                }
+            }
+        }
+    }
+}
+
 enum ActiveSessionWeightStep {
     @MainActor
     static func resolve(for block: SessionBlock, settings: SettingsStore) -> Double {
@@ -129,19 +145,14 @@ struct ActiveSessionView: View {
             return nil
         }
 
+        let progressSummary = ActiveSessionProgressSummary(blocks: draft.blocks)
         return ActiveSessionHeaderState(
             templateName: draft.templateNameSnapshot,
             startedAt: draft.startedAt,
             startedAtLabel: draft.startedAt.formatted(date: .omitted, time: .shortened),
             blockCount: draft.blocks.count,
-            completedSetCount: draft.blocks.reduce(0) { partialResult, block in
-                partialResult + block.sets.filter(\.log.isCompleted).count
-            },
-            canFinishWorkout: draft.blocks.contains(where: { block in
-                block.sets.contains(where: { row in
-                    row.target.setKind == .working && row.log.isCompleted
-                })
-            }),
+            completedSetCount: progressSummary.completedSetCount,
+            canFinishWorkout: progressSummary.canFinishWorkout,
             restTimerEndsAt: draft.restTimerEndsAt
         )
     }

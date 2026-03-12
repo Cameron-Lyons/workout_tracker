@@ -223,7 +223,9 @@ struct TodayView: View {
 
     private func resumeCard(_ draft: SessionDraft) -> some View {
         let completedSetCount = draft.blocks.reduce(0) { partialResult, block in
-            partialResult + block.sets.filter(\.log.isCompleted).count
+            partialResult + block.sets.reduce(0) { count, row in
+                count + (row.log.isCompleted ? 1 : 0)
+            }
         }
 
         return TodaySpotlightCard(tone: .today) {

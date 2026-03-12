@@ -320,6 +320,7 @@ final class PlanRepository: RepositoryBase {
     private func syncTemplates(of planRecord: StoredPlan, with templates: [WorkoutTemplate]) {
         var existingByID = Dictionary(uniqueKeysWithValues: planRecord.templates.map { ($0.id, $0) })
         var orderedRecords: [StoredTemplate] = []
+        orderedRecords.reserveCapacity(templates.count)
 
         for (index, template) in templates.enumerated() {
             let record: StoredTemplate
@@ -347,7 +348,7 @@ final class PlanRepository: RepositoryBase {
         }
 
         existingByID.values.forEach(modelContext.delete)
-        if planRecord.templates.map(\.id) != orderedRecords.map(\.id) {
+        if sameRecordOrder(planRecord.templates, orderedRecords, id: \.id) == false {
             planRecord.templates = orderedRecords
         }
     }
@@ -378,6 +379,7 @@ final class PlanRepository: RepositoryBase {
     private func syncBlocks(of templateRecord: StoredTemplate, with blocks: [ExerciseBlock]) {
         var existingByID = Dictionary(uniqueKeysWithValues: templateRecord.blocks.map { ($0.id, $0) })
         var orderedRecords: [StoredTemplateBlock] = []
+        orderedRecords.reserveCapacity(blocks.count)
 
         for (index, block) in blocks.enumerated() {
             let record: StoredTemplateBlock
@@ -408,7 +410,7 @@ final class PlanRepository: RepositoryBase {
         }
 
         existingByID.values.forEach(modelContext.delete)
-        if templateRecord.blocks.map(\.id) != orderedRecords.map(\.id) {
+        if sameRecordOrder(templateRecord.blocks, orderedRecords, id: \.id) == false {
             templateRecord.blocks = orderedRecords
         }
     }
@@ -451,6 +453,7 @@ final class PlanRepository: RepositoryBase {
     private func syncTargets(of blockRecord: StoredTemplateBlock, with targets: [SetTarget]) {
         var existingByID = Dictionary(uniqueKeysWithValues: blockRecord.targets.map { ($0.id, $0) })
         var orderedRecords: [StoredTemplateTarget] = []
+        orderedRecords.reserveCapacity(targets.count)
 
         for (index, target) in targets.enumerated() {
             let record: StoredTemplateTarget
@@ -480,7 +483,7 @@ final class PlanRepository: RepositoryBase {
         }
 
         existingByID.values.forEach(modelContext.delete)
-        if blockRecord.targets.map(\.id) != orderedRecords.map(\.id) {
+        if sameRecordOrder(blockRecord.targets, orderedRecords, id: \.id) == false {
             blockRecord.targets = orderedRecords
         }
     }
@@ -543,5 +546,16 @@ final class PlanRepository: RepositoryBase {
 
     private func loadProfileRecords() -> [StoredExerciseProfile] {
         (try? modelContext.fetch(FetchDescriptor<StoredExerciseProfile>())) ?? []
+    }
+
+    private func sameRecordOrder<Record>(
+        _ existing: [Record],
+        _ updated: [Record],
+        id: KeyPath<Record, UUID>
+    ) -> Bool {
+        existing.count == updated.count
+            && zip(existing, updated).allSatisfy { lhs, rhs in
+                lhs[keyPath: id] == rhs[keyPath: id]
+            }
     }
 }

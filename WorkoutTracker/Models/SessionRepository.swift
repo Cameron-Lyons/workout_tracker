@@ -220,7 +220,7 @@ final class SessionRepository: RepositoryBase {
                 syncActiveRows(of: record, with: rows)
             },
             assign: { orderedRecords in
-                if sessionRecord.blocks.map(\.id) != orderedRecords.map(\.id) {
+                if sameRecordOrder(sessionRecord.blocks, orderedRecords, id: \.id) == false {
                     sessionRecord.blocks = orderedRecords
                 }
             }
@@ -259,7 +259,7 @@ final class SessionRepository: RepositoryBase {
                 }
             },
             assign: { orderedRecords in
-                if blockRecord.rows.map(\.id) != orderedRecords.map(\.id) {
+                if sameRecordOrder(blockRecord.rows, orderedRecords, id: \.id) == false {
                     blockRecord.rows = orderedRecords
                 }
             }
@@ -326,7 +326,7 @@ final class SessionRepository: RepositoryBase {
                 syncCompletedRows(of: record, with: rows)
             },
             assign: { orderedRecords in
-                if sessionRecord.blocks.map(\.id) != orderedRecords.map(\.id) {
+                if sameRecordOrder(sessionRecord.blocks, orderedRecords, id: \.id) == false {
                     sessionRecord.blocks = orderedRecords
                 }
             }
@@ -365,7 +365,7 @@ final class SessionRepository: RepositoryBase {
                 }
             },
             assign: { orderedRecords in
-                if blockRecord.rows.map(\.id) != orderedRecords.map(\.id) {
+                if sameRecordOrder(blockRecord.rows, orderedRecords, id: \.id) == false {
                     blockRecord.rows = orderedRecords
                 }
             }
@@ -445,6 +445,7 @@ final class SessionRepository: RepositoryBase {
     ) {
         var existingByID = Dictionary(uniqueKeysWithValues: existingBlocks.map { ($0.id, $0) })
         var orderedRecords: [Record] = []
+        orderedRecords.reserveCapacity(blocks.count)
 
         for (index, block) in blocks.enumerated() {
             let record = existingByID.removeValue(forKey: block.id) ?? create(block, index)
@@ -506,6 +507,7 @@ final class SessionRepository: RepositoryBase {
     ) {
         var existingByID = Dictionary(uniqueKeysWithValues: existingRows.map { ($0.id, $0) })
         var orderedRecords: [Record] = []
+        orderedRecords.reserveCapacity(rows.count)
 
         for (index, row) in rows.enumerated() {
             let record = existingByID.removeValue(forKey: row.id) ?? create(row, index)
@@ -590,6 +592,17 @@ final class SessionRepository: RepositoryBase {
 
     private func loadCompletedSessionRecords() -> [StoredCompletedSession] {
         (try? modelContext.fetch(FetchDescriptor<StoredCompletedSession>())) ?? []
+    }
+
+    private func sameRecordOrder<Record>(
+        _ existing: [Record],
+        _ updated: [Record],
+        id: KeyPath<Record, UUID>
+    ) -> Bool {
+        existing.count == updated.count
+            && zip(existing, updated).allSatisfy { lhs, rhs in
+                lhs[keyPath: id] == rhs[keyPath: id]
+            }
     }
 }
 
