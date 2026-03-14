@@ -86,6 +86,16 @@ final class PlanRepository: RepositoryBase {
 
     @discardableResult
     func savePlans(_ plans: [Plan]) -> Bool {
+        persistPlans(plans, deleteMissing: true)
+    }
+
+    @discardableResult
+    func upsertPlans(_ plans: [Plan]) -> Bool {
+        persistPlans(plans, deleteMissing: false)
+    }
+
+    @discardableResult
+    private func persistPlans(_ plans: [Plan], deleteMissing: Bool) -> Bool {
         var recordsByID = Dictionary(uniqueKeysWithValues: loadPlanRecords().map { ($0.id, $0) })
 
         for plan in plans {
@@ -106,30 +116,8 @@ final class PlanRepository: RepositoryBase {
             syncTemplates(of: record, with: plan.templates)
         }
 
-        recordsByID.values.forEach(modelContext.delete)
-        return saveContext("plans")
-    }
-
-    @discardableResult
-    func upsertPlans(_ plans: [Plan]) -> Bool {
-        var recordsByID = Dictionary(uniqueKeysWithValues: loadPlanRecords().map { ($0.id, $0) })
-
-        for plan in plans {
-            let record: StoredPlan
-            if let existing = recordsByID.removeValue(forKey: plan.id) {
-                record = existing
-            } else {
-                record = StoredPlan(
-                    id: plan.id,
-                    name: plan.name,
-                    createdAt: plan.createdAt,
-                    pinnedTemplateID: plan.pinnedTemplateID
-                )
-                modelContext.insert(record)
-            }
-
-            apply(plan, to: record)
-            syncTemplates(of: record, with: plan.templates)
+        if deleteMissing {
+            recordsByID.values.forEach(modelContext.delete)
         }
 
         return saveContext("plans")
@@ -162,6 +150,16 @@ final class PlanRepository: RepositoryBase {
 
     @discardableResult
     func saveProfiles(_ profiles: [ExerciseProfile]) -> Bool {
+        persistProfiles(profiles, deleteMissing: true)
+    }
+
+    @discardableResult
+    func upsertProfiles(_ profiles: [ExerciseProfile]) -> Bool {
+        persistProfiles(profiles, deleteMissing: false)
+    }
+
+    @discardableResult
+    private func persistProfiles(_ profiles: [ExerciseProfile], deleteMissing: Bool) -> Bool {
         var recordsByID = Dictionary(uniqueKeysWithValues: loadProfileRecords().map { ($0.id, $0) })
 
         for profile in profiles {
@@ -181,29 +179,8 @@ final class PlanRepository: RepositoryBase {
             apply(profile, to: record)
         }
 
-        recordsByID.values.forEach(modelContext.delete)
-        return saveContext("profiles")
-    }
-
-    @discardableResult
-    func upsertProfiles(_ profiles: [ExerciseProfile]) -> Bool {
-        var recordsByID = Dictionary(uniqueKeysWithValues: loadProfileRecords().map { ($0.id, $0) })
-
-        for profile in profiles {
-            let record: StoredExerciseProfile
-            if let existing = recordsByID.removeValue(forKey: profile.id) {
-                record = existing
-            } else {
-                record = StoredExerciseProfile(
-                    id: profile.id,
-                    exerciseID: profile.exerciseID,
-                    trainingMax: profile.trainingMax,
-                    preferredIncrement: profile.preferredIncrement
-                )
-                modelContext.insert(record)
-            }
-
-            apply(profile, to: record)
+        if deleteMissing {
+            recordsByID.values.forEach(modelContext.delete)
         }
 
         return saveContext("profiles")

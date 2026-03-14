@@ -27,16 +27,6 @@ final class PlansStore {
         self.persistenceController = persistenceController
     }
 
-    func hydrate() {
-        hydrate(
-            with: HydrationSnapshot(
-                catalog: repository.loadCatalog(),
-                plans: repository.loadPlans(),
-                profiles: repository.loadProfiles()
-            )
-        )
-    }
-
     func hydrate(with snapshot: HydrationSnapshot) {
         catalog = snapshot.catalog
         plans = snapshot.plans

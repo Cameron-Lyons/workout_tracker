@@ -294,12 +294,6 @@ struct AnalyticsRepository: Sendable {
         ).trackedVolume
     }
 
-    func completedSetCount(for session: CompletedSession) -> Int {
-        session.blocks.reduce(0) { partialResult, block in
-            partialResult + block.sets.filter(\.log.isCompleted).count
-        }
-    }
-
     func estimateOneRepMax(weight: Double, reps: Int) -> Double {
         guard reps > 0 else {
             return weight

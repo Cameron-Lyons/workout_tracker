@@ -56,39 +56,6 @@ final class SessionRepository: RepositoryBase {
     }
 
     @discardableResult
-    func saveCompletedSessions(_ sessions: [CompletedSession]) -> Bool {
-        var recordsByID = Dictionary(uniqueKeysWithValues: loadCompletedSessionRecords().map { ($0.id, $0) })
-
-        for session in sessions {
-            let record = recordsByID.removeValue(forKey: session.id) ?? makeCompletedSessionRecord(from: session)
-            if record.modelContext == nil {
-                modelContext.insert(record)
-            }
-
-            apply(session, to: record)
-            syncCompletedBlocks(of: record, with: session.blocks)
-        }
-
-        recordsByID.values.forEach(modelContext.delete)
-        return saveContext("completed sessions")
-    }
-
-    @discardableResult
-    func saveCompletedSession(_ session: CompletedSession) -> Bool {
-        let descriptor = FetchDescriptor<StoredCompletedSession>(
-            predicate: #Predicate<StoredCompletedSession> { $0.id == session.id }
-        )
-        let record = (try? modelContext.fetch(descriptor))?.first ?? makeCompletedSessionRecord(from: session)
-        if record.modelContext == nil {
-            modelContext.insert(record)
-        }
-
-        apply(session, to: record)
-        syncCompletedBlocks(of: record, with: session.blocks)
-        return saveContext("completed session")
-    }
-
-    @discardableResult
     func persistCompletedSessionAndClearActiveDraft(_ session: CompletedSession) -> Bool {
         let descriptor = FetchDescriptor<StoredCompletedSession>(
             predicate: #Predicate<StoredCompletedSession> { $0.id == session.id }

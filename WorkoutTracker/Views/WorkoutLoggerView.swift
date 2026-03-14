@@ -2,7 +2,6 @@ import SwiftUI
 
 private struct ActiveSessionHeaderState: Equatable {
     var templateName: String
-    var startedAt: Date
     var startedAtLabel: String
     var blockCount: Int
     var completedSetCount: Int
@@ -148,7 +147,6 @@ struct ActiveSessionView: View {
         let progressSummary = ActiveSessionProgressSummary(blocks: draft.blocks)
         return ActiveSessionHeaderState(
             templateName: draft.templateNameSnapshot,
-            startedAt: draft.startedAt,
             startedAtLabel: draft.startedAt.formatted(date: .omitted, time: .shortened),
             blockCount: draft.blocks.count,
             completedSetCount: progressSummary.completedSetCount,
@@ -798,20 +796,36 @@ private struct SessionRowSurfaceModifier: ViewModifier {
     }
 }
 
+private struct RestTimerTickView<Content: View>: View {
+    let endDate: Date?
+    let content: (Date) -> Content
+
+    init(endDate: Date?, @ViewBuilder content: @escaping (Date) -> Content) {
+        self.endDate = endDate
+        self.content = content
+    }
+
+    var body: some View {
+        Group {
+            if endDate == nil {
+                content(.now)
+            } else {
+                TimelineView(.periodic(from: .now, by: 1)) { context in
+                    content(context.date)
+                }
+            }
+        }
+    }
+}
+
 private struct ActiveSessionFooterView: View {
     let state: ActiveSessionHeaderState
     let onClearRest: () -> Void
     let onFinishWorkout: () -> Void
 
     var body: some View {
-        Group {
-            if state.restTimerEndsAt == nil {
-                footerContent(now: .now)
-            } else {
-                TimelineView(.periodic(from: .now, by: 1)) { context in
-                    footerContent(now: context.date)
-                }
-            }
+        RestTimerTickView(endDate: state.restTimerEndsAt) { now in
+            footerContent(now: now)
         }
         .padding(.horizontal, 16)
         .padding(.top, 12)
@@ -889,14 +903,8 @@ private struct ActiveSessionHeaderView: View, Equatable {
     let state: ActiveSessionHeaderState
 
     var body: some View {
-        Group {
-            if state.restTimerEndsAt == nil {
-                heroCard(now: .now)
-            } else {
-                TimelineView(.periodic(from: .now, by: 1)) { context in
-                    heroCard(now: context.date)
-                }
-            }
+        RestTimerTickView(endDate: state.restTimerEndsAt) { now in
+            heroCard(now: now)
         }
         .padding(.horizontal, 16)
         .padding(.top, 14)

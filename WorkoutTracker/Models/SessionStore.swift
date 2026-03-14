@@ -4,6 +4,11 @@ import Observation
 @MainActor
 @Observable
 final class SessionStore {
+    private enum Defaults {
+        static let draftSaveDebounceNanoseconds: UInt64 = 400_000_000
+        static let maxUndoSnapshots = 50
+    }
+
     struct HydrationSnapshot: Sendable {
         var activeDraft: SessionDraft?
         var completedSessions: [CompletedSession]
@@ -17,8 +22,8 @@ final class SessionStore {
     @ObservationIgnored private let repository: SessionRepository
     @ObservationIgnored private let persistenceController: SessionPersistenceController
     @ObservationIgnored private var draftSaveTask: Task<Void, Never>?
-    @ObservationIgnored private let draftSaveDebounceNanoseconds: UInt64 = 400_000_000
-    @ObservationIgnored private let maxUndoSnapshots = 50
+    @ObservationIgnored private let draftSaveDebounceNanoseconds = Defaults.draftSaveDebounceNanoseconds
+    @ObservationIgnored private let maxUndoSnapshots = Defaults.maxUndoSnapshots
     @ObservationIgnored private(set) var completedSessionsRevision = 0
 
     var activeDraft: SessionDraft?
@@ -34,15 +39,6 @@ final class SessionStore {
 
     deinit {
         draftSaveTask?.cancel()
-    }
-
-    func hydrate() {
-        hydrate(
-            with: HydrationSnapshot(
-                activeDraft: repository.loadActiveDraft(),
-                completedSessions: repository.loadCompletedSessions()
-            )
-        )
     }
 
     func hydrate(with snapshot: HydrationSnapshot) {
