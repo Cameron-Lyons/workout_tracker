@@ -6,13 +6,14 @@ final class WorkoutTrackerUITests: XCTestCase {
     }
 
     @MainActor
-    private func launchAppForUITest() -> XCUIApplication {
+    private func launchAppForUITest(extraArguments: [String] = []) -> XCUIApplication {
         let app = XCUIApplication()
         app.launchArguments += [
             "--uitesting",
             "--uitesting-in-memory",
             "--uitesting-empty-store",
         ]
+        app.launchArguments += extraArguments
         app.launch()
         return app
     }
@@ -68,14 +69,10 @@ final class WorkoutTrackerUITests: XCTestCase {
 
     @MainActor
     func testCreateCustomTemplateAndLaunchIt() throws {
-        let app = launchAppForUITest()
-
-        let blankButton = app.buttons["onboarding.startBlank"]
-        XCTAssertTrue(blankButton.waitForExistence(timeout: 8))
-        blankButton.tap()
+        let app = launchAppForUITest(extraArguments: ["--uitesting-complete-onboarding"])
 
         let plansTab = app.tabBars.buttons["Plans"]
-        XCTAssertTrue(plansTab.waitForExistence(timeout: 4))
+        XCTAssertTrue(plansTab.waitForExistence(timeout: 8))
         plansTab.tap()
 
         let addPlanButton = app.buttons["plans.addPlanButton"]

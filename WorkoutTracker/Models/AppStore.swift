@@ -93,6 +93,10 @@ final class AppStore {
             resetAllDataForFreshStart()
         }
 
+        if launchArguments.contains("--uitesting-complete-onboarding") {
+            settingsStore.hasCompletedOnboarding = true
+        }
+
         let hydrationSnapshot = await hydrationLoader.load()
         plansStore.hydrate(with: hydrationSnapshot.plans)
         sessionStore.hydrate(with: hydrationSnapshot.sessions)
