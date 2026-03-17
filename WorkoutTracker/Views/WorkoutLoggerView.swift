@@ -3,45 +3,20 @@ import SwiftUI
 private struct ActiveSessionHeaderState: Equatable {
     var templateName: String
     var startedAtLabel: String
-    var blockCount: Int
-    var completedSetCount: Int
-    var canFinishWorkout: Bool
+    var progress: ActiveSessionProgress
     var restTimerEndsAt: Date?
 }
 
-private struct ActiveSessionSetState: Identifiable, Equatable {
-    var id: UUID
-    var setKindTitle: String
-    var loadValue: String
-    var loadUnit: String
-    var loadDisplayValue: String
-    var loadAccessibilityValue: String
-    var repsValue: String
-    var repsAccessibilityValue: String
-    var targetSummary: String
-    var loadCaption: String
-    var repsCaption: String
-    var loadDecreaseAccessibilityLabel: String
-    var loadIncreaseAccessibilityLabel: String
-    var repsDecreaseAccessibilityLabel: String
-    var repsIncreaseAccessibilityLabel: String
-    var note: String?
-    var isCompleted: Bool
-    var completionTitle: String
-    var completionSubtitle: String
-    var weightStep: Double
-}
+private struct ActiveSessionDisplaySettings: Equatable {
+    var weightUnit: WeightUnit
+    var upperBodyIncrement: Double
+    var lowerBodyIncrement: Double
 
-private struct ActiveSessionBlockState: Identifiable, Equatable {
-    var id: UUID
-    var exerciseName: String
-    var blockNote: String
-    var restSeconds: Int
-    var supersetGroup: String?
-    var progressionRuleLabel: String
-    var setCount: Int
-    var completedSetCount: Int
-    var rows: [ActiveSessionSetState]
+    func weightStep(for block: SessionBlock) -> Double {
+        ExerciseClassification.isLowerBody(block.exerciseNameSnapshot)
+            ? lowerBodyIncrement
+            : upperBodyIncrement
+    }
 }
 
 private struct ActiveSessionActions {
@@ -99,22 +74,6 @@ private struct ActiveSessionRestTimerPresentation {
     }
 }
 
-private struct ActiveSessionProgressSummary {
-    var completedSetCount = 0
-    var canFinishWorkout = false
-
-    init(blocks: [SessionBlock]) {
-        for block in blocks {
-            for row in block.sets where row.log.isCompleted {
-                completedSetCount += 1
-                if row.target.setKind == .working {
-                    canFinishWorkout = true
-                }
-            }
-        }
-    }
-}
-
 enum ActiveSessionWeightStep {
     @MainActor
     static func resolve(for block: SessionBlock, settings: SettingsStore) -> Double {
@@ -144,40 +103,20 @@ struct ActiveSessionView: View {
             return nil
         }
 
-        let progressSummary = ActiveSessionProgressSummary(blocks: draft.blocks)
         return ActiveSessionHeaderState(
             templateName: draft.templateNameSnapshot,
             startedAtLabel: draft.startedAt.formatted(date: .omitted, time: .shortened),
-            blockCount: draft.blocks.count,
-            completedSetCount: progressSummary.completedSetCount,
-            canFinishWorkout: progressSummary.canFinishWorkout,
+            progress: sessionStore.activeDraftProgress,
             restTimerEndsAt: draft.restTimerEndsAt
         )
     }
 
-    private var blockStates: [ActiveSessionBlockState] {
-        guard let draft else {
-            return []
-        }
-
-        return draft.blocks.map { block in
-            let weightStep = ActiveSessionWeightStep.resolve(for: block, settings: settingsStore)
-            return ActiveSessionBlockState(
-                id: block.id,
-                exerciseName: block.exerciseNameSnapshot,
-                blockNote: block.blockNote,
-                restSeconds: block.restSeconds,
-                supersetGroup: block.supersetGroup,
-                progressionRuleLabel: block.progressionRule.kind.displayLabel,
-                setCount: block.sets.count,
-                completedSetCount: block.sets.reduce(0) { partialResult, row in
-                    partialResult + (row.log.isCompleted ? 1 : 0)
-                },
-                rows: block.sets.map { row in
-                    makeSetState(row, weightUnit: settingsStore.weightUnit, weightStep: weightStep)
-                }
-            )
-        }
+    private var displaySettings: ActiveSessionDisplaySettings {
+        ActiveSessionDisplaySettings(
+            weightUnit: settingsStore.weightUnit,
+            upperBodyIncrement: settingsStore.upperBodyIncrement,
+            lowerBodyIncrement: settingsStore.lowerBodyIncrement
+        )
     }
 
     private var actions: ActiveSessionActions {
@@ -215,7 +154,8 @@ struct ActiveSessionView: View {
                     ActiveSessionContentView(
                         headerState: headerState,
                         notes: draft.notes,
-                        blockStates: blockStates,
+                        blocks: draft.blocks,
+                        displaySettings: displaySettings,
                         actions: actions,
                         showsDetailedChrome: showsDetailedChrome
                     )
@@ -243,7 +183,7 @@ struct ActiveSessionView: View {
                     Button("Undo") {
                         appStore.undoSessionMutation()
                     }
-                    .disabled(sessionStore.undoStack.isEmpty)
+                    .disabled(sessionStore.canUndo == false)
 
                     Button("Add Exercise") {
                         showingAddExerciseSheet = true
@@ -295,62 +235,13 @@ struct ActiveSessionView: View {
             showsDetailedChrome = true
         }
     }
-
-    private func makeSetState(
-        _ row: SessionSetRow,
-        weightUnit: WeightUnit,
-        weightStep: Double
-    ) -> ActiveSessionSetState {
-        let resolvedWeight = row.log.weight ?? row.target.targetWeight
-        let loadValue = WeightFormatter.displayString(resolvedWeight, unit: weightUnit)
-        let resolvedLoadValue = loadValue.isEmpty ? "0" : loadValue
-        let repsValue = "\(row.log.reps ?? row.target.repRange.upperBound)"
-        let repsLabel = row.target.repRange.displayLabel
-        let setKindTitle = row.target.setKind.displayName
-        let accessibilityContext = setKindTitle.lowercased()
-        let targetSummary: String
-        if let targetWeight = row.target.targetWeight {
-            targetSummary = "\(WeightFormatter.displayString(targetWeight, unit: weightUnit)) \(weightUnit.symbol) • \(repsLabel)"
-        } else {
-            targetSummary = repsLabel
-        }
-
-        let loadCaption: String
-        if let targetWeight = row.target.targetWeight {
-            loadCaption = "Target \(WeightFormatter.displayString(targetWeight, unit: weightUnit)) \(weightUnit.symbol)"
-        } else {
-            loadCaption = "Adjust load"
-        }
-
-        return ActiveSessionSetState(
-            id: row.id,
-            setKindTitle: setKindTitle,
-            loadValue: resolvedLoadValue,
-            loadUnit: weightUnit.symbol,
-            loadDisplayValue: "\(resolvedLoadValue) \(weightUnit.symbol)",
-            loadAccessibilityValue: "\(resolvedLoadValue) \(weightUnit.symbol)",
-            repsValue: repsValue,
-            repsAccessibilityValue: repsValue,
-            targetSummary: targetSummary,
-            loadCaption: loadCaption,
-            repsCaption: "Target \(repsLabel)",
-            loadDecreaseAccessibilityLabel: "Decrease load for the \(accessibilityContext) set",
-            loadIncreaseAccessibilityLabel: "Increase load for the \(accessibilityContext) set",
-            repsDecreaseAccessibilityLabel: "Decrease reps for the \(accessibilityContext) set",
-            repsIncreaseAccessibilityLabel: "Increase reps for the \(accessibilityContext) set",
-            note: row.target.note,
-            isCompleted: row.log.isCompleted,
-            completionTitle: row.log.isCompleted ? "Logged" : "Complete",
-            completionSubtitle: row.log.isCompleted ? "Tap to revise" : "Tap when done",
-            weightStep: weightStep
-        )
-    }
 }
 
 private struct ActiveSessionContentView: View {
     let headerState: ActiveSessionHeaderState
     let notes: String
-    let blockStates: [ActiveSessionBlockState]
+    let blocks: [SessionBlock]
+    let displaySettings: ActiveSessionDisplaySettings
     let actions: ActiveSessionActions
     let showsDetailedChrome: Bool
 
@@ -364,9 +255,10 @@ private struct ActiveSessionContentView: View {
                     ActiveSessionNotesCardView(notes: notes, onUpdateNotes: actions.updateSessionNotes)
                         .equatable()
 
-                    ForEach(blockStates) { block in
+                    ForEach(blocks) { block in
                         SessionBlockCardView(
                             block: block,
+                            displaySettings: displaySettings,
                             actions: actions,
                             showsDetailedChrome: showsDetailedChrome
                         )
@@ -423,19 +315,22 @@ private struct ActiveSessionNotesCardView: View, Equatable {
 
 @MainActor
 private struct SessionBlockCardView: View, Equatable {
-    let block: ActiveSessionBlockState
+    let block: SessionBlock
+    let displaySettings: ActiveSessionDisplaySettings
     let actions: ActiveSessionActions
     let showsDetailedChrome: Bool
 
     nonisolated static func == (lhs: SessionBlockCardView, rhs: SessionBlockCardView) -> Bool {
-        lhs.block == rhs.block && lhs.showsDetailedChrome == rhs.showsDetailedChrome
+        lhs.block == rhs.block
+            && lhs.displaySettings == rhs.displaySettings
+            && lhs.showsDetailedChrome == rhs.showsDetailedChrome
     }
 
     var body: some View {
         VStack(alignment: .leading, spacing: 12) {
             HStack(alignment: .top) {
                 VStack(alignment: .leading, spacing: 6) {
-                    Text(block.exerciseName)
+                    Text(block.exerciseNameSnapshot)
                         .font(.system(.title3, design: .rounded).weight(.bold))
                         .foregroundStyle(AppColors.textPrimary)
 
@@ -443,7 +338,7 @@ private struct SessionBlockCardView: View, Equatable {
                         HStack(spacing: 8) {
                             MetricBadge(
                                 label: "Sets",
-                                value: "\(block.setCount)",
+                                value: "\(block.sets.count)",
                                 systemImage: "number.square",
                                 tone: .today
                             )
@@ -466,7 +361,7 @@ private struct SessionBlockCardView: View, Equatable {
 
                             MetricBadge(
                                 label: "Rule",
-                                value: block.progressionRuleLabel,
+                                value: block.progressionRule.kind.displayLabel,
                                 systemImage: "arrow.up.right",
                                 tone: .progress
                             )
@@ -482,14 +377,14 @@ private struct SessionBlockCardView: View, Equatable {
 
                 if showsDetailedChrome {
                     AppStatePill(
-                        title: "\(block.completedSetCount)/\(block.setCount) done",
-                        systemImage: block.completedSetCount == block.setCount ? "checkmark.circle.fill" : "circle.dotted",
-                        tone: block.completedSetCount == block.setCount ? .success : .today
+                        title: "\(completedSetCount)/\(block.sets.count) done",
+                        systemImage: completedSetCount == block.sets.count ? "checkmark.circle.fill" : "circle.dotted",
+                        tone: completedSetCount == block.sets.count ? .success : .today
                     )
                 } else {
-                    Text("\(block.completedSetCount)/\(block.setCount) done")
+                    Text("\(completedSetCount)/\(block.sets.count) done")
                         .font(.caption.weight(.semibold))
-                        .foregroundStyle(block.completedSetCount == block.setCount ? AppToneStyle.success.accent : AppColors.textSecondary)
+                        .foregroundStyle(completedSetCount == block.sets.count ? AppToneStyle.success.accent : AppColors.textSecondary)
                 }
             }
 
@@ -506,10 +401,12 @@ private struct SessionBlockCardView: View, Equatable {
             .appInputField()
 
             LazyVStack(spacing: 12) {
-                ForEach(block.rows) { row in
+                ForEach(block.sets) { row in
                     SessionSetRowView(
                         blockID: block.id,
                         row: row,
+                        weightUnit: displaySettings.weightUnit,
+                        weightStep: displaySettings.weightStep(for: block),
                         actions: actions,
                         showsDetailedChrome: showsDetailedChrome
                     )
@@ -545,8 +442,14 @@ private struct SessionBlockCardView: View, Equatable {
         )
     }
 
+    private var completedSetCount: Int {
+        block.sets.reduce(0) { partialResult, row in
+            partialResult + (row.log.isCompleted ? 1 : 0)
+        }
+    }
+
     private var compactBlockSummary: String {
-        var parts = ["\(block.setCount) sets", "\(block.restSeconds)s rest", block.progressionRuleLabel]
+        var parts = ["\(block.sets.count) sets", "\(block.restSeconds)s rest", block.progressionRule.kind.displayLabel]
         if let supersetGroup = block.supersetGroup, !supersetGroup.isEmpty {
             parts.insert("Superset \(supersetGroup)", at: 2)
         }
@@ -557,18 +460,22 @@ private struct SessionBlockCardView: View, Equatable {
 @MainActor
 private struct SessionSetRowView: View, Equatable {
     let blockID: UUID
-    let row: ActiveSessionSetState
+    let row: SessionSetRow
+    let weightUnit: WeightUnit
+    let weightStep: Double
     let actions: ActiveSessionActions
     let showsDetailedChrome: Bool
 
     nonisolated static func == (lhs: SessionSetRowView, rhs: SessionSetRowView) -> Bool {
         lhs.blockID == rhs.blockID
             && lhs.row == rhs.row
+            && lhs.weightUnit == rhs.weightUnit
+            && lhs.weightStep == rhs.weightStep
             && lhs.showsDetailedChrome == rhs.showsDetailedChrome
     }
 
     private var tone: AppToneStyle {
-        row.isCompleted ? .success : .today
+        row.log.isCompleted ? .success : .today
     }
 
     var body: some View {
@@ -576,12 +483,12 @@ private struct SessionSetRowView: View, Equatable {
             HStack {
                 if showsDetailedChrome {
                     AppStatePill(
-                        title: row.setKindTitle,
-                        systemImage: row.isCompleted ? "checkmark.circle.fill" : "circle.dashed",
+                        title: setKindTitle,
+                        systemImage: row.log.isCompleted ? "checkmark.circle.fill" : "circle.dashed",
                         tone: tone
                     )
                 } else {
-                    Text(row.setKindTitle)
+                    Text(setKindTitle)
                         .font(.caption.weight(.semibold))
                         .foregroundStyle(AppColors.textSecondary)
                 }
@@ -589,7 +496,7 @@ private struct SessionSetRowView: View, Equatable {
                 Spacer()
 
                 if showsDetailedChrome {
-                    Text(row.targetSummary)
+                    Text(targetSummary)
                         .font(.caption.weight(.medium))
                         .foregroundStyle(AppColors.textSecondary)
                 }
@@ -598,32 +505,32 @@ private struct SessionSetRowView: View, Equatable {
             HStack(spacing: 10) {
                 statControl(
                     title: "Load",
-                    displayValue: row.loadDisplayValue,
-                    caption: row.loadCaption,
+                    displayValue: loadDisplayValue,
+                    caption: loadCaption,
                     tone: tone,
                     showsDetailedChrome: showsDetailedChrome,
-                    decreaseAccessibilityLabel: row.loadDecreaseAccessibilityLabel,
-                    increaseAccessibilityLabel: row.loadIncreaseAccessibilityLabel,
-                    accessibilityValue: row.loadAccessibilityValue,
+                    decreaseAccessibilityLabel: "Decrease load for the \(accessibilityContext) set",
+                    increaseAccessibilityLabel: "Increase load for the \(accessibilityContext) set",
+                    accessibilityValue: loadAccessibilityValue,
                     decreaseAccessibilityIdentifier: "session.adjust.load.\(blockID.uuidString).\(row.id.uuidString).decrease",
                     increaseAccessibilityIdentifier: "session.adjust.load.\(blockID.uuidString).\(row.id.uuidString).increase",
                     onDecrease: {
-                        actions.adjustWeight(blockID, row.id, -row.weightStep)
+                        actions.adjustWeight(blockID, row.id, -weightStep)
                     },
                     onIncrease: {
-                        actions.adjustWeight(blockID, row.id, row.weightStep)
+                        actions.adjustWeight(blockID, row.id, weightStep)
                     }
                 )
 
                 statControl(
                     title: "Reps",
-                    displayValue: row.repsValue,
-                    caption: row.repsCaption,
+                    displayValue: repsValue,
+                    caption: "Target \(repsLabel)",
                     tone: tone,
                     showsDetailedChrome: showsDetailedChrome,
-                    decreaseAccessibilityLabel: row.repsDecreaseAccessibilityLabel,
-                    increaseAccessibilityLabel: row.repsIncreaseAccessibilityLabel,
-                    accessibilityValue: row.repsAccessibilityValue,
+                    decreaseAccessibilityLabel: "Decrease reps for the \(accessibilityContext) set",
+                    increaseAccessibilityLabel: "Increase reps for the \(accessibilityContext) set",
+                    accessibilityValue: repsValue,
                     decreaseAccessibilityIdentifier: "session.adjust.reps.\(blockID.uuidString).\(row.id.uuidString).decrease",
                     increaseAccessibilityIdentifier: "session.adjust.reps.\(blockID.uuidString).\(row.id.uuidString).increase",
                     onDecrease: {
@@ -638,14 +545,14 @@ private struct SessionSetRowView: View, Equatable {
                     actions.toggleSetCompletion(blockID, row.id)
                 } label: {
                     VStack(spacing: 6) {
-                        Image(systemName: row.isCompleted ? "checkmark.circle.fill" : "circle")
+                        Image(systemName: row.log.isCompleted ? "checkmark.circle.fill" : "circle")
                             .font(.system(size: 28, weight: .bold))
 
-                        Text(row.completionTitle)
+                        Text(row.log.isCompleted ? "Logged" : "Complete")
                             .font(.caption.weight(.semibold))
 
                         if showsDetailedChrome {
-                            Text(row.completionSubtitle)
+                            Text(row.log.isCompleted ? "Tap to revise" : "Tap when done")
                                 .font(.caption2)
                                 .foregroundStyle(AppColors.textSecondary)
                         }
@@ -656,16 +563,16 @@ private struct SessionSetRowView: View, Equatable {
                 .buttonStyle(.plain)
                 .background {
                     RoundedRectangle(cornerRadius: 14, style: .continuous)
-                        .fill(row.isCompleted ? AppColors.success.opacity(0.18) : AppToneStyle.today.softFill.opacity(0.8))
+                        .fill(row.log.isCompleted ? AppColors.success.opacity(0.18) : AppToneStyle.today.softFill.opacity(0.8))
                 }
                 .overlay(
                     RoundedRectangle(cornerRadius: 14, style: .continuous)
-                        .stroke(row.isCompleted ? AppToneStyle.success.softBorder : AppToneStyle.today.softBorder, lineWidth: 1)
+                        .stroke(row.log.isCompleted ? AppToneStyle.success.softBorder : AppToneStyle.today.softBorder, lineWidth: 1)
                 )
                 .accessibilityIdentifier("session.completeSet.\(blockID.uuidString).\(row.id.uuidString)")
             }
 
-            if showsDetailedChrome, let note = row.note, !note.isEmpty {
+            if showsDetailedChrome, let note = row.target.note, !note.isEmpty {
                 Text(note)
                     .font(.caption)
                     .foregroundStyle(AppToneStyle.progress.accent)
@@ -674,9 +581,57 @@ private struct SessionSetRowView: View, Equatable {
         .modifier(
             SessionRowSurfaceModifier(
                 isDetailed: showsDetailedChrome,
-                isCompleted: row.isCompleted
+                isCompleted: row.log.isCompleted
             )
         )
+    }
+
+    private var setKindTitle: String {
+        row.target.setKind.displayName
+    }
+
+    private var accessibilityContext: String {
+        setKindTitle.lowercased()
+    }
+
+    private var resolvedLoadValue: String {
+        let displayValue = WeightFormatter.displayString(
+            row.log.weight ?? row.target.targetWeight,
+            unit: weightUnit
+        )
+        return displayValue.isEmpty ? "0" : displayValue
+    }
+
+    private var loadDisplayValue: String {
+        "\(resolvedLoadValue) \(weightUnit.symbol)"
+    }
+
+    private var loadAccessibilityValue: String {
+        loadDisplayValue
+    }
+
+    private var repsValue: String {
+        "\(row.log.reps ?? row.target.repRange.upperBound)"
+    }
+
+    private var repsLabel: String {
+        row.target.repRange.displayLabel
+    }
+
+    private var targetSummary: String {
+        if let targetWeight = row.target.targetWeight {
+            return "\(WeightFormatter.displayString(targetWeight, unit: weightUnit)) \(weightUnit.symbol) • \(repsLabel)"
+        }
+
+        return repsLabel
+    }
+
+    private var loadCaption: String {
+        if let targetWeight = row.target.targetWeight {
+            return "Target \(WeightFormatter.displayString(targetWeight, unit: weightUnit)) \(weightUnit.symbol)"
+        }
+
+        return "Adjust load"
     }
 
     private func statControl(
@@ -856,7 +811,7 @@ private struct ActiveSessionFooterView: View {
             HStack {
                 MetricBadge(
                     label: "Logged",
-                    value: "\(state.completedSetCount)",
+                        value: "\(state.progress.completedSetCount)",
                     systemImage: "checklist",
                     tone: .success
                 )
@@ -892,7 +847,7 @@ private struct ActiveSessionFooterView: View {
                 .buttonStyle(.borderedProminent)
                 .buttonBorderShape(.roundedRectangle(radius: 16))
                 .tint(AppToneStyle.success.accent)
-                .disabled(!state.canFinishWorkout)
+                .disabled(!state.progress.canFinishWorkout)
                 .accessibilityIdentifier("session.finishButton")
             }
         }
@@ -928,13 +883,13 @@ private struct ActiveSessionHeaderView: View, Equatable {
                 AppHeroMetric(
                     id: "blocks",
                     label: "Blocks",
-                    value: "\(state.blockCount)",
+                    value: "\(state.progress.blockCount)",
                     systemImage: "square.grid.2x2"
                 ),
                 AppHeroMetric(
                     id: "sets",
                     label: "Logged",
-                    value: "\(state.completedSetCount)",
+                    value: "\(state.progress.completedSetCount)",
                     systemImage: "checklist"
                 ),
                 AppHeroMetric(

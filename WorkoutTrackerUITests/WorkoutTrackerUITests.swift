@@ -117,11 +117,93 @@ final class WorkoutTrackerUITests: XCTestCase {
 
         XCTAssertTrue(app.buttons["session.finishButton"].waitForExistence(timeout: 8))
     }
+
+    @MainActor
+    func testProfileLoggerHotPath() throws {
+        let app = launchAppForUITest()
+
+        let presetButton = app.buttons["onboarding.preset.generalGym"]
+        XCTAssertTrue(presetButton.waitForExistence(timeout: 8))
+        presetButton.tap()
+
+        let pinnedStart = app.buttons["today.pinnedStartButton"]
+        XCTAssertTrue(pinnedStart.waitForExistence(timeout: 8))
+        pinnedStart.tap()
+
+        let loadIncreaseButton = app.firstButton(
+            withIdentifierPrefix: "session.adjust.load.",
+            suffix: ".increase"
+        )
+        XCTAssertTrue(loadIncreaseButton.waitForExistence(timeout: 8))
+        for _ in 0..<8 {
+            loadIncreaseButton.tap()
+        }
+
+        let repsIncreaseButton = app.firstButton(
+            withIdentifierPrefix: "session.adjust.reps.",
+            suffix: ".increase"
+        )
+        XCTAssertTrue(repsIncreaseButton.waitForExistence(timeout: 4))
+        for _ in 0..<4 {
+            repsIncreaseButton.tap()
+        }
+
+        let completeSetButton = app.firstButton(withIdentifierPrefix: "session.completeSet.")
+        XCTAssertTrue(completeSetButton.waitForExistence(timeout: 4))
+        completeSetButton.tap()
+
+        let addSetButton = app.buttons["Add Set"].firstMatch
+        XCTAssertTrue(addSetButton.waitForExistence(timeout: 4))
+        addSetButton.tap()
+
+        let copyLastButton = app.buttons["Copy Last"].firstMatch
+        XCTAssertTrue(copyLastButton.waitForExistence(timeout: 4))
+        copyLastButton.tap()
+
+        let undoButton = app.buttons["Undo"]
+        XCTAssertTrue(undoButton.waitForExistence(timeout: 4))
+        undoButton.tap()
+        undoButton.tap()
+        undoButton.tap()
+
+        XCTAssertTrue(app.buttons["session.finishButton"].waitForExistence(timeout: 4))
+    }
+
+    @MainActor
+    func testProfileForegroundRefreshNoOp() throws {
+        let app = launchAppForUITest()
+
+        let presetButton = app.buttons["onboarding.preset.generalGym"]
+        XCTAssertTrue(presetButton.waitForExistence(timeout: 8))
+        presetButton.tap()
+
+        let todayTab = app.tabBars.buttons["Today"]
+        XCTAssertTrue(todayTab.waitForExistence(timeout: 4))
+        todayTab.tap()
+
+        for _ in 0..<3 {
+            XCUIDevice.shared.press(.home)
+            app.activate()
+            XCTAssertTrue(todayTab.waitForExistence(timeout: 6))
+        }
+
+        XCTAssertTrue(app.buttons["today.pinnedStartButton"].waitForExistence(timeout: 6))
+    }
 }
 
 private extension XCUIApplication {
     func firstButton(withIdentifierPrefix prefix: String) -> XCUIElement {
         buttons.matching(NSPredicate(format: "identifier BEGINSWITH %@", prefix)).firstMatch
+    }
+
+    func firstButton(withIdentifierPrefix prefix: String, suffix: String) -> XCUIElement {
+        buttons.matching(
+            NSPredicate(
+                format: "identifier BEGINSWITH %@ AND identifier ENDSWITH %@",
+                prefix,
+                suffix
+            )
+        ).firstMatch
     }
 
     func revealIfNeeded(_ element: XCUIElement, maxSwipes: Int = 6) {

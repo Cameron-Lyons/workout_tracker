@@ -34,6 +34,23 @@ class RepositoryBase {
             return false
         }
     }
+
+    func orderedRecordsIfNeeded<Record>(_ records: [Record], by keyPath: KeyPath<Record, Int>) -> [Record] {
+        guard records.count > 1 else {
+            return records
+        }
+
+        var previousOrderIndex = records[0][keyPath: keyPath]
+        for record in records.dropFirst() {
+            let orderIndex = record[keyPath: keyPath]
+            if orderIndex < previousOrderIndex {
+                return records.sorted { $0[keyPath: keyPath] < $1[keyPath: keyPath] }
+            }
+            previousOrderIndex = orderIndex
+        }
+
+        return records
+    }
 }
 
 final class PlanRepository: RepositoryBase {
@@ -55,9 +72,19 @@ final class PlanRepository: RepositoryBase {
 
     @discardableResult
     func saveCatalog(_ catalog: [ExerciseCatalogItem]) -> Bool {
+        persistCatalogItems(catalog, deleteMissing: true)
+    }
+
+    @discardableResult
+    func upsertCatalogItems(_ items: [ExerciseCatalogItem]) -> Bool {
+        persistCatalogItems(items, deleteMissing: false)
+    }
+
+    @discardableResult
+    private func persistCatalogItems(_ items: [ExerciseCatalogItem], deleteMissing: Bool) -> Bool {
         var recordsByID = Dictionary(uniqueKeysWithValues: loadCatalogRecords().map { ($0.id, $0) })
 
-        for item in catalog {
+        for item in items {
             let record: StoredCatalogItem
             if let existing = recordsByID.removeValue(forKey: item.id) {
                 record = existing
@@ -74,7 +101,10 @@ final class PlanRepository: RepositoryBase {
             apply(item, to: record)
         }
 
-        recordsByID.values.forEach(modelContext.delete)
+        if deleteMissing {
+            recordsByID.values.forEach(modelContext.delete)
+        }
+
         return saveContext("catalog")
     }
 
@@ -92,6 +122,19 @@ final class PlanRepository: RepositoryBase {
     @discardableResult
     func upsertPlans(_ plans: [Plan]) -> Bool {
         persistPlans(plans, deleteMissing: false)
+    }
+
+    @discardableResult
+    func deletePlans(_ planIDs: [UUID]) -> Bool {
+        guard !planIDs.isEmpty else {
+            return true
+        }
+
+        let planIDSet = Set(planIDs)
+        loadPlanRecords()
+            .filter { planIDSet.contains($0.id) }
+            .forEach(modelContext.delete)
+        return saveContext("plans")
     }
 
     @discardableResult
@@ -209,8 +252,7 @@ final class PlanRepository: RepositoryBase {
             name: record.name,
             createdAt: record.createdAt,
             pinnedTemplateID: record.pinnedTemplateID,
-            templates: record.templates
-                .sorted(by: { $0.orderIndex < $1.orderIndex })
+            templates: orderedRecordsIfNeeded(record.templates, by: \.orderIndex)
                 .compactMap(template(from:))
         )
     }
@@ -221,8 +263,7 @@ final class PlanRepository: RepositoryBase {
             name: record.name,
             note: record.note,
             scheduledWeekdays: decode([Weekday].self, from: record.scheduledWeekdaysData) ?? [],
-            blocks: record.blocks
-                .sorted(by: { $0.orderIndex < $1.orderIndex })
+            blocks: orderedRecordsIfNeeded(record.blocks, by: \.orderIndex)
                 .compactMap(templateBlock(from:)),
             lastStartedAt: record.lastStartedAt
         )
@@ -237,8 +278,7 @@ final class PlanRepository: RepositoryBase {
             restSeconds: record.restSeconds,
             supersetGroup: record.supersetGroup,
             progressionRule: decode(ProgressionRule.self, from: record.progressionRuleData) ?? .manual,
-            targets: record.targets
-                .sorted(by: { $0.orderIndex < $1.orderIndex })
+            targets: orderedRecordsIfNeeded(record.targets, by: \.orderIndex)
                 .compactMap(templateTarget(from:)),
             allowsAutoWarmups: record.allowsAutoWarmups
         )

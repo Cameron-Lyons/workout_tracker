@@ -25,6 +25,30 @@ final class PlanPersistenceController: @unchecked Sendable {
         self.modelContainer = modelContainer
     }
 
+    func scheduleSaveCatalog(_ catalog: [ExerciseCatalogItem]) {
+        queue.async { [modelContainer] in
+            let interval = PerformanceSignpost.begin("Catalog Persistence")
+            defer { PerformanceSignpost.end(interval) }
+
+            let context = ModelContext(modelContainer)
+            context.autosaveEnabled = false
+            let repository = PlanRepository(modelContext: context)
+            repository.saveCatalog(catalog)
+        }
+    }
+
+    func scheduleUpsertCatalogItems(_ items: [ExerciseCatalogItem]) {
+        queue.async { [modelContainer] in
+            let interval = PerformanceSignpost.begin("Catalog Persistence")
+            defer { PerformanceSignpost.end(interval) }
+
+            let context = ModelContext(modelContainer)
+            context.autosaveEnabled = false
+            let repository = PlanRepository(modelContext: context)
+            repository.upsertCatalogItems(items)
+        }
+    }
+
     func scheduleUpsertPlans(_ plans: [Plan]) {
         queue.async { [modelContainer] in
             let interval = PerformanceSignpost.begin("Plan Persistence")
@@ -34,6 +58,18 @@ final class PlanPersistenceController: @unchecked Sendable {
             context.autosaveEnabled = false
             let repository = PlanRepository(modelContext: context)
             repository.upsertPlans(plans)
+        }
+    }
+
+    func scheduleDeletePlans(_ planIDs: [UUID]) {
+        queue.async { [modelContainer] in
+            let interval = PerformanceSignpost.begin("Plan Persistence")
+            defer { PerformanceSignpost.end(interval) }
+
+            let context = ModelContext(modelContainer)
+            context.autosaveEnabled = false
+            let repository = PlanRepository(modelContext: context)
+            repository.deletePlans(planIDs)
         }
     }
 
@@ -61,6 +97,18 @@ final class PlanPersistenceController: @unchecked Sendable {
                 repository.upsertProfiles(updatedProfiles)
             }
             repository.upsertPlans([plan])
+        }
+    }
+
+    func scheduleUpsertProfiles(_ profiles: [ExerciseProfile]) {
+        queue.async { [modelContainer] in
+            let interval = PerformanceSignpost.begin("Profile Persistence")
+            defer { PerformanceSignpost.end(interval) }
+
+            let context = ModelContext(modelContainer)
+            context.autosaveEnabled = false
+            let repository = PlanRepository(modelContext: context)
+            repository.upsertProfiles(profiles)
         }
     }
 

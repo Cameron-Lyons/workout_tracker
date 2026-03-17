@@ -70,6 +70,61 @@ struct AnalyticsRepository: Sendable {
         }
     }
 
+    func makeOverview(sessions: [CompletedSession], now: Date = .now) -> ProgressOverview {
+        guard !sessions.isEmpty else {
+            return .empty
+        }
+
+        let calendar = Calendar.autoupdatingCurrent
+        let startOfToday = calendar.startOfDay(for: now)
+        let startOfWeek = calendar.dateInterval(of: .weekOfYear, for: startOfToday)?.start ?? startOfToday
+        let last30Days = AnalyticsDefaults.rollingWindowStart(from: startOfToday, calendar: calendar)
+        let firstSessionDate = sessions.first?.completedAt ?? startOfToday
+
+        var totalVolume = 0.0
+        var sessionsThisWeek = 0
+        var sessionsLast30Days = 0
+
+        for session in sessions {
+            if session.completedAt >= startOfWeek {
+                sessionsThisWeek += 1
+            }
+
+            if session.completedAt >= last30Days {
+                sessionsLast30Days += 1
+            }
+
+            for block in session.blocks {
+                totalVolume += block.sets.reduce(0) { partialResult, row in
+                    guard row.log.isCompleted else {
+                        return partialResult
+                    }
+
+                    return partialResult + ((row.log.weight ?? 0) * Double(row.log.reps ?? 0))
+                }
+            }
+        }
+
+        let weeksSpan = AnalyticsDefaults.weeksSpan(from: firstSessionDate, to: startOfToday)
+        return ProgressOverview(
+            totalSessions: sessions.count,
+            sessionsThisWeek: sessionsThisWeek,
+            sessionsLast30Days: sessionsLast30Days,
+            totalVolume: totalVolume,
+            averageSessionsPerWeek: Double(sessions.count) / weeksSpan
+        )
+    }
+
+    func updatingOverview(
+        of snapshot: SessionAnalyticsSnapshot,
+        sessions: [CompletedSession],
+        now: Date = .now
+    ) -> SessionAnalyticsSnapshot {
+        var updatedSnapshot = snapshot
+        updatedSnapshot.overview = makeOverview(sessions: sessions, now: now)
+        return updatedSnapshot
+    }
+
     func finishSummary(
         for session: CompletedSession,
         previousBestByExerciseID: [UUID: Double],
@@ -124,28 +179,12 @@ struct AnalyticsRepository: Sendable {
         }
 
         let chronologicalSessions = sessions.sorted(by: { $0.completedAt < $1.completedAt })
-        let calendar = Calendar.autoupdatingCurrent
-        let startOfToday = calendar.startOfDay(for: now)
-        let startOfWeek = calendar.dateInterval(of: .weekOfYear, for: startOfToday)?.start ?? startOfToday
-        let last30Days = AnalyticsDefaults.rollingWindowStart(from: startOfToday, calendar: calendar)
-        let firstSessionDate = chronologicalSessions.first?.completedAt ?? startOfToday
-
         var totalVolume = 0.0
-        var sessionsThisWeek = 0
-        var sessionsLast30Days = 0
         var bestOneRepMaxByExerciseID: [UUID: Double] = [:]
         var personalRecords: [PersonalRecord] = []
         var exerciseAccumulatorsByID: [UUID: ExerciseAnalyticsAccumulator] = [:]
 
         for session in chronologicalSessions {
-            if session.completedAt >= startOfWeek {
-                sessionsThisWeek += 1
-            }
-
-            if session.completedAt >= last30Days {
-                sessionsLast30Days += 1
-            }
-
             let analysis = analyzeSession(
                 session,
                 displayNameForBlock: { block in
@@ -195,8 +234,6 @@ struct AnalyticsRepository: Sendable {
 
             totalVolume += analysis.totalVolume
         }
-
-        let weeksSpan = AnalyticsDefaults.weeksSpan(from: firstSessionDate, to: startOfToday)
         let exerciseSummaries = exerciseAccumulatorsByID.values
             .map { accumulator in
                 ExerciseAnalyticsSummary(
@@ -211,13 +248,7 @@ struct AnalyticsRepository: Sendable {
             .sorted(by: { $0.displayName < $1.displayName })
 
         return SessionAnalyticsSnapshot(
-            overview: ProgressOverview(
-                totalSessions: sessions.count,
-                sessionsThisWeek: sessionsThisWeek,
-                sessionsLast30Days: sessionsLast30Days,
-                totalVolume: totalVolume,
-                averageSessionsPerWeek: Double(sessions.count) / weeksSpan
-            ),
+            overview: makeOverview(sessions: chronologicalSessions, now: now),
             personalRecords: personalRecords,
             exerciseSummaries: exerciseSummaries,
             recentPersonalRecords: Array(personalRecords.suffix(AnalyticsDefaults.recentActivityLimit).reversed()),

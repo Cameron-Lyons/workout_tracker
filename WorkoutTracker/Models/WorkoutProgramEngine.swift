@@ -225,146 +225,223 @@ enum SessionEngine {
         )
     }
 
+    @discardableResult
     static func toggleCompletion(
         of setID: UUID,
         in blockID: UUID,
         draft: inout SessionDraft,
+        context: SessionMutationContext = .empty,
         completedAt: Date = .now
-    ) {
-        var nextRestTimerEndsAt: Date?
-
-        draft.mutateBlock(blockID) { block in
-            let blockRestSeconds = block.restSeconds
-            block.mutatingSet(setID) { row in
-                if row.log.isCompleted {
-                    row.log.completedAt = nil
-                    nextRestTimerEndsAt = nil
-                } else {
-                    row.log.weight = row.log.weight ?? row.target.targetWeight
-                    row.log.reps = row.log.reps ?? row.target.repRange.upperBound
-                    row.log.rir = row.log.rir ?? row.target.rir
-                    row.log.completedAt = completedAt
-                    let seconds = row.target.restSeconds ?? blockRestSeconds
-                    nextRestTimerEndsAt = completedAt.addingTimeInterval(
-                        TimeInterval(max(minimumRestTimerSeconds, seconds))
-                    )
-                }
-            }
+    ) -> SessionMutationResult {
+        guard
+            let blockIndex = resolvedBlockIndex(in: draft, blockID: blockID, suggested: context.blockIndex),
+            let setIndex = resolvedSetIndex(
+                in: draft.blocks[blockIndex],
+                setID: setID,
+                suggested: context.setIndex
+            )
+        else {
+            return .unchanged
         }
 
-        draft.restTimerEndsAt = nextRestTimerEndsAt
+        let blockRestSeconds = draft.blocks[blockIndex].restSeconds
+        if draft.blocks[blockIndex].sets[setIndex].log.isCompleted {
+            draft.blocks[blockIndex].sets[setIndex].log.completedAt = nil
+            draft.restTimerEndsAt = nil
+        } else {
+            if draft.blocks[blockIndex].sets[setIndex].log.weight == nil {
+                draft.blocks[blockIndex].sets[setIndex].log.weight =
+                    draft.blocks[blockIndex].sets[setIndex].target.targetWeight
+            }
+            if draft.blocks[blockIndex].sets[setIndex].log.reps == nil {
+                draft.blocks[blockIndex].sets[setIndex].log.reps =
+                    draft.blocks[blockIndex].sets[setIndex].target.repRange.upperBound
+            }
+            if draft.blocks[blockIndex].sets[setIndex].log.rir == nil {
+                draft.blocks[blockIndex].sets[setIndex].log.rir =
+                    draft.blocks[blockIndex].sets[setIndex].target.rir
+            }
+            draft.blocks[blockIndex].sets[setIndex].log.completedAt = completedAt
+            let seconds = draft.blocks[blockIndex].sets[setIndex].target.restSeconds ?? blockRestSeconds
+            draft.restTimerEndsAt = completedAt.addingTimeInterval(
+                TimeInterval(max(minimumRestTimerSeconds, seconds))
+            )
+        }
+
         draft.touch(now: completedAt)
+        return .changed
     }
 
+    @discardableResult
     static func adjustWeight(
         by delta: Double,
         setID: UUID,
         in blockID: UUID,
         draft: inout SessionDraft,
+        context: SessionMutationContext = .empty,
         now: Date = .now
-    ) {
-        draft.mutateBlock(blockID) { block in
-            block.mutatingSet(setID) { row in
-                if let baseWeight = row.log.weight ?? row.target.targetWeight {
-                    row.log.weight = max(0, baseWeight + delta)
-                } else if delta > 0 {
-                    row.log.weight = delta
-                }
-            }
+    ) -> SessionMutationResult {
+        guard
+            let blockIndex = resolvedBlockIndex(in: draft, blockID: blockID, suggested: context.blockIndex),
+            let setIndex = resolvedSetIndex(
+                in: draft.blocks[blockIndex],
+                setID: setID,
+                suggested: context.setIndex
+            )
+        else {
+            return .unchanged
         }
+
+        let previousWeight = draft.blocks[blockIndex].sets[setIndex].log.weight
+        if let baseWeight = previousWeight ?? draft.blocks[blockIndex].sets[setIndex].target.targetWeight {
+            let updatedWeight = max(0, baseWeight + delta)
+            guard previousWeight != updatedWeight else {
+                return .unchanged
+            }
+            draft.blocks[blockIndex].sets[setIndex].log.weight = updatedWeight
+        } else {
+            guard delta > 0 else {
+                return .unchanged
+            }
+            draft.blocks[blockIndex].sets[setIndex].log.weight = delta
+        }
+
         draft.touch(now: now)
+        return .changed
     }
 
+    @discardableResult
     static func adjustReps(
         by delta: Int,
         setID: UUID,
         in blockID: UUID,
         draft: inout SessionDraft,
+        context: SessionMutationContext = .empty,
         now: Date = .now
-    ) {
-        draft.mutateBlock(blockID) { block in
-            block.mutatingSet(setID) { row in
-                let baseReps = row.log.reps ?? row.target.repRange.upperBound
-                row.log.reps = max(0, baseReps + delta)
-            }
+    ) -> SessionMutationResult {
+        guard
+            let blockIndex = resolvedBlockIndex(in: draft, blockID: blockID, suggested: context.blockIndex),
+            let setIndex = resolvedSetIndex(
+                in: draft.blocks[blockIndex],
+                setID: setID,
+                suggested: context.setIndex
+            )
+        else {
+            return .unchanged
         }
+
+        let previousReps = draft.blocks[blockIndex].sets[setIndex].log.reps
+        let baseReps = previousReps ?? draft.blocks[blockIndex].sets[setIndex].target.repRange.upperBound
+        let updatedReps = max(0, baseReps + delta)
+        guard previousReps != updatedReps else {
+            return .unchanged
+        }
+
+        draft.blocks[blockIndex].sets[setIndex].log.reps = updatedReps
         draft.touch(now: now)
+        return .changed
     }
 
+    @discardableResult
     static func updateNotes(
         in blockID: UUID,
         note: String,
         draft: inout SessionDraft,
+        context: SessionMutationContext = .empty,
         now: Date = .now
-    ) {
-        draft.mutateBlock(blockID) { block in
-            block.blockNote = note
+    ) -> SessionMutationResult {
+        guard let blockIndex = resolvedBlockIndex(in: draft, blockID: blockID, suggested: context.blockIndex) else {
+            return .unchanged
         }
+
+        guard draft.blocks[blockIndex].blockNote != note else {
+            return .unchanged
+        }
+
+        draft.blocks[blockIndex].blockNote = note
         draft.touch(now: now)
+        return .changed
     }
 
+    @discardableResult
     static func updateSessionNotes(
         _ notes: String,
         draft: inout SessionDraft,
         now: Date = .now
-    ) {
+    ) -> SessionMutationResult {
+        guard draft.notes != notes else {
+            return .unchanged
+        }
+
         draft.notes = notes
         draft.touch(now: now)
+        return .changed
     }
 
+    @discardableResult
     static func addSet(
         to blockID: UUID,
         draft: inout SessionDraft,
+        context: SessionMutationContext = .empty,
         now: Date = .now
-    ) {
-        draft.mutateBlock(blockID) { block in
-            let copiedTarget = block.sets.last?.target ?? SetTarget(repRange: defaultRepRange)
-            let copiedLog = block.sets.last?.log
-            var newRow = SessionSetRow(target: copiedTarget)
-            newRow.target.id = UUID()
-            newRow.log.setTargetID = newRow.target.id
-            if let copiedLog {
-                newRow.log.weight = copiedLog.weight
-                newRow.log.reps = copiedLog.reps
-                newRow.log.rir = copiedLog.rir
-            }
-            block.sets.append(newRow)
+    ) -> SessionMutationResult {
+        guard let blockIndex = resolvedBlockIndex(in: draft, blockID: blockID, suggested: context.blockIndex) else {
+            return .unchanged
         }
+
+        let copiedTarget = draft.blocks[blockIndex].sets.last?.target ?? SetTarget(repRange: defaultRepRange)
+        let copiedLog = draft.blocks[blockIndex].sets.last?.log
+        var newRow = SessionSetRow(target: copiedTarget)
+        newRow.target.id = UUID()
+        newRow.log.setTargetID = newRow.target.id
+        if let copiedLog {
+            newRow.log.weight = copiedLog.weight
+            newRow.log.reps = copiedLog.reps
+            newRow.log.rir = copiedLog.rir
+        }
+        draft.blocks[blockIndex].sets.append(newRow)
         draft.touch(now: now)
+        return .structureChanged
     }
 
+    @discardableResult
     static func copyLastSet(
         in blockID: UUID,
         draft: inout SessionDraft,
+        context: SessionMutationContext = .empty,
         now: Date = .now
-    ) {
-        draft.mutateBlock(blockID) { block in
-            guard let lastRow = block.sets.last else {
-                return
-            }
-
-            var newRow = SessionSetRow(
-                target: lastRow.target,
-                log: SetLog(
-                    setTargetID: lastRow.target.id,
-                    weight: lastRow.log.weight,
-                    reps: lastRow.log.reps,
-                    rir: lastRow.log.rir
-                )
-            )
-            newRow.target.id = UUID()
-            newRow.log.setTargetID = newRow.target.id
-            block.sets.append(newRow)
+    ) -> SessionMutationResult {
+        guard let blockIndex = resolvedBlockIndex(in: draft, blockID: blockID, suggested: context.blockIndex) else {
+            return .unchanged
         }
+
+        guard let lastRow = draft.blocks[blockIndex].sets.last else {
+            return .unchanged
+        }
+
+        var newRow = SessionSetRow(
+            target: lastRow.target,
+            log: SetLog(
+                setTargetID: lastRow.target.id,
+                weight: lastRow.log.weight,
+                reps: lastRow.log.reps,
+                rir: lastRow.log.rir
+            )
+        )
+        newRow.target.id = UUID()
+        newRow.log.setTargetID = newRow.target.id
+        draft.blocks[blockIndex].sets.append(newRow)
         draft.touch(now: now)
+        return .structureChanged
     }
 
+    @discardableResult
     static func addExerciseBlock(
         exercise: ExerciseCatalogItem,
         draft: inout SessionDraft,
         defaultRestSeconds: Int,
         now: Date = .now
-    ) {
+    ) -> SessionMutationResult {
         draft.blocks.append(
             SessionBlock(
                 exerciseID: exercise.id,
@@ -384,6 +461,7 @@ enum SessionEngine {
             )
         )
         draft.touch(now: now)
+        return .structureChanged
     }
 
     static func finishSession(
@@ -471,32 +549,40 @@ private extension ExerciseBlock {
 }
 
 private extension SessionDraft {
-    mutating func mutateBlock(
-        _ blockID: UUID,
-        mutation: (inout SessionBlock) -> Void
-    ) {
-        guard let index = blocks.firstIndex(where: { $0.id == blockID }) else {
-            return
-        }
-
-        mutation(&blocks[index])
-    }
-
     mutating func touch(_ restTimerEndsAt: Date? = nil, now: Date = .now) {
         lastUpdatedAt = now
         self.restTimerEndsAt = restTimerEndsAt ?? self.restTimerEndsAt
     }
 }
 
-private extension SessionBlock {
-    mutating func mutatingSet(
-        _ setID: UUID,
-        mutation: (inout SessionSetRow) -> Void
-    ) {
-        guard let index = sets.firstIndex(where: { $0.id == setID }) else {
-            return
+private extension SessionEngine {
+    static func resolvedBlockIndex(
+        in draft: SessionDraft,
+        blockID: UUID,
+        suggested: Int?
+    ) -> Int? {
+        if let suggested,
+            draft.blocks.indices.contains(suggested),
+            draft.blocks[suggested].id == blockID
+        {
+            return suggested
         }
 
-        mutation(&sets[index])
+        return draft.blocks.firstIndex(where: { $0.id == blockID })
+    }
+
+    static func resolvedSetIndex(
+        in block: SessionBlock,
+        setID: UUID,
+        suggested: Int?
+    ) -> Int? {
+        if let suggested,
+            block.sets.indices.contains(suggested),
+            block.sets[suggested].id == setID
+        {
+            return suggested
+        }
+
+        return block.sets.firstIndex(where: { $0.id == setID })
     }
 }

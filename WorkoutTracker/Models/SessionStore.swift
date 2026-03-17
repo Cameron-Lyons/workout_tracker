@@ -1,6 +1,115 @@
 import Foundation
 import Observation
 
+struct SessionMutationContext {
+    static let empty = SessionMutationContext(blockIndex: nil, setIndex: nil)
+
+    let blockIndex: Int?
+    let setIndex: Int?
+}
+
+enum SessionMutationResult {
+    case unchanged
+    case changed
+    case structureChanged
+
+    var didMutate: Bool {
+        self != .unchanged
+    }
+
+    var invalidatesIndexCache: Bool {
+        self == .structureChanged
+    }
+}
+
+private struct SessionDraftMetadata {
+    var notes: String
+    var restTimerEndsAt: Date?
+    var lastUpdatedAt: Date
+
+    init(draft: SessionDraft) {
+        notes = draft.notes
+        restTimerEndsAt = draft.restTimerEndsAt
+        lastUpdatedAt = draft.lastUpdatedAt
+    }
+
+    func applying(to draft: inout SessionDraft) {
+        draft.notes = notes
+        draft.restTimerEndsAt = restTimerEndsAt
+        draft.lastUpdatedAt = lastUpdatedAt
+    }
+}
+
+enum SessionUndoStrategy {
+    case fullDraft
+    case sessionMetadata
+    case block(UUID)
+}
+
+struct ActiveSessionProgress: Equatable, Sendable {
+    var blockCount = 0
+    var completedSetCount = 0
+    var canFinishWorkout = false
+
+    init(draft: SessionDraft?) {
+        guard let draft else {
+            return
+        }
+
+        blockCount = draft.blocks.count
+        for block in draft.blocks {
+            for row in block.sets where row.log.isCompleted {
+                completedSetCount += 1
+                if row.target.setKind == .working {
+                    canFinishWorkout = true
+                }
+            }
+        }
+    }
+}
+
+private enum SessionUndoEntry {
+    case fullDraft(SessionDraft)
+    case sessionMetadata(SessionDraftMetadata)
+    case block(
+        blockID: UUID,
+        index: Int,
+        block: SessionBlock,
+        metadata: SessionDraftMetadata
+    )
+}
+
+private struct ActiveDraftIndexCache {
+    private var blockIndicesByID: [UUID: Int] = [:]
+    private var setIndicesByBlockID: [UUID: [UUID: Int]] = [:]
+
+    init(draft: SessionDraft?) {
+        guard let draft else {
+            return
+        }
+
+        blockIndicesByID.reserveCapacity(draft.blocks.count)
+        setIndicesByBlockID.reserveCapacity(draft.blocks.count)
+
+        for (blockIndex, block) in draft.blocks.enumerated() {
+            blockIndicesByID[block.id] = blockIndex
+            setIndicesByBlockID[block.id] = Dictionary(
+                uniqueKeysWithValues: block.sets.enumerated().map { ($0.element.id, $0.offset) }
+            )
+        }
+    }
+
+    func context(blockID: UUID?, setID: UUID?) -> SessionMutationContext {
+        guard let blockID else {
+            return .empty
+        }
+
+        let blockIndex = blockIndicesByID[blockID]
+        let setIndex = setID.flatMap { setIndicesByBlockID[blockID]?[$0] }
+        return SessionMutationContext(blockIndex: blockIndex, setIndex: setIndex)
+    }
+}
+
 @MainActor
 @Observable
 final class SessionStore {
@@ -25,12 +134,18 @@ final class SessionStore {
     @ObservationIgnored private let draftSaveDebounceNanoseconds = Defaults.draftSaveDebounceNanoseconds
     @ObservationIgnored private let maxUndoSnapshots = Defaults.maxUndoSnapshots
     @ObservationIgnored private(set) var completedSessionsRevision = 0
+    @ObservationIgnored private var activeDraftIndexCache = ActiveDraftIndexCache(draft: nil)
 
     var activeDraft: SessionDraft?
+    private(set) var activeDraftProgress = ActiveSessionProgress(draft: nil)
     var completedSessions: [CompletedSession] = []
     var isPresentingSession = false
     var lastFinishedSummary: SessionFinishSummary?
-    var undoStack: [SessionDraft] = []
+    private var undoStack: [SessionUndoEntry] = []
+
+    var canUndo: Bool {
+        !undoStack.isEmpty
+    }
 
     init(repository: SessionRepository, persistenceController: SessionPersistenceController) {
         self.repository = repository
@@ -42,7 +157,7 @@ final class SessionStore {
     }
 
     func hydrate(with snapshot: HydrationSnapshot) {
-        activeDraft = snapshot.activeDraft
+        replaceActiveDraft(snapshot.activeDraft)
         completedSessions = snapshot.completedSessions
         bumpCompletedSessionsRevision()
     }
@@ -50,7 +165,7 @@ final class SessionStore {
     func resetAllData() {
         cancelPendingDraftSave()
         persistenceController.scheduleDeleteEverything()
-        activeDraft = nil
+        replaceActiveDraft(nil)
         completedSessions = []
         bumpCompletedSessionsRevision()
         isPresentingSession = false
@@ -72,7 +187,7 @@ final class SessionStore {
 
     func beginSession(_ draft: SessionDraft) {
         cancelPendingDraftSave()
-        activeDraft = draft
+        replaceActiveDraft(draft)
         undoStack = []
         persistActiveDraft(using: .immediate)
         isPresentingSession = true
@@ -82,28 +197,71 @@ final class SessionStore {
         persistence: DraftPersistenceBehavior = .immediate,
         _ mutation: (inout SessionDraft) -> Void
     ) {
-        guard let activeDraft else {
+        pushMutation(persistence: persistence) { draft, _ in
+            let previousDraft = draft
+            mutation(&draft)
+            return draft == previousDraft ? .unchanged : .changed
+        }
+    }
+
+    func pushMutation(
+        blockID: UUID? = nil,
+        setID: UUID? = nil,
+        undoStrategy: SessionUndoStrategy = .fullDraft,
+        persistence: DraftPersistenceBehavior = .immediate,
+        _ mutation: (inout SessionDraft, SessionMutationContext) -> SessionMutationResult
+    ) {
+        guard var draft = activeDraft else {
             return
         }
 
-        var updatedDraft = activeDraft
-        mutation(&updatedDraft)
-        guard updatedDraft != activeDraft else {
+        let interval = PerformanceSignpost.begin("Session Mutation")
+        defer { PerformanceSignpost.end(interval) }
+
+        let snapshot = draft
+        let context = activeDraftIndexCache.context(blockID: blockID, setID: setID)
+        let result = mutation(&draft, context)
+        guard result.didMutate else {
             return
         }
 
-        appendUndoSnapshot(activeDraft)
-        self.activeDraft = updatedDraft
+        appendUndoEntry(snapshot, strategy: undoStrategy, context: context)
+        updateActiveDraft(draft, invalidateIndexCache: result.invalidatesIndexCache)
         persistActiveDraft(using: persistence)
     }
 
     func undoLastMutation() {
-        guard let previousDraft = undoStack.popLast() else {
+        guard let entry = undoStack.popLast() else {
             return
         }
 
+        let interval = PerformanceSignpost.begin("Session Undo")
+        defer { PerformanceSignpost.end(interval) }
+
         cancelPendingDraftSave()
-        activeDraft = previousDraft
+        switch entry {
+        case .fullDraft(let previousDraft):
+            replaceActiveDraft(previousDraft)
+        case .sessionMetadata(let metadata):
+            guard var draft = activeDraft else {
+                return
+            }
+
+            metadata.applying(to: &draft)
+            replaceActiveDraft(draft)
+        case .block(let blockID, let index, let block, let metadata):
+            guard var draft = activeDraft else {
+                return
+            }
+
+            if let currentIndex = resolvedBlockIndex(in: draft, blockID: blockID, suggested: index) {
+                draft.blocks[currentIndex] = block
+            } else {
+                draft.blocks.insert(block, at: min(index, draft.blocks.count))
+            }
+            metadata.applying(to: &draft)
+            replaceActiveDraft(draft)
+        }
         persistActiveDraft(using: .immediate)
     }
 
@@ -112,8 +270,12 @@ final class SessionStore {
             return
         }
 
+        guard activeDraft.restTimerEndsAt != nil else {
+            return
+        }
+
         activeDraft.restTimerEndsAt = nil
-        self.activeDraft = activeDraft
+        updateActiveDraft(activeDraft)
         cancelPendingDraftSave()
         persistActiveDraft(using: .immediate)
     }
@@ -147,7 +309,7 @@ final class SessionStore {
         insertCompletedSession(completedSession)
         bumpCompletedSessionsRevision()
         persistenceController.schedulePersistCompletedSession(completedSession)
-        self.activeDraft = nil
+        replaceActiveDraft(nil)
         isPresentingSession = false
         undoStack = []
         return completedSession
@@ -155,7 +317,7 @@ final class SessionStore {
 
     func discardActiveSession() {
         cancelPendingDraftSave()
-        activeDraft = nil
+        replaceActiveDraft(nil)
         undoStack = []
         isPresentingSession = false
         persistenceController.scheduleSaveActiveDraft(nil)
@@ -180,13 +342,37 @@ final class SessionStore {
             return
         }
 
-        self.activeDraft = activeDraft
+        updateActiveDraft(activeDraft)
         cancelPendingDraftSave()
         persistActiveDraft(using: .immediate)
     }
 
-    private func appendUndoSnapshot(_ draft: SessionDraft) {
-        undoStack.append(draft)
+    private func appendUndoEntry(
+        _ snapshot: SessionDraft,
+        strategy: SessionUndoStrategy,
+        context: SessionMutationContext
+    ) {
+        let entry: SessionUndoEntry
+        switch strategy {
+        case .fullDraft:
+            entry = .fullDraft(snapshot)
+        case .sessionMetadata:
+            entry = .sessionMetadata(SessionDraftMetadata(draft: snapshot))
+        case .block(let blockID):
+            guard let blockIndex = resolvedBlockIndex(in: snapshot, blockID: blockID, suggested: context.blockIndex) else {
+                entry = .fullDraft(snapshot)
+                break
+            }
+
+            entry = .block(
+                blockID: blockID,
+                index: blockIndex,
+                block: snapshot.blocks[blockIndex],
+                metadata: SessionDraftMetadata(draft: snapshot)
+            )
+        }
+
+        undoStack.append(entry)
 
         if undoStack.count > maxUndoSnapshots {
             undoStack.removeFirst(undoStack.count - maxUndoSnapshots)
@@ -195,6 +381,34 @@ final class SessionStore {
 
     private func bumpCompletedSessionsRevision() {
         completedSessionsRevision &+= 1
+    }
+
+    private func replaceActiveDraft(_ draft: SessionDraft?) {
+        updateActiveDraft(draft, invalidateIndexCache: true)
+    }
+
+    private func updateActiveDraft(_ draft: SessionDraft?, invalidateIndexCache: Bool = false) {
+        activeDraft = draft
+        activeDraftProgress = ActiveSessionProgress(draft: draft)
+        if invalidateIndexCache {
+            rebuildActiveDraftIndexCache()
+        }
+    }
+
+    private func rebuildActiveDraftIndexCache() {
+        activeDraftIndexCache = ActiveDraftIndexCache(draft: activeDraft)
+    }
+
+    private func resolvedBlockIndex(
+        in draft: SessionDraft,
+        blockID: UUID,
+        suggested: Int?
+    ) -> Int? {
+        if let suggested, draft.blocks.indices.contains(suggested), draft.blocks[suggested].id == blockID {
+            return suggested
+        }
+
+        return draft.blocks.firstIndex(where: { $0.id == blockID })
     }
 
     private func insertCompletedSession(_ session: CompletedSession) {

@@ -10,10 +10,10 @@ final class PlansStore {
         var profiles: [ExerciseProfile]
     }
 
-    @ObservationIgnored private let repository: PlanRepository
     @ObservationIgnored private let persistenceController: PlanPersistenceController
     @ObservationIgnored private(set) var catalogByID: [UUID: ExerciseCatalogItem] = [:]
     @ObservationIgnored private(set) var catalogRevision = 0
+    @ObservationIgnored private(set) var planRevision = 0
     @ObservationIgnored private var plansByID: [UUID: Plan] = [:]
     @ObservationIgnored private var profilesByExerciseID: [UUID: ExerciseProfile] = [:]
     @ObservationIgnored private var cachedTemplateReferences: [TemplateReference] = []
@@ -22,8 +22,7 @@ final class PlansStore {
     var plans: [Plan] = []
     var profiles: [ExerciseProfile] = []
 
-    init(repository: PlanRepository, persistenceController: PlanPersistenceController) {
-        self.repository = repository
+    init(persistenceController: PlanPersistenceController) {
         self.persistenceController = persistenceController
     }
 
@@ -37,27 +36,28 @@ final class PlansStore {
 
     func resetAllData() {
         persistenceController.scheduleDeleteEverything()
-        persistenceController.flush()
         catalog = CatalogSeed.defaultCatalog()
         plans = []
         profiles = []
         rebuildCaches()
         bumpCatalogRevision()
-        repository.saveCatalog(catalog)
+        persistenceController.scheduleSaveCatalog(catalog)
     }
 
     func savePlan(_ plan: Plan) {
         upsertPlan(plan)
         rebuildPlanCaches()
-        flushPendingPlanPersistence()
-        repository.savePlans(plans)
+        persistenceController.scheduleUpsertPlans([plan])
     }
 
     func deletePlan(_ planID: UUID) {
+        guard plansByID[planID] != nil else {
+            return
+        }
+
         plans.removeAll(where: { $0.id == planID })
         rebuildPlanCaches()
-        flushPendingPlanPersistence()
-        repository.savePlans(plans)
+        persistenceController.scheduleDeletePlans([planID])
     }
 
     func addPresetPack(_ pack: PresetPack, settings: SettingsStore) {
@@ -157,6 +157,7 @@ final class PlansStore {
         }
 
         var didUpdate = false
+        var changedPlans: [Plan] = []
 
         for index in plans.indices {
             if plans[index].id == planID {
@@ -166,9 +167,11 @@ final class PlansStore {
 
                 plans[index].pinnedTemplateID = templateID
                 didUpdate = true
+                changedPlans.append(plans[index])
             } else if plans[index].pinnedTemplateID != nil {
                 plans[index].pinnedTemplateID = nil
                 didUpdate = true
+                changedPlans.append(plans[index])
             }
         }
 
@@ -177,8 +180,7 @@ final class PlansStore {
         }
 
         rebuildPlanCaches()
-        flushPendingPlanPersistence()
-        repository.savePlans(plans)
+        persistenceController.scheduleUpsertPlans(changedPlans)
     }
 
     func deleteTemplate(planID: UUID, templateID: UUID) {
@@ -211,8 +213,7 @@ final class PlansStore {
         }
 
         rebuildProfileCaches()
-        flushPendingPlanPersistence()
-        repository.saveProfiles(profiles)
+        persistenceController.scheduleUpsertProfiles(updatedProfiles)
     }
 
     func updateExerciseCatalogItem(
@@ -231,11 +232,13 @@ final class PlansStore {
         updatedItem.aliases = Array(Set(aliases + [previousName]).subtracting([name])).sorted()
         updatedItem.category = category
         catalog[index] = updatedItem
-        synchronizeExerciseNameSnapshots(exerciseID: itemID, name: name)
+        let changedPlans = synchronizeExerciseNameSnapshots(exerciseID: itemID, name: name)
         rebuildCatalogCaches()
         bumpCatalogRevision()
-        flushPendingPlanPersistence()
-        repository.saveCatalog(catalog)
+        persistenceController.scheduleUpsertCatalogItems([updatedItem])
+        if !changedPlans.isEmpty {
+            persistenceController.scheduleUpsertPlans(changedPlans)
+        }
     }
 
     func addCustomExercise(name: String, category: ExerciseCategory = .custom) -> ExerciseCatalogItem {
@@ -248,8 +251,7 @@ final class PlansStore {
         catalog.sort(by: { $0.name < $1.name })
         rebuildCatalogCaches()
         bumpCatalogRevision()
-        flushPendingPlanPersistence()
-        repository.saveCatalog(catalog)
+        persistenceController.scheduleUpsertCatalogItems([item])
         return item
     }
 
@@ -296,6 +298,7 @@ final class PlansStore {
                 )
             }
         }
+        bumpPlanRevision()
     }
 
     private func rebuildProfileCaches() {
@@ -304,6 +307,10 @@ final class PlansStore {
 
     private func bumpCatalogRevision() {
         catalogRevision &+= 1
+    }
+
+    private func bumpPlanRevision() {
+        planRevision &+= 1
     }
 
     private func hasPinnedTemplate(excluding planID: UUID? = nil) -> Bool {
@@ -316,8 +323,8 @@ final class PlansStore {
         }
     }
 
-    private func synchronizeExerciseNameSnapshots(exerciseID: UUID, name: String) {
-        var didUpdatePlans = false
+    private func synchronizeExerciseNameSnapshots(exerciseID: UUID, name: String) -> [Plan] {
+        var changedPlanIDs: Set<UUID> = []
 
         for planIndex in plans.indices {
             for templateIndex in plans[planIndex].templates.indices {
@@ -328,18 +335,17 @@ final class PlansStore {
                     }
 
                     plans[planIndex].templates[templateIndex].blocks[blockIndex].exerciseNameSnapshot = name
-                    didUpdatePlans = true
+                    changedPlanIDs.insert(plans[planIndex].id)
                 }
             }
         }
 
-        guard didUpdatePlans else {
-            return
+        guard !changedPlanIDs.isEmpty else {
+            return []
         }
 
         rebuildPlanCaches()
-        flushPendingPlanPersistence()
-        repository.savePlans(plans)
+        return plans.filter { changedPlanIDs.contains($0.id) }
     }
 
     func updatePlanProgression(

@@ -87,8 +87,7 @@ final class SessionRepository: RepositoryBase {
             startedAt: record.startedAt,
             lastUpdatedAt: record.lastUpdatedAt,
             notes: record.notes,
-            blocks: record.blocks
-                .sorted(by: { $0.orderIndex < $1.orderIndex })
+            blocks: orderedRecordsIfNeeded(record.blocks, by: \.orderIndex)
                 .compactMap(activeBlock(from:)),
             restTimerEndsAt: record.restTimerEndsAt
         )
@@ -116,8 +115,7 @@ final class SessionRepository: RepositoryBase {
             startedAt: record.startedAt,
             completedAt: record.completedAt,
             notes: record.notes,
-            blocks: record.blocks
-                .sorted(by: { $0.orderIndex < $1.orderIndex })
+            blocks: orderedRecordsIfNeeded(record.blocks, by: \.orderIndex)
                 .compactMap(completedBlock(from:))
         )
     }
@@ -340,8 +338,7 @@ final class SessionRepository: RepositoryBase {
     }
 
     private func orderedSessionRows<Record: StoredSessionRowRecord>(from records: [Record]) -> [SessionSetRow] {
-        records
-            .sorted(by: { $0.orderIndex < $1.orderIndex })
+        orderedRecordsIfNeeded(records, by: \.orderIndex)
             .map(sessionSetRow(from:))
     }
 

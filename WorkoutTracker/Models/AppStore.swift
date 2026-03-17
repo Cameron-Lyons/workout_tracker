@@ -38,7 +38,6 @@ final class AppStore {
 
         let settingsStore = SettingsStore()
         let plansStore = PlansStore(
-            repository: PlanRepository(modelContext: context),
             persistenceController: planPersistenceController
         )
         let sessionStore = SessionStore(
@@ -219,7 +218,8 @@ final class AppStore {
         Plan(name: name, templates: [])
     }
 
-    func refreshDerivedStores() async {
+    @discardableResult
+    func refreshDerivedStores() async -> Bool {
         await derivedStateController.refreshDerivedStores(
             plansStore: plansStore,
             sessionStore: sessionStore

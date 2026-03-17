@@ -222,11 +222,7 @@ struct TodayView: View {
     }
 
     private func resumeCard(_ draft: SessionDraft) -> some View {
-        let completedSetCount = draft.blocks.reduce(0) { partialResult, block in
-            partialResult + block.sets.reduce(0) { count, row in
-                count + (row.log.isCompleted ? 1 : 0)
-            }
-        }
+        let progress = sessionStore.activeDraftProgress
 
         return TodaySpotlightCard(tone: .today) {
             VStack(alignment: .leading, spacing: 16) {
@@ -248,13 +244,13 @@ struct TodayView: View {
                     VStack(alignment: .trailing, spacing: 8) {
                         MetricBadge(
                             label: "Blocks",
-                            value: "\(draft.blocks.count)",
+                            value: "\(progress.blockCount)",
                             systemImage: "square.grid.2x2",
                             tone: .today
                         )
                         MetricBadge(
                             label: "Logged",
-                            value: "\(completedSetCount)",
+                            value: "\(progress.completedSetCount)",
                             systemImage: "checklist",
                             tone: .success
                         )

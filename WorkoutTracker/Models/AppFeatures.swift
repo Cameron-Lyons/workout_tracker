@@ -5,6 +5,16 @@ final class AppDerivedStateController {
     private struct SessionAnalyticsCacheKey: Equatable {
         var completedSessionsRevision: Int
         var catalogRevision: Int
+    }
+
+    private struct TodayStateKey: Equatable {
+        var sessionAnalytics: SessionAnalyticsCacheKey
+        var planRevision: Int
+        var dayBucket: Date
+    }
+
+    private struct ProgressStateKey: Equatable {
+        var sessionAnalytics: SessionAnalyticsCacheKey
         var dayBucket: Date
     }
 
@@ -15,6 +25,9 @@ final class AppDerivedStateController {
     private var progressRefreshGeneration = 0
     private var cachedSessionAnalytics: AnalyticsRepository.SessionAnalyticsSnapshot?
     private var cachedSessionAnalyticsKey: SessionAnalyticsCacheKey?
+    private var cachedSessionAnalyticsDayBucket: Date?
+    private var lastAppliedTodayStateKey: TodayStateKey?
+    private var lastAppliedProgressStateKey: ProgressStateKey?
 
     init(
         analytics: AnalyticsRepository = AnalyticsRepository(),
@@ -30,11 +43,31 @@ final class AppDerivedStateController {
         await refreshDerivedStores(plansStore: plansStore, sessionStore: sessionStore)
     }
 
+    @discardableResult
     func refreshDerivedStores(
         plansStore: PlansStore,
         sessionStore: SessionStore,
         now: Date = .now
-    ) async {
+    ) async -> Bool {
+        let sessionAnalyticsKey = sessionAnalyticsCacheKey(plansStore: plansStore, sessionStore: sessionStore)
+        let dayBucket = dayBucket(for: now)
+        let todayKey = TodayStateKey(
+            sessionAnalytics: sessionAnalyticsKey,
+            planRevision: plansStore.planRevision,
+            dayBucket: dayBucket
+        )
+        let progressKey = ProgressStateKey(sessionAnalytics: sessionAnalyticsKey, dayBucket: dayBucket)
+        let shouldRefreshToday = lastAppliedTodayStateKey != todayKey
+        let shouldRefreshProgress = lastAppliedProgressStateKey != progressKey
+
+        guard shouldRefreshToday || shouldRefreshProgress else {
+            PerformanceSignpost.event("Derived Refresh Skipped")
+            return false
+        }
+
+        let interval = PerformanceSignpost.begin("Derived Store Refresh")
+        defer { PerformanceSignpost.end(interval) }
+
         let plans = plansStore.plans
         let references = plansStore.templateReferences()
         let sessions = sessionStore.completedSessions
@@ -47,26 +80,50 @@ final class AppDerivedStateController {
             now: now
         )
 
-        let todaySnapshot = analytics.makeTodaySnapshot(
-            plans: plans,
-            references: references,
-            sessions: sessions,
-            sessionAnalytics: sessionAnalytics,
-            now: now
-        )
+        if shouldRefreshToday {
+            let todaySnapshot = analytics.makeTodaySnapshot(
+                plans: plans,
+                references: references,
+                sessions: sessions,
+                sessionAnalytics: sessionAnalytics,
+                now: now
+            )
+            todayStore.apply(todaySnapshot)
+            lastAppliedTodayStateKey = todayKey
+        }
 
-        let progressState = await preparedProgressState(
-            sessionAnalytics: sessionAnalytics,
-            completedSessions: sessions,
-            selectedExerciseID: selectedExerciseID,
-            selectedDay: selectedDay
-        )
+        if shouldRefreshProgress {
+            let progressState = await preparedProgressState(
+                sessionAnalytics: sessionAnalytics,
+                completedSessions: sessions,
+                selectedExerciseID: selectedExerciseID,
+                selectedDay: selectedDay
+            )
+            progressStore.apply(progressState)
+            lastAppliedProgressStateKey = progressKey
+        }
 
-        apply(todaySnapshot: todaySnapshot, progressState: progressState)
+        return true
     }
 
-    func refreshToday(plansStore: PlansStore, sessionStore: SessionStore, now: Date = .now) {
+    @discardableResult
+    func refreshToday(plansStore: PlansStore, sessionStore: SessionStore, now: Date = .now) -> Bool {
         let sessions = sessionStore.completedSessions
+        let sessionAnalyticsKey = sessionAnalyticsCacheKey(plansStore: plansStore, sessionStore: sessionStore)
+        let todayKey = TodayStateKey(
+            sessionAnalytics: sessionAnalyticsKey,
+            planRevision: plansStore.planRevision,
+            dayBucket: dayBucket(for: now)
+        )
+
+        guard lastAppliedTodayStateKey != todayKey else {
+            PerformanceSignpost.event("Today Refresh Skipped")
+            return false
+        }
+
+        let interval = PerformanceSignpost.begin("Today Refresh")
+        defer { PerformanceSignpost.end(interval) }
+
         let sessionAnalytics = resolvedSessionAnalyticsSnapshot(
             plansStore: plansStore,
             sessionStore: sessionStore,
@@ -82,13 +139,25 @@ final class AppDerivedStateController {
                 now: now
             )
         )
+        lastAppliedTodayStateKey = todayKey
+        return true
     }
 
+    @discardableResult
     func scheduleProgressRefresh(
         plansStore: PlansStore,
         sessionStore: SessionStore,
         priority: TaskPriority = .utility
-    ) {
+    ) -> Bool {
+        let progressKey = ProgressStateKey(
+            sessionAnalytics: sessionAnalyticsCacheKey(plansStore: plansStore, sessionStore: sessionStore),
+            dayBucket: dayBucket()
+        )
+        guard lastAppliedProgressStateKey != progressKey else {
+            PerformanceSignpost.event("Progress Refresh Skipped")
+            return false
+        }
+
         let selectedExerciseID = progressStore.selectedExerciseID
         let selectedDay = progressStore.selectedDay
         let completedSessions = sessionStore.completedSessions
@@ -101,6 +170,9 @@ final class AppDerivedStateController {
             guard let self else {
                 return
             }
+
+            let interval = PerformanceSignpost.begin("Progress Refresh")
+            defer { PerformanceSignpost.end(interval) }
 
             let sessionAnalytics: AnalyticsRepository.SessionAnalyticsSnapshot
             if let cachedSessionAnalytics = self.cachedSessionAnalyticsSnapshot(
@@ -138,9 +210,12 @@ final class AppDerivedStateController {
                 }
 
                 self.progressStore.apply(progressState)
+                self.lastAppliedProgressStateKey = progressKey
                 self.progressRefreshTask = nil
             }
         }
+
+        return true
     }
 
     func recordCompletedSession(
@@ -177,8 +252,16 @@ final class AppDerivedStateController {
                 recentPersonalRecords: todayStore.recentPersonalRecords,
                 recentSessions: todayStore.recentSessions
             ),
-            key: sessionAnalyticsCacheKey(plansStore: plansStore, sessionStore: sessionStore)
+            key: sessionAnalyticsCacheKey(plansStore: plansStore, sessionStore: sessionStore),
+            dayBucket: dayBucket()
         )
+        let sessionAnalyticsKey = sessionAnalyticsCacheKey(plansStore: plansStore, sessionStore: sessionStore)
+        lastAppliedTodayStateKey = TodayStateKey(
+            sessionAnalytics: sessionAnalyticsKey,
+            planRevision: plansStore.planRevision,
+            dayBucket: dayBucket()
+        )
+        lastAppliedProgressStateKey = ProgressStateKey(sessionAnalytics: sessionAnalyticsKey, dayBucket: dayBucket())
     }
 
     func completedSessionResult(
@@ -190,14 +273,6 @@ final class AppDerivedStateController {
             previousBestByExerciseID: progressStore.personalBestOneRepMaxByExerciseID,
             catalogByID: catalogByID
         )
-    }
-
-    private func apply(
-        todaySnapshot: AnalyticsRepository.TodaySnapshot,
-        progressState: ProgressStore.PreparedState
-    ) {
-        todayStore.apply(todaySnapshot)
-        progressStore.apply(progressState)
     }
 
     private func preparedProgressState(
@@ -241,11 +316,8 @@ final class AppDerivedStateController {
         )
         cacheSessionAnalytics(
             snapshot,
-            key: sessionAnalyticsCacheKey(
-                plansStore: plansStore,
-                sessionStore: sessionStore,
-                now: now
-            )
+            key: sessionAnalyticsCacheKey(plansStore: plansStore, sessionStore: sessionStore),
+            dayBucket: dayBucket(for: now)
         )
         return snapshot
     }
@@ -266,7 +338,7 @@ final class AppDerivedStateController {
 
         let sessions = sessionStore.completedSessions
         let catalogByID = plansStore.catalogByID
-        let key = sessionAnalyticsCacheKey(plansStore: plansStore, sessionStore: sessionStore, now: now)
+        let key = sessionAnalyticsCacheKey(plansStore: plansStore, sessionStore: sessionStore)
         let snapshot = await Task.detached(priority: priority) { [analytics] in
             analytics.makeSessionAnalyticsSnapshot(
                 sessions: sessions,
@@ -274,7 +346,7 @@ final class AppDerivedStateController {
                 now: now
             )
         }.value
-        cacheSessionAnalytics(snapshot, key: key)
+        cacheSessionAnalytics(snapshot, key: key, dayBucket: dayBucket(for: now))
         return snapshot
     }
 
@@ -283,32 +355,51 @@ final class AppDerivedStateController {
         sessionStore: SessionStore,
         now: Date = .now
     ) -> AnalyticsRepository.SessionAnalyticsSnapshot? {
-        let key = sessionAnalyticsCacheKey(plansStore: plansStore, sessionStore: sessionStore, now: now)
+        let key = sessionAnalyticsCacheKey(plansStore: plansStore, sessionStore: sessionStore)
         guard cachedSessionAnalyticsKey == key else {
             return nil
         }
 
-        return cachedSessionAnalytics
+        guard let cachedSessionAnalytics else {
+            return nil
+        }
+
+        let dayBucket = dayBucket(for: now)
+        guard cachedSessionAnalyticsDayBucket != dayBucket else {
+            return cachedSessionAnalytics
+        }
+
+        let updatedSnapshot = analytics.updatingOverview(
+            of: cachedSessionAnalytics,
+            sessions: sessionStore.completedSessions,
+            now: now
+        )
+        cacheSessionAnalytics(updatedSnapshot, key: key, dayBucket: dayBucket)
+        return updatedSnapshot
     }
 
     private func cacheSessionAnalytics(
         _ snapshot: AnalyticsRepository.SessionAnalyticsSnapshot,
-        key: SessionAnalyticsCacheKey
+        key: SessionAnalyticsCacheKey,
+        dayBucket: Date
     ) {
         cachedSessionAnalytics = snapshot
         cachedSessionAnalyticsKey = key
+        cachedSessionAnalyticsDayBucket = dayBucket
     }
 
     private func sessionAnalyticsCacheKey(
         plansStore: PlansStore,
-        sessionStore: SessionStore,
-        now: Date = .now
+        sessionStore: SessionStore
     ) -> SessionAnalyticsCacheKey {
         SessionAnalyticsCacheKey(
             completedSessionsRevision: sessionStore.completedSessionsRevision,
-            catalogRevision: plansStore.catalogRevision,
-            dayBucket: Calendar.autoupdatingCurrent.startOfDay(for: now)
+            catalogRevision: plansStore.catalogRevision
         )
+    }
+
+    private func dayBucket(for now: Date = .now) -> Date {
+        Calendar.autoupdatingCurrent.startOfDay(for: now)
     }
 }
 
@@ -463,32 +554,55 @@ final class AppSessionCoordinator {
     }
 
     func toggleSetCompletion(blockID: UUID, setID: UUID) {
-        sessionStore.pushMutation(persistence: .deferred) { draft in
-            SessionEngine.toggleCompletion(of: setID, in: blockID, draft: &draft)
+        sessionStore.pushMutation(
+            blockID: blockID,
+            setID: setID,
+            undoStrategy: .block(blockID),
+            persistence: .deferred
+        ) { draft, context in
+            SessionEngine.toggleCompletion(of: setID, in: blockID, draft: &draft, context: context)
         }
     }
 
     func adjustSetWeight(blockID: UUID, setID: UUID, delta: Double) {
-        sessionStore.pushMutation(persistence: .deferred) { draft in
-            SessionEngine.adjustWeight(by: delta, setID: setID, in: blockID, draft: &draft)
+        sessionStore.pushMutation(
+            blockID: blockID,
+            setID: setID,
+            undoStrategy: .block(blockID),
+            persistence: .deferred
+        ) { draft, context in
+            SessionEngine.adjustWeight(by: delta, setID: setID, in: blockID, draft: &draft, context: context)
         }
     }
 
     func adjustSetReps(blockID: UUID, setID: UUID, delta: Int) {
-        sessionStore.pushMutation(persistence: .deferred) { draft in
-            SessionEngine.adjustReps(by: delta, setID: setID, in: blockID, draft: &draft)
+        sessionStore.pushMutation(
+            blockID: blockID,
+            setID: setID,
+            undoStrategy: .block(blockID),
+            persistence: .deferred
+        ) { draft, context in
+            SessionEngine.adjustReps(by: delta, setID: setID, in: blockID, draft: &draft, context: context)
         }
     }
 
     func addSet(to blockID: UUID) {
-        sessionStore.pushMutation(persistence: .deferred) { draft in
-            SessionEngine.addSet(to: blockID, draft: &draft)
+        sessionStore.pushMutation(
+            blockID: blockID,
+            undoStrategy: .block(blockID),
+            persistence: .deferred
+        ) { draft, context in
+            SessionEngine.addSet(to: blockID, draft: &draft, context: context)
         }
     }
 
     func copyLastSet(in blockID: UUID) {
-        sessionStore.pushMutation(persistence: .deferred) { draft in
-            SessionEngine.copyLastSet(in: blockID, draft: &draft)
+        sessionStore.pushMutation(
+            blockID: blockID,
+            undoStrategy: .block(blockID),
+            persistence: .deferred
+        ) { draft, context in
+            SessionEngine.copyLastSet(in: blockID, draft: &draft, context: context)
         }
     }
 
@@ -497,7 +611,7 @@ final class AppSessionCoordinator {
             return
         }
 
-        sessionStore.pushMutation(persistence: .deferred) { draft in
+        sessionStore.pushMutation(persistence: .deferred) { draft, _ in
             SessionEngine.addExerciseBlock(
                 exercise: exercise,
                 draft: &draft,
@@ -516,13 +630,17 @@ final class AppSessionCoordinator {
     }
 
     func updateActiveBlockNotes(blockID: UUID, note: String) {
-        sessionStore.pushMutation(persistence: .deferred) { draft in
-            SessionEngine.updateNotes(in: blockID, note: note, draft: &draft)
+        sessionStore.pushMutation(
+            blockID: blockID,
+            undoStrategy: .block(blockID),
+            persistence: .deferred
+        ) { draft, context in
+            SessionEngine.updateNotes(in: blockID, note: note, draft: &draft, context: context)
         }
     }
 
     func updateActiveSessionNotes(_ notes: String) {
-        sessionStore.pushMutation(persistence: .deferred) { draft in
+        sessionStore.pushMutation(undoStrategy: .sessionMetadata, persistence: .deferred) { draft, _ in
             SessionEngine.updateSessionNotes(notes, draft: &draft)
         }
     }

@@ -157,6 +157,19 @@ final class WorkoutStoreTests: XCTestCase {
     }
 
     @MainActor
+    func testRefreshDerivedStoresSkipsNoOpForegroundPass() async throws {
+        let store = makeStore()
+        await store.hydrateIfNeeded()
+        store.plansStore.addPresetPack(.generalGym, settings: store.settingsStore)
+
+        let firstRefresh = await store.refreshDerivedStores()
+        let secondRefresh = await store.refreshDerivedStores()
+
+        XCTAssertTrue(firstRefresh)
+        XCTAssertFalse(secondRefresh)
+    }
+
+    @MainActor
     func testStartingAnotherTemplateResumesCurrentDraftUntilUserReplacesIt() async throws {
         let store = makeStore()
         await store.hydrateIfNeeded()
@@ -1133,6 +1146,128 @@ final class WorkoutStoreTests: XCTestCase {
         store.flushPendingDraftSave()
 
         XCTAssertEqual(repository.loadActiveDraft()?.blocks.first?.sets.first?.log.weight, 190)
+    }
+
+    @MainActor
+    func testSessionStoreUndoRestoresBlockSessionAndFullDraftMutationsIncrementally() throws {
+        let container = WorkoutModelContainerFactory.makeContainer(isStoredInMemoryOnly: true)
+        let context = ModelContext(container)
+        context.autosaveEnabled = false
+        let repository = SessionRepository(modelContext: context)
+        let store = SessionStore(
+            repository: repository,
+            persistenceController: SessionPersistenceControllerRegistry.controller(for: container)
+        )
+
+        let target = SetTarget(
+            setKind: .working,
+            targetWeight: 185,
+            repRange: RepRange(5, 5)
+        )
+        let row = SessionSetRow(
+            target: target,
+            log: SetLog(setTargetID: target.id, weight: 185, reps: 5)
+        )
+        let block = SessionBlock(
+            exerciseID: CatalogSeed.benchPress,
+            exerciseNameSnapshot: "Bench Press",
+            restSeconds: 90,
+            progressionRule: .manual,
+            sets: [row]
+        )
+        let draft = SessionDraft(
+            planID: nil,
+            templateID: UUID(),
+            templateNameSnapshot: "Bench Day",
+            blocks: [block]
+        )
+        let accessory = ExerciseCatalogItem(
+            id: CatalogSeed.backSquat,
+            name: "Back Squat",
+            category: .legs
+        )
+
+        store.beginSession(draft)
+        XCTAssertFalse(store.canUndo)
+
+        store.pushMutation(
+            blockID: block.id,
+            setID: row.id,
+            undoStrategy: .block(block.id),
+            persistence: .deferred
+        ) { updatedDraft, context in
+            SessionEngine.adjustWeight(by: 5, setID: row.id, in: block.id, draft: &updatedDraft, context: context)
+        }
+        store.pushMutation(
+            blockID: block.id,
+            undoStrategy: .block(block.id),
+            persistence: .deferred
+        ) { updatedDraft, context in
+            SessionEngine.addSet(to: block.id, draft: &updatedDraft, context: context)
+        }
+        store.pushMutation(undoStrategy: .sessionMetadata, persistence: .deferred) { updatedDraft, _ in
+            SessionEngine.updateSessionNotes("Focus cues", draft: &updatedDraft)
+        }
+        store.pushMutation(persistence: .deferred) { updatedDraft, _ in
+            SessionEngine.addExerciseBlock(
+                exercise: accessory,
+                draft: &updatedDraft,
+                defaultRestSeconds: 120
+            )
+        }
+
+        let mutatedDraft = try XCTUnwrap(store.activeDraft)
+        XCTAssertTrue(store.canUndo)
+        XCTAssertEqual(mutatedDraft.blocks.count, 2)
+        XCTAssertEqual(mutatedDraft.notes, "Focus cues")
+        XCTAssertEqual(mutatedDraft.blocks.first?.sets.count, 2)
+        XCTAssertEqual(mutatedDraft.blocks.first?.sets.first?.log.weight, 190)
+
+        store.undoLastMutation()
+        let afterFullDraftUndo = try XCTUnwrap(store.activeDraft)
+        XCTAssertEqual(afterFullDraftUndo.blocks.count, 1)
+        XCTAssertEqual(afterFullDraftUndo.notes, "Focus cues")
+        XCTAssertEqual(afterFullDraftUndo.blocks.first?.sets.count, 2)
+        XCTAssertEqual(afterFullDraftUndo.blocks.first?.sets.first?.log.weight, 190)
+
+        store.undoLastMutation()
+        let afterSessionMetadataUndo = try XCTUnwrap(store.activeDraft)
+        XCTAssertEqual(afterSessionMetadataUndo.notes, "")
+        XCTAssertEqual(afterSessionMetadataUndo.blocks.first?.sets.count, 2)
+        XCTAssertEqual(afterSessionMetadataUndo.blocks.first?.sets.first?.log.weight, 190)
+
+        store.undoLastMutation()
+        let afterBlockStructureUndo = try XCTUnwrap(store.activeDraft)
+        XCTAssertEqual(afterBlockStructureUndo.blocks.first?.sets.count, 1)
+        XCTAssertEqual(afterBlockStructureUndo.blocks.first?.sets.first?.log.weight, 190)
+
+        store.undoLastMutation()
+        let afterBlockValueUndo = try XCTUnwrap(store.activeDraft)
+        XCTAssertEqual(afterBlockValueUndo.blocks.first?.sets.count, 1)
+        XCTAssertEqual(afterBlockValueUndo.blocks.first?.sets.first?.log.weight, 185)
+        XCTAssertFalse(store.canUndo)
+
+        store.flushPendingDraftSave()
+
+        let rehydrationContext = ModelContext(container)
+        rehydrationContext.autosaveEnabled = false
+        let rehydrationRepository = SessionRepository(modelContext: rehydrationContext)
+        let rehydratedStore = SessionStore(
+            repository: rehydrationRepository,
+            persistenceController: SessionPersistenceControllerRegistry.controller(for: container)
+        )
+        rehydratedStore.hydrate(
+            with: SessionStore.HydrationSnapshot(
+                activeDraft: rehydrationRepository.loadActiveDraft(),
+                completedSessions: rehydrationRepository.loadCompletedSessions()
+            )
+        )
+
+        let persistedDraft = try XCTUnwrap(rehydratedStore.activeDraft)
+        XCTAssertEqual(persistedDraft.blocks.count, 1)
+        XCTAssertEqual(persistedDraft.notes, "")
+        XCTAssertEqual(persistedDraft.blocks.first?.sets.count, 1)
+        XCTAssertEqual(persistedDraft.blocks.first?.sets.first?.log.weight, 185)
     }
 
     @MainActor
