@@ -15,6 +15,7 @@
 		1AE4C2FD2C5E486C7C2B5EC5 /* PresetPackBuilder.swift in Sources */ = {isa = PBXBuildFile; fileRef = 3F5DC8791A1D1335933B1B59 /* PresetPackBuilder.swift */; };
 		27D4532BEB04B573C149762D /* AnalyticsRepository.swift in Sources */ = {isa = PBXBuildFile; fileRef = 7745455D06F0AE7C3CCF813C /* AnalyticsRepository.swift */; };
 		2CE6AA48746C6D5DA1DE9163 /* WorkoutProgramEngine.swift in Sources */ = {isa = PBXBuildFile; fileRef = 114369B450A456FF1EEED1B1 /* WorkoutProgramEngine.swift */; };
+		A1B2C3D4E5F60718293A4B5C /* WorkoutBenchmarkTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = A1B2C3D4E5F60718293A4B5D /* WorkoutBenchmarkTests.swift */; };
 		30E7100ABA3CBE52E878DEDE /* WeightLogicTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 3FE38E02182360CF96242C4C /* WeightLogicTests.swift */; };
 		3AF0B94393706B4BF3FF2FE2 /* AppFeatures.swift in Sources */ = {isa = PBXBuildFile; fileRef = AF1CB2547635A2626D932A70 /* AppFeatures.swift */; };
 		3BBC2D3193CD98731B5054D5 /* PlansStore.swift in Sources */ = {isa = PBXBuildFile; fileRef = 6E0E037604004C09AB0B9267 /* PlansStore.swift */; };
@@ -58,6 +59,7 @@
 /* Begin PBXFileReference section */
 		051126D66CEE8C5031D2E955 /* RootTabView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = RootTabView.swift; sourceTree = "<group>"; };
 		114369B450A456FF1EEED1B1 /* WorkoutProgramEngine.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = WorkoutProgramEngine.swift; sourceTree = "<group>"; };
+		A1B2C3D4E5F60718293A4B5D /* WorkoutBenchmarkTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = WorkoutBenchmarkTests.swift; sourceTree = "<group>"; };
 		2AB9E215AE2B627588A526E4 /* SessionStore.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SessionStore.swift; sourceTree = "<group>"; };
 		3DABDDB62B39CC0CB62EEACD /* PlanPersistenceController.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = PlanPersistenceController.swift; sourceTree = "<group>"; };
 		3F5DC8791A1D1335933B1B59 /* PresetPackBuilder.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = PresetPackBuilder.swift; sourceTree = "<group>"; };
@@ -140,6 +142,7 @@
 		A299D8FA2EE633EA50284A46 /* WorkoutTrackerTests */ = {
 			isa = PBXGroup;
 			children = (
+				A1B2C3D4E5F60718293A4B5D /* WorkoutBenchmarkTests.swift */,
 				3FE38E02182360CF96242C4C /* WeightLogicTests.swift */,
 				551AE52134D85116A5415169 /* WorkoutProgramEngineTests.swift */,
 				C34F48B2A70097769AF75CFB /* WorkoutStoreTests.swift */,
@@ -288,6 +291,7 @@
 			isa = PBXSourcesBuildPhase;
 			buildActionMask = 2147483647;
 			files = (
+				A1B2C3D4E5F60718293A4B5C /* WorkoutBenchmarkTests.swift in Sources */,
 				30E7100ABA3CBE52E878DEDE /* WeightLogicTests.swift in Sources */,
 				ED7478F198DCDFCD0F107A4A /* WorkoutProgramEngineTests.swift in Sources */,
 				ABD873E424154FD3FB356B4B /* WorkoutStoreTests.swift in Sources */,
