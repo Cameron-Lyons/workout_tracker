@@ -3,7 +3,31 @@ import XCTest
 
 @testable import WorkoutTracker
 
+@MainActor
 final class WorkoutBenchmarkTests: XCTestCase {
+    private enum Thresholds {
+        static let sessionAnalyticsSnapshotLargeHistory = BenchmarkThreshold(
+            iterationCount: 5,
+            averageSecondsUpperBound: 0.040,
+            maxSecondsUpperBound: 0.055
+        )
+        static let progressStorePrepareStateLargeHistory = BenchmarkThreshold(
+            iterationCount: 5,
+            averageSecondsUpperBound: 0.010,
+            maxSecondsUpperBound: 0.020
+        )
+        static let planRepositoryLoadPlansLargeLibrary = BenchmarkThreshold(
+            iterationCount: 3,
+            averageSecondsUpperBound: 2.350,
+            maxSecondsUpperBound: 2.700
+        )
+        static let sessionRepositoryLoadCompletedSessionsLargeHistory = BenchmarkThreshold(
+            iterationCount: 3,
+            averageSecondsUpperBound: 1.000,
+            maxSecondsUpperBound: 1.150
+        )
+    }
+
     private let analytics = AnalyticsRepository()
 
     func testBenchmarkSessionAnalyticsSnapshotLargeHistory() {
@@ -14,7 +38,10 @@ final class WorkoutBenchmarkTests: XCTestCase {
         )
         var snapshot: AnalyticsRepository.SessionAnalyticsSnapshot?
 
-        measure(metrics: [XCTClockMetric()], options: benchmarkOptions()) {
+        benchmark(
+            named: "Session analytics snapshot / large history",
+            threshold: Thresholds.sessionAnalyticsSnapshotLargeHistory
+        ) {
             snapshot = analytics.makeSessionAnalyticsSnapshot(
                 sessions: sessions,
                 catalogByID: WorkoutBenchmarkFixtures.catalogByID,
@@ -45,7 +72,10 @@ final class WorkoutBenchmarkTests: XCTestCase {
         let selectedDay = sessions[sessions.count / 2].completedAt
         var preparedState: ProgressStore.PreparedState?
 
-        measure(metrics: [XCTClockMetric()], options: benchmarkOptions()) {
+        benchmark(
+            named: "Progress store prepareState / large history",
+            threshold: Thresholds.progressStorePrepareStateLargeHistory
+        ) {
             preparedState = ProgressStore.prepareState(
                 progressSnapshot,
                 completedSessions: sessions,
@@ -73,7 +103,10 @@ final class WorkoutBenchmarkTests: XCTestCase {
         XCTAssertTrue(seedRepository.savePlans(plans))
 
         var loadedPlans: [Plan] = []
-        measure(metrics: [XCTClockMetric()], options: benchmarkOptions(iterationCount: 3)) {
+        benchmark(
+            named: "Plan repository loadPlans / large library",
+            threshold: Thresholds.planRepositoryLoadPlansLargeLibrary
+        ) {
             autoreleasepool {
                 let context = ModelContext(container)
                 context.autosaveEnabled = false
@@ -101,7 +134,10 @@ final class WorkoutBenchmarkTests: XCTestCase {
         }
 
         var loadedSessions: [CompletedSession] = []
-        measure(metrics: [XCTClockMetric()], options: benchmarkOptions(iterationCount: 3)) {
+        benchmark(
+            named: "Session repository loadCompletedSessions / large history",
+            threshold: Thresholds.sessionRepositoryLoadCompletedSessionsLargeHistory
+        ) {
             autoreleasepool {
                 let context = ModelContext(container)
                 context.autosaveEnabled = false
@@ -113,10 +149,105 @@ final class WorkoutBenchmarkTests: XCTestCase {
         XCTAssertEqual(loadedSessions.first?.completedAt, sessions.first?.completedAt)
     }
 
-    private func benchmarkOptions(iterationCount: Int = 5) -> XCTMeasureOptions {
-        let options = XCTMeasureOptions()
-        options.iterationCount = iterationCount
-        return options
+    @discardableResult
+    private func benchmark(
+        named name: String,
+        threshold: BenchmarkThreshold,
+        operation: () -> Void
+    ) -> BenchmarkResult {
+        operation()
+
+        var samples: [TimeInterval] = []
+        samples.reserveCapacity(threshold.iterationCount)
+
+        for _ in 0..<threshold.iterationCount {
+            let start = DispatchTime.now().uptimeNanoseconds
+            operation()
+            let elapsedNanoseconds = DispatchTime.now().uptimeNanoseconds - start
+            samples.append(Double(elapsedNanoseconds) / 1_000_000_000)
+        }
+
+        let result = BenchmarkResult(samples: samples)
+        XCTContext.runActivity(named: "Benchmark: \(name)") { activity in
+            activity.add(XCTAttachment(string: result.report(named: name, threshold: threshold)))
+        }
+
+        XCTAssertLessThanOrEqual(
+            result.averageSeconds,
+            threshold.averageSecondsUpperBound,
+            "\(name) average \(result.formattedAverage) exceeded threshold \(threshold.formattedAverageUpperBound)"
+        )
+        XCTAssertLessThanOrEqual(
+            result.maxSeconds,
+            threshold.maxSecondsUpperBound,
+            "\(name) max sample \(result.formattedMax) exceeded threshold \(threshold.formattedMaxUpperBound)"
+        )
+
+        return result
+    }
+}
+
+private struct BenchmarkThreshold {
+    let iterationCount: Int
+    let averageSecondsUpperBound: TimeInterval
+    let maxSecondsUpperBound: TimeInterval
+
+    var formattedAverageUpperBound: String {
+        String(format: "%.3fs", averageSecondsUpperBound)
+    }
+
+    var formattedMaxUpperBound: String {
+        String(format: "%.3fs", maxSecondsUpperBound)
+    }
+}
+
+private struct BenchmarkResult {
+    let samples: [TimeInterval]
+
+    var averageSeconds: TimeInterval {
+        guard !samples.isEmpty else {
+            return 0
+        }
+
+        return samples.reduce(0, +) / Double(samples.count)
+    }
+
+    var maxSeconds: TimeInterval {
+        samples.max() ?? 0
+    }
+
+    var relativeStandardDeviation: Double {
+        guard samples.count > 1, averageSeconds > 0 else {
+            return 0
+        }
+
+        let variance = samples.reduce(0) { partialResult, sample in
+            partialResult + ((sample - averageSeconds) * (sample - averageSeconds))
+        } / Double(samples.count)
+        return variance.squareRoot() / averageSeconds
+    }
+
+    var formattedAverage: String {
+        String(format: "%.3fs", averageSeconds)
+    }
+
+    var formattedMax: String {
+        String(format: "%.3fs", maxSeconds)
+    }
+
+    func report(named name: String, threshold: BenchmarkThreshold) -> String {
+        let formattedSamples = samples
+            .map { String(format: "%.4f", $0) }
+            .joined(separator: ", ")
+
+        return """
+        \(name)
+        iterations: \(samples.count)
+        average: \(formattedAverage) (threshold: \(threshold.formattedAverageUpperBound))
+        max: \(formattedMax) (threshold: \(threshold.formattedMaxUpperBound))
+        rsd: \(String(format: "%.2f%%", relativeStandardDeviation * 100))
+        samples: [\(formattedSamples)]
+        """
     }
 }
 

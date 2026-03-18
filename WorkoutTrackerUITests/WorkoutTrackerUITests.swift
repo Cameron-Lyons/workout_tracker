@@ -112,10 +112,89 @@ final class WorkoutTrackerUITests: XCTestCase {
         saveTemplateButton.tap()
 
         let startButton = app.firstButton(withIdentifierPrefix: "plans.startTemplate.")
+        app.revealIfNeeded(startButton)
         XCTAssertTrue(startButton.waitForExistence(timeout: 6))
         startButton.tap()
 
         XCTAssertTrue(app.buttons["session.finishButton"].waitForExistence(timeout: 8))
+    }
+
+    @MainActor
+    func testFinishButtonRequiresCompletedWorkingSet() throws {
+        let app = launchAppForUITest()
+
+        let presetButton = app.buttons["onboarding.preset.generalGym"]
+        XCTAssertTrue(presetButton.waitForExistence(timeout: 8))
+        presetButton.tap()
+
+        let pinnedStart = app.buttons["today.pinnedStartButton"]
+        XCTAssertTrue(pinnedStart.waitForExistence(timeout: 8))
+        pinnedStart.tap()
+
+        let finishButton = app.buttons["session.finishButton"]
+        XCTAssertTrue(finishButton.waitForExistence(timeout: 8))
+        XCTAssertFalse(finishButton.isEnabled)
+
+        let completeSetButton = app.firstButton(withIdentifierPrefix: "session.completeSet.")
+        XCTAssertTrue(completeSetButton.waitForExistence(timeout: 8))
+        completeSetButton.tap()
+
+        XCTAssertTrue(finishButton.isEnabled)
+    }
+
+    @MainActor
+    func testCreateCustomExerciseTemplateAndSaveIt() throws {
+        let app = launchAppForUITest(extraArguments: ["--uitesting-complete-onboarding"])
+
+        let plansTab = app.tabBars.buttons["Plans"]
+        XCTAssertTrue(plansTab.waitForExistence(timeout: 8))
+        plansTab.tap()
+
+        let addPlanButton = app.buttons["plans.addPlanButton"]
+        XCTAssertTrue(addPlanButton.waitForExistence(timeout: 4))
+        addPlanButton.tap()
+
+        let planNameField = app.textFields["Plan name"]
+        XCTAssertTrue(planNameField.waitForExistence(timeout: 4))
+        planNameField.tap()
+        planNameField.typeText("Custom Exercise Plan")
+        app.buttons["Save"].tap()
+
+        let addTemplateButton = app.firstButton(withIdentifierPrefix: "plans.addTemplateButton.")
+        XCTAssertTrue(addTemplateButton.waitForExistence(timeout: 4))
+        addTemplateButton.tap()
+
+        let templateNameField = app.textFields["Template name"]
+        XCTAssertTrue(templateNameField.waitForExistence(timeout: 4))
+        templateNameField.tap()
+        templateNameField.typeText("Cable Builder")
+
+        let addBlockButton = app.buttons["plans.template.addBlockButton"]
+        XCTAssertTrue(addBlockButton.waitForExistence(timeout: 4))
+        addBlockButton.tap()
+
+        let pickButton = app.buttons["plans.template.pickExerciseButton"].firstMatch
+        app.revealIfNeeded(pickButton)
+        XCTAssertTrue(pickButton.waitForExistence(timeout: 4))
+        pickButton.tap()
+
+        let createCustomButton = app.buttons["Create Custom Exercise"]
+        XCTAssertTrue(createCustomButton.waitForExistence(timeout: 4))
+        XCTAssertFalse(createCustomButton.isEnabled)
+
+        let customExerciseField = app.textFields["New custom exercise"]
+        XCTAssertTrue(customExerciseField.waitForExistence(timeout: 4))
+        customExerciseField.tap()
+        customExerciseField.typeText("Cable Fly Variation")
+
+        XCTAssertTrue(createCustomButton.isEnabled)
+        createCustomButton.tap()
+
+        let saveTemplateButton = app.buttons["plans.template.saveButton"]
+        XCTAssertTrue(saveTemplateButton.waitForExistence(timeout: 4))
+        saveTemplateButton.tap()
+
+        XCTAssertTrue(app.buttons["plans.addPlanButton"].waitForExistence(timeout: 6))
     }
 
     @MainActor

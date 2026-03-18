@@ -524,6 +524,75 @@ final class WorkoutStoreTests: XCTestCase {
         XCTAssertEqual(rehydratedStore.plansStore.profile(for: CatalogSeed.benchPress)?.preferredIncrement, 5)
     }
 
+    @MainActor
+    func testDeletingPinnedTemplateFallsBackToRemainingTemplateAndRefreshesToday() async throws {
+        let store = makeStore()
+        await store.hydrateIfNeeded()
+        store.completeOnboarding(with: nil)
+
+        let benchBlock = ExerciseBlock(
+            exerciseID: CatalogSeed.benchPress,
+            exerciseNameSnapshot: store.plansStore.exerciseName(for: CatalogSeed.benchPress),
+            restSeconds: 90,
+            progressionRule: .manual,
+            targets: [SetTarget(setKind: .working, targetWeight: 185, repRange: RepRange(5, 5))]
+        )
+        let pressBlock = ExerciseBlock(
+            exerciseID: CatalogSeed.overheadPress,
+            exerciseNameSnapshot: store.plansStore.exerciseName(for: CatalogSeed.overheadPress),
+            restSeconds: 90,
+            progressionRule: .manual,
+            targets: [SetTarget(setKind: .working, targetWeight: 115, repRange: RepRange(5, 5))]
+        )
+
+        let firstTemplate = WorkoutTemplate(name: "Bench Day", blocks: [benchBlock])
+        let secondTemplate = WorkoutTemplate(name: "Press Day", blocks: [pressBlock])
+        let plan = Plan(
+            name: "Push Plan",
+            pinnedTemplateID: firstTemplate.id,
+            templates: [firstTemplate, secondTemplate]
+        )
+
+        store.savePlan(plan)
+        store.refreshTodayStore()
+
+        XCTAssertEqual(store.todayStore.pinnedTemplate?.templateID, firstTemplate.id)
+
+        store.deleteTemplate(planID: plan.id, templateID: firstTemplate.id)
+
+        let updatedPlan = try XCTUnwrap(store.plansStore.plan(for: plan.id))
+        XCTAssertEqual(updatedPlan.pinnedTemplateID, secondTemplate.id)
+        XCTAssertEqual(updatedPlan.templates.map(\.id), [secondTemplate.id])
+        XCTAssertEqual(store.todayStore.pinnedTemplate?.templateID, secondTemplate.id)
+        XCTAssertEqual(store.todayStore.pinnedTemplate?.templateName, "Press Day")
+    }
+
+    @MainActor
+    func testBlankCustomExerciseNameIsIgnoredForActiveSession() async throws {
+        let store = makeStore()
+        await store.hydrateIfNeeded()
+        store.completeOnboarding(with: nil)
+
+        let plan = makeSingleTemplatePlan(
+            name: "Bench Focus",
+            templateName: "Bench Day",
+            store: store,
+            weight: 185
+        )
+        store.savePlan(plan)
+        store.startSession(planID: plan.id, templateID: try XCTUnwrap(plan.templates.first?.id))
+
+        let initialBlockCount = try XCTUnwrap(store.sessionStore.activeDraft?.blocks.count)
+        let initialCatalogCount = store.plansStore.catalog.count
+
+        store.addCustomExerciseToActiveSession(name: "   ")
+        store.addCustomExerciseToActiveSession(name: "\n\t")
+
+        XCTAssertEqual(store.sessionStore.activeDraft?.blocks.count, initialBlockCount)
+        XCTAssertEqual(store.plansStore.catalog.count, initialCatalogCount)
+        XCTAssertFalse(store.plansStore.catalog.contains(where: { $0.name.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty }))
+    }
+
     func testAnalyticsSummariesHandleWarmupsAndVolume() {
         let analytics = AnalyticsRepository()
         let catalog = [
