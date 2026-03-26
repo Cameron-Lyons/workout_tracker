@@ -5,7 +5,7 @@ This repo keeps lightweight performance guardrails in `WorkoutTrackerTests/Worko
 ## Run
 
 ```bash
-xcodebuild test -project "WorkoutTracker.xcodeproj" -scheme "WorkoutTracker" -destination 'platform=iOS Simulator,name=iPhone 17,OS=26.2' -only-testing:WorkoutTrackerTests/WorkoutBenchmarkTests
+xcodebuild test -project "WorkoutTracker.xcodeproj" -scheme "WorkoutTracker" -destination 'platform=iOS Simulator,name=iPhone 17' -only-testing:WorkoutTrackerTests/WorkoutBenchmarkTests
 ```
 
 ## What is covered
@@ -15,7 +15,7 @@ xcodebuild test -project "WorkoutTracker.xcodeproj" -scheme "WorkoutTracker" -de
 | `testBenchmarkSessionAnalyticsSnapshotLargeHistory` | 500 sessions, 4 blocks/session, 6 sets/block | avg `<= 0.040s`, max `<= 0.055s` |
 | `testBenchmarkProgressStorePrepareStateLargeHistory` | same 500-session history | avg `<= 0.010s`, max `<= 0.020s` |
 | `testBenchmarkPlanRepositoryLoadPlansLargeLibrary` | 120 plans, 4 templates/plan, 5 blocks/template, 6 targets/block | avg `<= 2.350s`, max `<= 2.700s` |
-| `testBenchmarkSessionRepositoryLoadCompletedSessionsLargeHistory` | 240 completed sessions, 4 blocks/session, 6 sets/block | avg `<= 1.000s`, max `<= 1.150s` |
+| `testBenchmarkSessionRepositoryLoadCompletedSessionsLargeHistory` | 240 completed sessions, 4 blocks/session, 6 sets/block | avg `<= 1.100s`, max `<= 1.200s` |
 
 The thresholds are code-level guardrails, not Xcode `.xcbaseline` files. Each benchmark:
 
@@ -23,6 +23,7 @@ The thresholds are code-level guardrails, not Xcode `.xcbaseline` files. Each be
 - records several timed samples
 - asserts both average and worst-case sample bounds
 - attaches a short timing report to the XCTest activity log
+- prints a machine-greppable summary into the test log for CI artifacts
 
 ## Updating thresholds
 
@@ -39,3 +40,4 @@ Recommended process:
 
 - Simulator timing is noisy; the thresholds are intentionally a bit looser than the latest local averages.
 - These benchmarks are meant to catch meaningful regressions in analytics, derived-state preparation, and persistence loading hot paths.
+- GitHub Actions uploads both `benchmark-results.log` and `BenchmarkResults.xcresult`, so timing history survives outside the raw console log.

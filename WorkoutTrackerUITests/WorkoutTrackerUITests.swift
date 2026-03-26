@@ -6,16 +6,37 @@ final class WorkoutTrackerUITests: XCTestCase {
     }
 
     @MainActor
-    private func launchAppForUITest(extraArguments: [String] = []) -> XCUIApplication {
+    private func launchAppForUITest(
+        extraArguments: [String] = [],
+        languageCode: String? = nil,
+        localeIdentifier: String? = nil
+    ) -> XCUIApplication {
         let app = XCUIApplication()
         app.launchArguments += [
             "--uitesting",
             "--uitesting-in-memory",
             "--uitesting-empty-store",
         ]
+
+        if let languageCode {
+            app.launchArguments += ["-AppleLanguages", "(\(languageCode))"]
+        }
+
+        if let localeIdentifier {
+            app.launchArguments += ["-AppleLocale", localeIdentifier]
+        }
+
         app.launchArguments += extraArguments
         app.launch()
         return app
+    }
+
+    @MainActor
+    private func attachScreenshot(named name: String) {
+        let attachment = XCTAttachment(screenshot: XCUIScreen.main.screenshot())
+        attachment.name = name
+        attachment.lifetime = .keepAlways
+        add(attachment)
     }
 
     @MainActor
@@ -198,6 +219,34 @@ final class WorkoutTrackerUITests: XCTestCase {
     }
 
     @MainActor
+    func testPinnedTemplateAccessibilityLabelUpdates() throws {
+        let app = launchAppForUITest()
+
+        let presetButton = app.buttons["onboarding.preset.generalGym"]
+        XCTAssertTrue(presetButton.waitForExistence(timeout: 8))
+        presetButton.tap()
+
+        let plansTab = app.tabButton(named: "Plans")
+        XCTAssertTrue(plansTab.waitForExistence(timeout: 8))
+        plansTab.tap()
+
+        let pinButtons = app.buttons.matching(NSPredicate(format: "identifier BEGINSWITH %@", "plans.pinTemplate."))
+        XCTAssertGreaterThanOrEqual(pinButtons.count, 2)
+
+        let pinnedButton = try XCTUnwrap(pinButtons.allElementsBoundByIndex.first(where: { $0.label == "Pinned to Today" }))
+        let unpinnedButton = try XCTUnwrap(pinButtons.allElementsBoundByIndex.first(where: { $0.label == "Pin to Today" }))
+        let updatedButtonIdentifier = unpinnedButton.identifier
+
+        attachScreenshot(named: "accessibility-plans-before-repin")
+        unpinnedButton.tap()
+
+        let updatedButton = app.buttons[updatedButtonIdentifier]
+        XCTAssertTrue(updatedButton.waitForExistence(timeout: 4))
+        XCTAssertEqual(updatedButton.label, "Pinned to Today")
+        XCTAssertNotEqual(pinnedButton.identifier, updatedButtonIdentifier)
+    }
+
+    @MainActor
     func testLayoutSmokeEmptyStatesAcrossDeviceClasses() throws {
         let app = launchAppForUITest(extraArguments: ["--uitesting-complete-onboarding"])
 
@@ -205,17 +254,20 @@ final class WorkoutTrackerUITests: XCTestCase {
         XCTAssertTrue(todayTab.waitForExistence(timeout: 8))
         todayTab.tap()
         XCTAssertTrue(app.staticTexts["Start from a plan"].waitForExistence(timeout: 8))
+        attachScreenshot(named: "layout-empty-today")
 
         let plansTab = app.tabButton(named: "Plans")
         XCTAssertTrue(plansTab.waitForExistence(timeout: 4))
         plansTab.tap()
         XCTAssertTrue(app.staticTexts["No plans yet"].waitForExistence(timeout: 8))
         XCTAssertTrue(app.buttons["plans.addPlanButton"].waitForExistence(timeout: 4))
+        attachScreenshot(named: "layout-empty-plans")
 
         let progressTab = app.tabButton(named: "Progress")
         XCTAssertTrue(progressTab.waitForExistence(timeout: 4))
         progressTab.tap()
         XCTAssertTrue(app.staticTexts["No progress yet"].waitForExistence(timeout: 8))
+        attachScreenshot(named: "layout-empty-progress")
     }
 
     @MainActor
@@ -239,6 +291,7 @@ final class WorkoutTrackerUITests: XCTestCase {
 
         let finishButton = app.buttons["session.finishButton"]
         XCTAssertTrue(finishButton.waitForExistence(timeout: 8))
+        attachScreenshot(named: "layout-active-session")
 
         let closeButton = app.buttons["Close"]
         XCTAssertTrue(closeButton.waitForExistence(timeout: 8))
@@ -246,6 +299,27 @@ final class WorkoutTrackerUITests: XCTestCase {
 
         let resumeButton = app.buttons["today.resumeSessionButton"]
         XCTAssertTrue(resumeButton.waitForExistence(timeout: 8))
+        attachScreenshot(named: "layout-resume-session")
+    }
+
+    @MainActor
+    func testSpanishLocaleSessionSmokeUsesStableIdentifiers() throws {
+        let app = launchAppForUITest(languageCode: "es", localeIdentifier: "es_ES")
+
+        let presetButton = app.buttons["onboarding.preset.generalGym"]
+        XCTAssertTrue(presetButton.waitForExistence(timeout: 8))
+        presetButton.tap()
+
+        let pinnedStart = app.buttons["today.pinnedStartButton"]
+        XCTAssertTrue(pinnedStart.waitForExistence(timeout: 8))
+        attachScreenshot(named: "locale-es-today")
+        pinnedStart.tap()
+
+        let finishButton = app.buttons["session.finishButton"]
+        XCTAssertTrue(finishButton.waitForExistence(timeout: 8))
+        let completeSetButton = app.firstButton(withIdentifierPrefix: "session.completeSet.")
+        XCTAssertTrue(completeSetButton.waitForExistence(timeout: 8))
+        attachScreenshot(named: "locale-es-session")
     }
 
     @MainActor

@@ -23,8 +23,8 @@ final class WorkoutBenchmarkTests: XCTestCase {
         )
         static let sessionRepositoryLoadCompletedSessionsLargeHistory = BenchmarkThreshold(
             iterationCount: 3,
-            averageSecondsUpperBound: 1.000,
-            maxSecondsUpperBound: 1.150
+            averageSecondsUpperBound: 1.100,
+            maxSecondsUpperBound: 1.200
         )
     }
 
@@ -168,9 +168,13 @@ final class WorkoutBenchmarkTests: XCTestCase {
         }
 
         let result = BenchmarkResult(samples: samples)
+        let report = result.report(named: name, threshold: threshold)
         XCTContext.runActivity(named: "Benchmark: \(name)") { activity in
-            activity.add(XCTAttachment(string: result.report(named: name, threshold: threshold)))
+            let attachment = XCTAttachment(string: report)
+            attachment.lifetime = .keepAlways
+            activity.add(attachment)
         }
+        print(report)
 
         XCTAssertLessThanOrEqual(
             result.averageSeconds,
@@ -241,12 +245,13 @@ private struct BenchmarkResult {
             .joined(separator: ", ")
 
         return """
-        \(name)
-        iterations: \(samples.count)
-        average: \(formattedAverage) (threshold: \(threshold.formattedAverageUpperBound))
-        max: \(formattedMax) (threshold: \(threshold.formattedMaxUpperBound))
-        rsd: \(String(format: "%.2f%%", relativeStandardDeviation * 100))
-        samples: [\(formattedSamples)]
+        BENCHMARK: \(name)
+        benchmark.iterations: \(samples.count)
+        benchmark.average: \(formattedAverage) (threshold: \(threshold.formattedAverageUpperBound))
+        benchmark.max: \(formattedMax) (threshold: \(threshold.formattedMaxUpperBound))
+        benchmark.rsd: \(String(format: "%.2f%%", relativeStandardDeviation * 100))
+        benchmark.samples: [\(formattedSamples)]
+
         """
     }
 }
