@@ -42,7 +42,7 @@ final class WorkoutTrackerUITests: XCTestCase {
         XCTAssertTrue(doneButton.waitForExistence(timeout: 8))
         doneButton.tap()
 
-        let progressTab = app.tabBars.buttons["Progress"]
+        let progressTab = app.tabButton(named: "Progress")
         XCTAssertTrue(progressTab.waitForExistence(timeout: 4))
         progressTab.tap()
 
@@ -71,7 +71,7 @@ final class WorkoutTrackerUITests: XCTestCase {
     func testCreateCustomTemplateAndLaunchIt() throws {
         let app = launchAppForUITest(extraArguments: ["--uitesting-complete-onboarding"])
 
-        let plansTab = app.tabBars.buttons["Plans"]
+        let plansTab = app.tabButton(named: "Plans")
         XCTAssertTrue(plansTab.waitForExistence(timeout: 8))
         plansTab.tap()
 
@@ -146,7 +146,7 @@ final class WorkoutTrackerUITests: XCTestCase {
     func testCreateCustomExerciseTemplateAndSaveIt() throws {
         let app = launchAppForUITest(extraArguments: ["--uitesting-complete-onboarding"])
 
-        let plansTab = app.tabBars.buttons["Plans"]
+        let plansTab = app.tabButton(named: "Plans")
         XCTAssertTrue(plansTab.waitForExistence(timeout: 8))
         plansTab.tap()
 
@@ -195,6 +195,57 @@ final class WorkoutTrackerUITests: XCTestCase {
         saveTemplateButton.tap()
 
         XCTAssertTrue(app.buttons["plans.addPlanButton"].waitForExistence(timeout: 6))
+    }
+
+    @MainActor
+    func testLayoutSmokeEmptyStatesAcrossDeviceClasses() throws {
+        let app = launchAppForUITest(extraArguments: ["--uitesting-complete-onboarding"])
+
+        let todayTab = app.tabButton(named: "Today")
+        XCTAssertTrue(todayTab.waitForExistence(timeout: 8))
+        todayTab.tap()
+        XCTAssertTrue(app.staticTexts["Start from a plan"].waitForExistence(timeout: 8))
+
+        let plansTab = app.tabButton(named: "Plans")
+        XCTAssertTrue(plansTab.waitForExistence(timeout: 4))
+        plansTab.tap()
+        XCTAssertTrue(app.staticTexts["No plans yet"].waitForExistence(timeout: 8))
+        XCTAssertTrue(app.buttons["plans.addPlanButton"].waitForExistence(timeout: 4))
+
+        let progressTab = app.tabButton(named: "Progress")
+        XCTAssertTrue(progressTab.waitForExistence(timeout: 4))
+        progressTab.tap()
+        XCTAssertTrue(app.staticTexts["No progress yet"].waitForExistence(timeout: 8))
+    }
+
+    @MainActor
+    func testLayoutSmokeSeededSessionFlowAcrossDeviceClasses() throws {
+        let app = launchAppForUITest()
+
+        let presetButton = app.buttons["onboarding.preset.generalGym"]
+        XCTAssertTrue(presetButton.waitForExistence(timeout: 8))
+        presetButton.tap()
+
+        let todayTab = app.tabButton(named: "Today")
+        XCTAssertTrue(todayTab.waitForExistence(timeout: 8))
+        todayTab.tap()
+
+        let pinnedStart = app.buttons["today.pinnedStartButton"]
+        XCTAssertTrue(pinnedStart.waitForExistence(timeout: 8))
+        pinnedStart.tap()
+
+        let completeSetButton = app.firstButton(withIdentifierPrefix: "session.completeSet.")
+        XCTAssertTrue(completeSetButton.waitForExistence(timeout: 8))
+
+        let finishButton = app.buttons["session.finishButton"]
+        XCTAssertTrue(finishButton.waitForExistence(timeout: 8))
+
+        let closeButton = app.buttons["Close"]
+        XCTAssertTrue(closeButton.waitForExistence(timeout: 8))
+        closeButton.tap()
+
+        let resumeButton = app.buttons["today.resumeSessionButton"]
+        XCTAssertTrue(resumeButton.waitForExistence(timeout: 8))
     }
 
     @MainActor
@@ -256,7 +307,7 @@ final class WorkoutTrackerUITests: XCTestCase {
         XCTAssertTrue(presetButton.waitForExistence(timeout: 8))
         presetButton.tap()
 
-        let todayTab = app.tabBars.buttons["Today"]
+        let todayTab = app.tabButton(named: "Today")
         XCTAssertTrue(todayTab.waitForExistence(timeout: 4))
         todayTab.tap()
 
@@ -271,6 +322,10 @@ final class WorkoutTrackerUITests: XCTestCase {
 }
 
 private extension XCUIApplication {
+    func tabButton(named label: String) -> XCUIElement {
+        buttons.matching(NSPredicate(format: "label == %@", label)).firstMatch
+    }
+
     func firstButton(withIdentifierPrefix prefix: String) -> XCUIElement {
         buttons.matching(NSPredicate(format: "identifier BEGINSWITH %@", prefix)).firstMatch
     }
