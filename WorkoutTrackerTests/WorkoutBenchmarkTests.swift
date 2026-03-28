@@ -21,7 +21,7 @@ final class WorkoutBenchmarkTests: XCTestCase {
             averageSecondsUpperBound: 2.350,
             maxSecondsUpperBound: 2.700
         )
-        static let sessionRepositoryLoadCompletedSessionsLargeHistory = BenchmarkThreshold(
+        static let sessionRepositoryLoadCompletedSessions = BenchmarkThreshold(
             iterationCount: 3,
             averageSecondsUpperBound: 1.100,
             maxSecondsUpperBound: 1.200
@@ -136,7 +136,7 @@ final class WorkoutBenchmarkTests: XCTestCase {
         var loadedSessions: [CompletedSession] = []
         benchmark(
             named: "Session repository loadCompletedSessions / large history",
-            threshold: Thresholds.sessionRepositoryLoadCompletedSessionsLargeHistory
+            threshold: Thresholds.sessionRepositoryLoadCompletedSessions
         ) {
             autoreleasepool {
                 let context = ModelContext(container)
@@ -225,9 +225,10 @@ private struct BenchmarkResult {
             return 0
         }
 
-        let variance = samples.reduce(0) { partialResult, sample in
-            partialResult + ((sample - averageSeconds) * (sample - averageSeconds))
-        } / Double(samples.count)
+        let variance =
+            samples.reduce(0) { partialResult, sample in
+                partialResult + ((sample - averageSeconds) * (sample - averageSeconds))
+            } / Double(samples.count)
         return variance.squareRoot() / averageSeconds
     }
 
@@ -240,19 +241,20 @@ private struct BenchmarkResult {
     }
 
     func report(named name: String, threshold: BenchmarkThreshold) -> String {
-        let formattedSamples = samples
+        let formattedSamples =
+            samples
             .map { String(format: "%.4f", $0) }
             .joined(separator: ", ")
 
         return """
-        BENCHMARK: \(name)
-        benchmark.iterations: \(samples.count)
-        benchmark.average: \(formattedAverage) (threshold: \(threshold.formattedAverageUpperBound))
-        benchmark.max: \(formattedMax) (threshold: \(threshold.formattedMaxUpperBound))
-        benchmark.rsd: \(String(format: "%.2f%%", relativeStandardDeviation * 100))
-        benchmark.samples: [\(formattedSamples)]
+            BENCHMARK: \(name)
+            benchmark.iterations: \(samples.count)
+            benchmark.average: \(formattedAverage) (threshold: \(threshold.formattedAverageUpperBound))
+            benchmark.max: \(formattedMax) (threshold: \(threshold.formattedMaxUpperBound))
+            benchmark.rsd: \(String(format: "%.2f%%", relativeStandardDeviation * 100))
+            benchmark.samples: [\(formattedSamples)]
 
-        """
+            """
     }
 }
 

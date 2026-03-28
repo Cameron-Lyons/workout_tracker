@@ -25,7 +25,7 @@ Native SwiftUI iPhone app for logging workouts with routines.
 - `WorkoutTracker/Views` for routines, logging, and history screens
 
 ## Run
-1. Open `/Users/cam/workout_tracker/WorkoutTracker.xcodeproj` in Xcode.
+1. Open `WorkoutTracker.xcodeproj` in Xcode.
 2. Select an iPhone simulator or connected iPhone.
 3. Build and run.
 
@@ -37,7 +37,7 @@ Native SwiftUI iPhone app for logging workouts with routines.
 - `swift-format lint --recursive --configuration .swift-format WorkoutTracker WorkoutTrackerTests WorkoutTrackerUITests`
 - `swift-format format --in-place --recursive --configuration .swift-format WorkoutTracker WorkoutTrackerTests WorkoutTrackerUITests`
 - `xcodebuild build -project "WorkoutTracker.xcodeproj" -scheme "WorkoutTracker" -destination "platform=iOS Simulator,name=iPhone 17"`
-- `xcodebuild test -project "WorkoutTracker.xcodeproj" -scheme "WorkoutTracker" -destination "platform=iOS Simulator,name=iPhone 17" -parallel-testing-enabled NO -only-testing:WorkoutTrackerTests`
+- `xcodebuild test -project "WorkoutTracker.xcodeproj" -scheme "WorkoutTracker" -destination "platform=iOS Simulator,name=iPhone 17" -only-testing:WorkoutTrackerTests`
 - `xcodebuild test -project "WorkoutTracker.xcodeproj" -scheme "WorkoutTracker" -destination "platform=iOS Simulator,name=iPhone 17" -parallel-testing-enabled NO -only-testing:WorkoutTrackerUITests`
 - `xcodebuild test -project "WorkoutTracker.xcodeproj" -scheme "WorkoutTracker" -destination "platform=iOS Simulator,name=iPhone 17" -parallel-testing-enabled NO -only-testing:WorkoutTrackerTests/WorkoutBenchmarkTests`
 - GitHub Actions also runs dedicated benchmark coverage plus compact-phone and iPad layout smoke jobs, and uploads the benchmark/UI result bundles as artifacts for later inspection.

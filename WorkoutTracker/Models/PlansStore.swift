@@ -402,13 +402,7 @@ final class PlansStore {
     }
 
     private func templateBlockIndex(in template: WorkoutTemplate, matching finishedBlock: SessionBlock) -> Int? {
-        if let blockIndex = template.blocks.firstIndex(where: { $0.id == finishedBlock.id }) {
-            return blockIndex
-        }
-
-        return template.blocks.firstIndex(where: {
-            $0.exerciseID == finishedBlock.exerciseID && $0.exerciseNameSnapshot == finishedBlock.exerciseNameSnapshot
-        })
+        template.blocks.firstIndex(where: { $0.id == finishedBlock.id })
     }
 
     private func completedSnapshot(from finishedBlock: SessionBlock) -> CompletedSessionBlock {

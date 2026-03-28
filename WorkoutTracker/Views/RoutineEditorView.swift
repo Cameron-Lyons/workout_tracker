@@ -55,6 +55,92 @@ private struct TemplateDraftBlock: Identifiable, Equatable {
     }
 }
 
+enum TemplateProfileResolver {
+    static func mergedProfile(
+        existing: ExerciseProfile?,
+        exerciseID: UUID,
+        trainingMax: Double?,
+        preferredIncrement: Double?
+    ) -> ExerciseProfile? {
+        let resolvedTrainingMax = trainingMax ?? existing?.trainingMax
+        let resolvedPreferredIncrement = preferredIncrement ?? existing?.preferredIncrement
+
+        guard resolvedTrainingMax != nil || resolvedPreferredIncrement != nil else {
+            return nil
+        }
+
+        return ExerciseProfile(
+            id: existing?.id ?? UUID(),
+            exerciseID: exerciseID,
+            trainingMax: resolvedTrainingMax,
+            preferredIncrement: resolvedPreferredIncrement
+        )
+    }
+}
+
+enum TemplateExerciseSelectionResolver {
+    struct ResolvedFields: Equatable {
+        var trainingMaxText: String
+        var preferredIncrementText: String
+        var incrementText: String
+    }
+
+    static func resolvedFields(
+        previousExerciseID: UUID?,
+        newExerciseID: UUID,
+        currentTrainingMaxText: String,
+        currentPreferredIncrementText: String,
+        currentIncrementText: String,
+        progressionKind: ProgressionRuleKind,
+        existingProfile: ExerciseProfile?,
+        defaultIncrement: Double,
+        weightUnit: WeightUnit
+    ) -> ResolvedFields {
+        let isSwitchingExercises = previousExerciseID != nil && previousExerciseID != newExerciseID
+        let profileTrainingMaxText = WeightFormatter.displayString(existingProfile?.trainingMax, unit: weightUnit)
+        let profilePreferredIncrementText = WeightFormatter.displayString(
+            existingProfile?.preferredIncrement,
+            unit: weightUnit
+        )
+        let defaultIncrementText = WeightFormatter.displayString(
+            displayValue: weightUnit.displayValue(fromStoredPounds: defaultIncrement),
+            unit: weightUnit
+        )
+
+        return ResolvedFields(
+            trainingMaxText: resolvedText(
+                currentTrainingMaxText,
+                replacement: profileTrainingMaxText,
+                shouldReplace: isSwitchingExercises
+            ),
+            preferredIncrementText: resolvedText(
+                currentPreferredIncrementText,
+                replacement: profilePreferredIncrementText,
+                shouldReplace: isSwitchingExercises
+            ),
+            incrementText: progressionKind == .manual
+                ? currentIncrementText
+                : resolvedText(
+                    currentIncrementText,
+                    replacement: defaultIncrementText,
+                    shouldReplace: isSwitchingExercises
+                )
+        )
+    }
+
+    private static func resolvedText(
+        _ current: String,
+        replacement: String,
+        shouldReplace: Bool
+    ) -> String {
+        if shouldReplace || current.isEmpty {
+            return replacement
+        }
+
+        return current
+    }
+}
+
 struct PlanEditorSheet: View {
     @Environment(\.dismiss) private var dismiss
 
@@ -469,15 +555,26 @@ struct TemplateEditorSheet: View {
             return
         }
 
+        let previousExerciseID = blocks[index].exerciseID
+        let existingProfile = appStore.plansStore.profile(for: exercise.id)
+        let defaultIncrement = appStore.settingsStore.preferredIncrement(for: exercise.name)
+        let resolvedFields = TemplateExerciseSelectionResolver.resolvedFields(
+            previousExerciseID: previousExerciseID,
+            newExerciseID: exercise.id,
+            currentTrainingMaxText: blocks[index].trainingMaxText,
+            currentPreferredIncrementText: blocks[index].preferredIncrementText,
+            currentIncrementText: blocks[index].incrementText,
+            progressionKind: blocks[index].progressionKind,
+            existingProfile: existingProfile,
+            defaultIncrement: defaultIncrement,
+            weightUnit: weightUnit
+        )
+
         blocks[index].exerciseID = exercise.id
         blocks[index].exerciseName = exercise.name
-        if blocks[index].progressionKind != .manual && blocks[index].incrementText.isEmpty {
-            let increment = appStore.settingsStore.preferredIncrement(for: exercise.name)
-            blocks[index].incrementText = WeightFormatter.displayString(
-                displayValue: appStore.settingsStore.weightUnit.displayValue(fromStoredPounds: increment),
-                unit: weightUnit
-            )
-        }
+        blocks[index].trainingMaxText = resolvedFields.trainingMaxText
+        blocks[index].preferredIncrementText = resolvedFields.preferredIncrementText
+        blocks[index].incrementText = resolvedFields.incrementText
     }
 
     private func saveTemplate() {
@@ -518,13 +615,15 @@ struct TemplateEditorSheet: View {
                 allowsZero: true
             )
 
-            let profile = ExerciseProfile(
-                id: appStore.plansStore.profile(for: exerciseID)?.id ?? UUID(),
+            let profile = TemplateProfileResolver.mergedProfile(
+                existing: appStore.plansStore.profile(for: exerciseID),
                 exerciseID: exerciseID,
                 trainingMax: profileTrainingMax,
                 preferredIncrement: preferredIncrement
             )
-            savedProfiles.append(profile)
+            if let profile {
+                savedProfiles.append(profile)
+            }
 
             let progressionRule: ProgressionRule
             switch block.progressionKind {
@@ -542,7 +641,7 @@ struct TemplateEditorSheet: View {
                 progressionRule = ProgressionRule(
                     kind: .percentageWave,
                     percentageWave: PercentageWaveRule.fiveThreeOne(
-                        trainingMax: profileTrainingMax,
+                        trainingMax: profile?.trainingMax,
                         currentWeekIndex: existingTemplate?.blocks.first(where: { $0.id == block.id })?.progressionRule.percentageWave?
                             .currentWeekIndex ?? 0,
                         cycle: existingTemplate?.blocks.first(where: { $0.id == block.id })?.progressionRule.percentageWave?.cycle ?? 1,

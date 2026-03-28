@@ -24,9 +24,9 @@ targets:
       - path: WorkoutTracker
         excludes:
           - Info.plist
-          - Resources/Assets.xcassets
+          - Resources
     resources:
-      - path: WorkoutTracker/Resources/Assets.xcassets
+      - path: WorkoutTracker/Resources
     settings:
       base:
         PRODUCT_NAME: WorkoutTracker

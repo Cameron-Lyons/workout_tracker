@@ -306,7 +306,11 @@ private struct ProgressChartSectionView: View {
                             systemImage: "chart.xyaxis.line",
                             subtitle: "Solid line shows top logged load. Dashed line estimates one-rep max from the same sessions.",
                             trailing: summary.currentPR.map {
-                                "e1RM PR \(WeightFormatter.displayString($0.estimatedOneRepMax, unit: settingsStore.weightUnit)) \(settingsStore.weightUnit.symbol)"
+                                let oneRepMax = WeightFormatter.displayString(
+                                    $0.estimatedOneRepMax,
+                                    unit: settingsStore.weightUnit
+                                )
+                                return "e1RM PR \(oneRepMax) \(settingsStore.weightUnit.symbol)"
                             },
                             tone: .progress
                         )
@@ -612,8 +616,10 @@ private struct ProgressRecordSpotlightCardView: View {
                     .font(.system(.title2, design: .rounded).weight(.bold))
                     .foregroundStyle(AppColors.textPrimary)
 
+                let loggedWeight = WeightFormatter.displayString(record.weight, unit: weightUnit)
                 Text(
-                    "Logged \(WeightFormatter.displayString(record.weight, unit: weightUnit)) \(weightUnit.symbol) for \(record.reps) reps, setting a new estimated strength high point."
+                    "Logged \(loggedWeight) \(weightUnit.symbol) for \(record.reps) reps, "
+                        + "setting a new estimated strength high point."
                 )
                 .font(.subheadline)
                 .foregroundStyle(AppColors.textSecondary)
@@ -761,7 +767,7 @@ struct AppCalendarMonthLayout: Equatable {
                 from: calendar.dateComponents([.year, .month], from: displayedMonth)
             ) ?? displayedMonth
         let title = monthStart.formatted(.dateTime.month(.wide).year())
-        let weekdaySymbols = calendar.shortStandaloneWeekdaySymbols
+        let weekdaySymbols = rotatedWeekdaySymbols(for: calendar)
 
         guard let dayRange = calendar.range(of: .day, in: .month, for: monthStart),
             let firstWeekday = calendar.dateComponents([.weekday], from: monthStart).weekday
@@ -808,6 +814,16 @@ struct AppCalendarMonthLayout: Equatable {
             weekdaySymbols: weekdaySymbols,
             dayEntries: dayEntries
         )
+    }
+
+    private static func rotatedWeekdaySymbols(for calendar: Calendar) -> [String] {
+        let symbols = calendar.shortStandaloneWeekdaySymbols
+        guard !symbols.isEmpty else {
+            return symbols
+        }
+
+        let startIndex = max(0, min(symbols.count - 1, calendar.firstWeekday - 1))
+        return Array(symbols[startIndex...]) + Array(symbols[..<startIndex])
     }
 }
 

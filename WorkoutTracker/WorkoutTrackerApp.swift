@@ -20,7 +20,6 @@ private struct AppStartupShellView: View {
             .appSurface(cornerRadius: 16, shadow: false)
             .padding(.horizontal, 24)
         }
-        .preferredColorScheme(.dark)
     }
 }
 

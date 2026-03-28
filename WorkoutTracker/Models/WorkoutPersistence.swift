@@ -448,6 +448,13 @@ struct PersistenceStartupIssue: Identifiable, Equatable {
     let id = UUID()
     let title: String
     let message: String
+    let recoveryDirectoryURL: URL?
+
+    init(title: String, message: String, recoveryDirectoryURL: URL? = nil) {
+        self.title = title
+        self.message = message
+        self.recoveryDirectoryURL = recoveryDirectoryURL
+    }
 }
 
 enum PersistenceDiagnostics {
@@ -475,6 +482,8 @@ enum WorkoutModelContainerFactory {
     private static let storageResetMessage =
         "WorkoutTracker reset its local database after a storage error. Existing saved plans "
         + "and workout history may need to be recreated."
+    private static let storageResetBackupSuffix =
+        " A backup of the previous store was saved locally when possible."
 
     static func makeContainer(
         isStoredInMemoryOnly: Bool = false,
@@ -504,13 +513,17 @@ enum WorkoutModelContainerFactory {
             PersistenceDiagnostics.record("Failed to initialize persistent SwiftData container", error: error)
 
             do {
+                let backupURL = try backupPersistentStoreArtifacts(at: resolvedStoreURL)
                 try removePersistentStoreArtifacts(at: resolvedStoreURL)
                 let recoveredContainer = try makePersistentContainer(at: resolvedStoreURL)
                 pendingStartupIssue = PersistenceStartupIssue(
                     title: "Storage Reset",
-                    message: storageResetMessage
+                    message: storageResetMessage + storageResetBackupSuffix,
+                    recoveryDirectoryURL: backupURL
                 )
-                PersistenceDiagnostics.record("Recovered persistent store by resetting local database.")
+                PersistenceDiagnostics.record(
+                    "Recovered persistent store by resetting local database. Backup saved to \(backupURL.path)"
+                )
                 return recoveredContainer
             } catch {
                 PersistenceDiagnostics.record(
@@ -578,14 +591,41 @@ enum WorkoutModelContainerFactory {
 
     private static func removePersistentStoreArtifacts(at url: URL) throws {
         let fileManager = FileManager.default
-        let relatedURLs = [
+        for candidate in relatedPersistentStoreURLs(at: url)
+        where fileManager.fileExists(atPath: candidate.path) {
+            try fileManager.removeItem(at: candidate)
+        }
+    }
+
+    private static func backupPersistentStoreArtifacts(at url: URL) throws -> URL {
+        let fileManager = FileManager.default
+        let existingURLs = relatedPersistentStoreURLs(at: url).filter { fileManager.fileExists(atPath: $0.path) }
+        let backupRoot = url.deletingLastPathComponent()
+            .appendingPathComponent("Recovery", isDirectory: true)
+        let formatter = DateFormatter()
+        formatter.calendar = Calendar(identifier: .gregorian)
+        formatter.locale = Locale(identifier: "en_US_POSIX")
+        formatter.timeZone = TimeZone(secondsFromGMT: 0)
+        formatter.dateFormat = "yyyyMMdd-HHmmss"
+        let backupDirectory = backupRoot.appendingPathComponent(
+            "\(url.deletingPathExtension().lastPathComponent)-\(formatter.string(from: .now))",
+            isDirectory: true
+        )
+
+        try fileManager.createDirectory(at: backupDirectory, withIntermediateDirectories: true)
+        for sourceURL in existingURLs {
+            let destinationURL = backupDirectory.appendingPathComponent(sourceURL.lastPathComponent)
+            try fileManager.copyItem(at: sourceURL, to: destinationURL)
+        }
+
+        return backupDirectory
+    }
+
+    private static func relatedPersistentStoreURLs(at url: URL) -> [URL] {
+        [
             url,
             URL(fileURLWithPath: url.path + "-shm"),
             URL(fileURLWithPath: url.path + "-wal"),
         ]
-
-        for candidate in relatedURLs where fileManager.fileExists(atPath: candidate.path) {
-            try fileManager.removeItem(at: candidate)
-        }
     }
 }

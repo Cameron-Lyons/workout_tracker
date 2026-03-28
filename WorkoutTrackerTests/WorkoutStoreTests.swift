@@ -4,14 +4,21 @@ import XCTest
 @testable import WorkoutTracker
 
 final class WorkoutStoreTests: XCTestCase {
+    private var defaultsSuiteName: String!
+    private var testDefaults: UserDefaults!
+
     override func setUp() {
         super.setUp()
-        resetDefaults()
+        defaultsSuiteName = "WorkoutStoreTests.\(name.replacingOccurrences(of: " ", with: "_")).\(UUID().uuidString)"
+        testDefaults = UserDefaults(suiteName: defaultsSuiteName)
+        testDefaults.removePersistentDomain(forName: defaultsSuiteName)
         _ = WorkoutModelContainerFactory.consumeStartupIssue()
     }
 
     override func tearDown() {
-        resetDefaults()
+        testDefaults?.removePersistentDomain(forName: defaultsSuiteName)
+        testDefaults = nil
+        defaultsSuiteName = nil
         _ = WorkoutModelContainerFactory.consumeStartupIssue()
         super.tearDown()
     }
@@ -237,7 +244,7 @@ final class WorkoutStoreTests: XCTestCase {
 
     @MainActor
     func testNewPresetPacksGenerateExpectedTemplateStructures() throws {
-        let settings = SettingsStore()
+        let settings = SettingsStore(defaults: testDefaults)
 
         let phul = try XCTUnwrap(PresetPackBuilder.makePlans(for: .phul, settings: settings).first)
         XCTAssertEqual(phul.templates.map(\.name), ["Upper Power", "Lower Power", "Upper Hypertrophy", "Lower Hypertrophy"])
@@ -274,7 +281,7 @@ final class WorkoutStoreTests: XCTestCase {
             calendar.date(from: DateComponents(year: 2026, month: 3, day: 9))
         )
 
-        let settings = SettingsStore()
+        let settings = SettingsStore(defaults: testDefaults)
         let plan = try XCTUnwrap(PresetPackBuilder.makePlans(for: .greyskullLP, settings: settings).first)
         let references = plan.templates.map { template in
             makeReference(plan: plan, template: template)
@@ -1159,6 +1166,7 @@ final class WorkoutStoreTests: XCTestCase {
 
         let container = WorkoutModelContainerFactory.makeContainer(storeURL: storeURL)
         let issue = try XCTUnwrap(WorkoutModelContainerFactory.consumeStartupIssue())
+        let recoveryDirectoryURL = try XCTUnwrap(issue.recoveryDirectoryURL)
         let context = ModelContext(container)
         context.autosaveEnabled = false
         let repository = PlanRepository(modelContext: context)
@@ -1169,6 +1177,13 @@ final class WorkoutStoreTests: XCTestCase {
         )
 
         XCTAssertEqual(issue.title, "Storage Reset")
+        XCTAssertTrue(issue.message.contains("backup"))
+        XCTAssertTrue(FileManager.default.fileExists(atPath: recoveryDirectoryURL.path))
+        XCTAssertTrue(
+            FileManager.default.fileExists(
+                atPath: recoveryDirectoryURL.appendingPathComponent("WorkoutTracker.store").path
+            )
+        )
         XCTAssertTrue(repository.saveCatalog([catalogItem]))
         XCTAssertEqual(repository.loadCatalog().first?.name, "Bench Press")
     }
@@ -1509,6 +1524,25 @@ final class WorkoutStoreTests: XCTestCase {
         XCTAssertEqual(layout.dayEntries[6].dayNumber, 1)
     }
 
+    func testCalendarMonthLayoutRotatesWeekdaySymbolsForMondayFirstCalendars() throws {
+        var calendar = Calendar(identifier: .gregorian)
+        calendar.timeZone = try XCTUnwrap(TimeZone(secondsFromGMT: 0))
+        calendar.firstWeekday = 2
+
+        let displayedMonth = try XCTUnwrap(
+            calendar.date(from: DateComponents(year: 2026, month: 3, day: 15))
+        )
+
+        let layout = AppCalendarMonthLayout.make(
+            for: displayedMonth,
+            workoutDays: [],
+            calendar: calendar
+        )
+
+        let symbols = calendar.shortStandaloneWeekdaySymbols
+        XCTAssertEqual(layout.weekdaySymbols, Array(symbols[1...]) + Array(symbols[..<1]))
+    }
+
     @MainActor
     func testFinishSessionIncrementallyUpdatesTodayAndProgressStores() async throws {
         let store = makeStore()
@@ -1589,6 +1623,50 @@ final class WorkoutStoreTests: XCTestCase {
     }
 
     @MainActor
+    func testAdHocDuplicateExerciseBlockDoesNotAdvanceTemplateProgressionTwice() async throws {
+        let store = makeStore()
+        await store.hydrateIfNeeded()
+        store.completeOnboarding(with: nil)
+
+        var plan = store.makePlan(name: "Ad Hoc Bench")
+        let template = WorkoutTemplate(
+            name: "Bench Day",
+            blocks: [
+                ExerciseBlock(
+                    exerciseID: CatalogSeed.benchPress,
+                    exerciseNameSnapshot: "Bench Press",
+                    progressionRule: ProgressionRule(
+                        kind: .percentageWave,
+                        percentageWave: PercentageWaveRule.fiveThreeOne(trainingMax: 200, cycleIncrement: 5)
+                    ),
+                    targets: []
+                )
+            ]
+        )
+        plan.templates = [template]
+        plan.pinnedTemplateID = template.id
+        store.savePlan(plan)
+
+        store.startSession(planID: plan.id, templateID: template.id)
+
+        let startedBlock = try XCTUnwrap(store.sessionStore.activeDraft?.blocks.first)
+        for row in startedBlock.sets where row.target.setKind == .working {
+            store.toggleSetCompletion(blockID: startedBlock.id, setID: row.id)
+        }
+
+        store.addExerciseToActiveSession(exerciseID: CatalogSeed.benchPress)
+        let addedBlock = try XCTUnwrap(store.sessionStore.activeDraft?.blocks.last)
+        let addedRow = try XCTUnwrap(addedBlock.sets.first(where: { $0.target.setKind == .working }))
+        store.toggleSetCompletion(blockID: addedBlock.id, setID: addedRow.id)
+
+        XCTAssertTrue(store.finishActiveSession())
+
+        let updatedTemplate = try XCTUnwrap(store.plansStore.plan(for: plan.id)?.templates.first)
+        XCTAssertEqual(updatedTemplate.blocks.first?.progressionRule.percentageWave?.currentWeekIndex, 1)
+        XCTAssertEqual(updatedTemplate.blocks.first?.progressionRule.percentageWave?.cycle, 1)
+    }
+
+    @MainActor
     func testFinishingStartingStrengthSessionPinsTheAlternateWorkout() async throws {
         let store = makeStore()
         await store.hydrateIfNeeded()
@@ -1658,7 +1736,11 @@ final class WorkoutStoreTests: XCTestCase {
         container: ModelContainer = WorkoutModelContainerFactory.makeContainer(isStoredInMemoryOnly: true),
         launchArguments: Set<String> = []
     ) -> AppStore {
-        AppStore(modelContainer: container, launchArguments: launchArguments)
+        AppStore(
+            modelContainer: container,
+            launchArguments: launchArguments,
+            settingsStore: SettingsStore(defaults: testDefaults)
+        )
     }
 
     @MainActor
@@ -1811,14 +1893,4 @@ final class WorkoutStoreTests: XCTestCase {
         )
     }
 
-    private func resetDefaults() {
-        [
-            WeightUnit.settingsKey,
-            "workout_tracker_upper_increment",
-            "workout_tracker_lower_increment",
-            "workout_tracker_default_rest",
-            "workout_tracker_completed_onboarding",
-            "workout_tracker_warmup_ramp",
-        ].forEach { UserDefaults.standard.removeObject(forKey: $0) }
-    }
 }

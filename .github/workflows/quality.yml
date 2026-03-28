@@ -83,7 +83,7 @@ jobs:
           xcode-version: latest-stable
 
       - name: Run unit tests
-        run: xcodebuild test -project "$XCODE_PROJECT" -scheme "$XCODE_SCHEME" -destination "$XCODE_DESTINATION" -parallel-testing-enabled NO -only-testing:WorkoutTrackerTests
+        run: xcodebuild test -project "$XCODE_PROJECT" -scheme "$XCODE_SCHEME" -destination "$XCODE_DESTINATION" -only-testing:WorkoutTrackerTests
 
   benchmark-tests:
     name: Benchmark Tests

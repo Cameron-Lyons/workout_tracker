@@ -176,9 +176,9 @@ final class AppDerivedStateController {
 
             let sessionAnalytics: AnalyticsRepository.SessionAnalyticsSnapshot
             if let cachedSessionAnalytics = self.cachedSessionAnalyticsSnapshot(
-                    plansStore: plansStore,
-                    sessionStore: sessionStore
-                ) {
+                plansStore: plansStore,
+                sessionStore: sessionStore
+            ) {
                 sessionAnalytics = cachedSessionAnalytics
             } else {
                 sessionAnalytics = await self.sessionAnalyticsSnapshot(

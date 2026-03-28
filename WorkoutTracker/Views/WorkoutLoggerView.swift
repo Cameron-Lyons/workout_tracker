@@ -88,7 +88,7 @@ struct ActiveSessionView: View {
     @Environment(SettingsStore.self) private var settingsStore
     @Environment(\.dismiss) private var dismiss
 
-    var onDisplayed: (() -> Void)? = nil
+    var onDisplayed: (() -> Void)?
 
     @State private var showingAddExerciseSheet = false
     @State private var showsDetailedChrome = false
@@ -811,7 +811,7 @@ private struct ActiveSessionFooterView: View {
             HStack {
                 MetricBadge(
                     label: "Logged",
-                        value: "\(state.progress.completedSetCount)",
+                    value: "\(state.progress.completedSetCount)",
                     systemImage: "checklist",
                     tone: .success
                 )

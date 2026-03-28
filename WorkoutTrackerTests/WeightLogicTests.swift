@@ -102,4 +102,77 @@ final class WeightLogicTests: XCTestCase {
         XCTAssertEqual(settings.upperBodyIncrement, WeightUnit.kilograms.defaultUpperBodyIncrement)
         XCTAssertEqual(settings.lowerBodyIncrement, WeightUnit.kilograms.defaultLowerBodyIncrement)
     }
+
+    func testTemplateProfileResolverPreservesExistingProfileWhenTemplateLeavesOverridesBlank() {
+        let existingProfile = ExerciseProfile(
+            exerciseID: CatalogSeed.benchPress,
+            trainingMax: 235,
+            preferredIncrement: 5
+        )
+
+        let mergedProfile = TemplateProfileResolver.mergedProfile(
+            existing: existingProfile,
+            exerciseID: CatalogSeed.benchPress,
+            trainingMax: nil,
+            preferredIncrement: nil
+        )
+
+        XCTAssertEqual(mergedProfile, existingProfile)
+    }
+
+    func testTemplateExerciseSelectionResolverReplacesProfileFieldsWhenSwitchingExercises() {
+        let squatProfile = ExerciseProfile(
+            exerciseID: CatalogSeed.backSquat,
+            trainingMax: 315,
+            preferredIncrement: 10
+        )
+
+        let resolvedFields = TemplateExerciseSelectionResolver.resolvedFields(
+            previousExerciseID: CatalogSeed.benchPress,
+            newExerciseID: CatalogSeed.backSquat,
+            currentTrainingMaxText: "235",
+            currentPreferredIncrementText: "5",
+            currentIncrementText: "2.5",
+            progressionKind: .doubleProgression,
+            existingProfile: squatProfile,
+            defaultIncrement: 5,
+            weightUnit: .pounds
+        )
+
+        XCTAssertEqual(
+            resolvedFields,
+            .init(
+                trainingMaxText: "315",
+                preferredIncrementText: "10",
+                incrementText: "5"
+            )
+        )
+    }
+
+    func testTemplateExerciseSelectionResolverPreservesTypedValuesOnFirstSelection() {
+        let resolvedFields = TemplateExerciseSelectionResolver.resolvedFields(
+            previousExerciseID: nil,
+            newExerciseID: CatalogSeed.benchPress,
+            currentTrainingMaxText: "225",
+            currentPreferredIncrementText: "2.5",
+            currentIncrementText: "1.25",
+            progressionKind: .doubleProgression,
+            existingProfile: ExerciseProfile(
+                exerciseID: CatalogSeed.benchPress,
+                trainingMax: 235,
+                preferredIncrement: 5
+            ),
+            defaultIncrement: 2.5,
+            weightUnit: .pounds
+        )
+
+        XCTAssertEqual(
+            resolvedFields,
+            .init(
+                trainingMaxText: "225",
+                preferredIncrementText: "2.5",
+                incrementText: "1.25"
+            )
+        )
+    }
 }

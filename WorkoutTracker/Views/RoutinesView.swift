@@ -78,7 +78,9 @@ private struct SessionStartConfirmationDialogModifier: ViewModifier {
         } message: {
             if let activeDraft, let pendingStartRequest {
                 Text(
-                    "\(activeDraft.templateNameSnapshot) is still autosaved. Replacing it will discard that session and start \(pendingStartRequest.templateName) instead."
+                    "\(activeDraft.templateNameSnapshot) is still autosaved. "
+                        + "Replacing it will discard that session and start "
+                        + "\(pendingStartRequest.templateName) instead."
                 )
             }
         }

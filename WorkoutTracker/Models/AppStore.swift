@@ -23,7 +23,8 @@ final class AppStore {
 
     init(
         modelContainer: ModelContainer = WorkoutModelContainerFactory.makeContainer(),
-        launchArguments: Set<String> = Set(ProcessInfo.processInfo.arguments)
+        launchArguments: Set<String> = Set(ProcessInfo.processInfo.arguments),
+        settingsStore: SettingsStore? = nil
     ) {
         self.launchArguments = launchArguments
         let context = ModelContext(modelContainer)
@@ -36,7 +37,7 @@ final class AppStore {
             sessionPersistenceController: sessionPersistenceController
         )
 
-        let settingsStore = SettingsStore()
+        let settingsStore = settingsStore ?? SettingsStore()
         let plansStore = PlansStore(
             persistenceController: planPersistenceController
         )

@@ -408,8 +408,8 @@ struct AppStatePill: View {
 struct AppSectionHeader: View {
     let title: String
     let systemImage: String
-    var subtitle: String? = nil
-    var trailing: String? = nil
+    var subtitle: String?
+    var trailing: String?
     var tone: AppToneStyle = .base
 
     var body: some View {
@@ -497,7 +497,6 @@ struct RootAppView: View {
                     .environment(appStore.progressStore)
             }
         }
-        .preferredColorScheme(.dark)
         .fullScreenCover(
             isPresented: Binding(
                 get: { appStore.sessionStore.isPresentingSession },
@@ -585,7 +584,6 @@ private struct OnboardingSetupView: View {
             .frame(maxWidth: 340)
             .appFeatureSurface()
         }
-        .preferredColorScheme(.dark)
     }
 }
 
