@@ -875,20 +875,43 @@ enum TemplateReferenceSelection {
         init(references: [TemplateReference], sessions: [CompletedSession]) {
             referencesByTemplateID = Dictionary(uniqueKeysWithValues: references.map { ($0.templateID, $0) })
             recentTemplateIDs = []
-            recentTemplateIDs.reserveCapacity(sessions.count)
+            recentTemplateIDs.reserveCapacity(min(sessions.count, AnalyticsDefaults.quickStartLimit))
             lastCompletedTemplateIDByPlan = [:]
             lastCompletedTemplateIDByPlan.reserveCapacity(min(sessions.count, references.count))
+            let trackedPlanIDs = Set(references.map(\.planID))
+            var unresolvedPlanIDs = trackedPlanIDs
+            var seenRecentTemplateIDs: Set<UUID> = []
+            seenRecentTemplateIDs.reserveCapacity(min(sessions.count, AnalyticsDefaults.quickStartLimit))
+            let recentTemplateLimit = min(AnalyticsDefaults.quickStartLimit, referencesByTemplateID.count)
 
             for session in sessions.reversed() {
-                recentTemplateIDs.append(session.templateID)
+                if recentTemplateIDs.count < recentTemplateLimit,
+                    referencesByTemplateID[session.templateID] != nil,
+                    seenRecentTemplateIDs.insert(session.templateID).inserted
+                {
+                    recentTemplateIDs.append(session.templateID)
+                }
 
                 guard let planID = session.planID,
-                    lastCompletedTemplateIDByPlan[planID] == nil
+                    unresolvedPlanIDs.contains(planID)
                 else {
+                    if recentTemplateIDs.count == recentTemplateLimit,
+                        unresolvedPlanIDs.isEmpty
+                    {
+                        break
+                    }
+
                     continue
                 }
 
                 lastCompletedTemplateIDByPlan[planID] = session.templateID
+                unresolvedPlanIDs.remove(planID)
+
+                if recentTemplateIDs.count == recentTemplateLimit,
+                    unresolvedPlanIDs.isEmpty
+                {
+                    break
+                }
             }
         }
     }

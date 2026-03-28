@@ -20,7 +20,7 @@ actor PersistenceHydrationLoader {
         self.sessionPersistenceController = sessionPersistenceController
     }
 
-    func load() -> AppHydrationSnapshot {
+    func loadStartupSnapshot() -> AppHydrationSnapshot {
         planPersistenceController.flush()
         sessionPersistenceController.flush()
 
@@ -44,8 +44,17 @@ actor PersistenceHydrationLoader {
             ),
             sessions: SessionStore.HydrationSnapshot(
                 activeDraft: sessionRepository.loadActiveDraft(),
-                completedSessions: sessionRepository.loadCompletedSessions()
+                completedSessions: [],
+                includesCompleteHistory: false
             )
         )
+    }
+
+    func loadCompletedSessionHistory() -> [CompletedSession] {
+        sessionPersistenceController.flush()
+
+        let context = ModelContext(modelContainer)
+        context.autosaveEnabled = false
+        return SessionRepository(modelContext: context).loadCompletedSessions()
     }
 }

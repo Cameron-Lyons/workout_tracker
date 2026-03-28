@@ -1,7 +1,6 @@
 import SwiftUI
 
 private enum TodayViewMetrics {
-    static let quickStartCardWidth: CGFloat = 238
     static let spotlightCornerRadius: CGFloat = 22
 }
 
@@ -39,6 +38,25 @@ private func handleSessionStart(
         templateID: templateID,
         templateName: templateName
     )
+}
+
+private func setTargetRepSummary(for targets: [SetTarget]) -> String {
+    let labels = targets.reduce(into: [String]()) { partialResult, target in
+        let label = target.repRange.displayLabel
+        if partialResult.last != label {
+            partialResult.append(label)
+        }
+    }
+
+    return labels.isEmpty ? "-" : labels.joined(separator: "/")
+}
+
+private func weekdaySummary(_ weekdays: [Weekday], emptyLabel: String) -> String {
+    guard !weekdays.isEmpty else {
+        return emptyLabel
+    }
+
+    return weekdays.map { $0.shortLabel.uppercased() }.joined(separator: " • ")
 }
 
 private struct SessionStartConfirmationDialogModifier: ViewModifier {
@@ -163,8 +181,9 @@ struct TodayView: View {
                 .scrollIndicators(.hidden)
             }
             .navigationTitle("Today")
-            .toolbarBackground(AppColors.chrome, for: .navigationBar)
-            .toolbarBackground(.visible, for: .navigationBar)
+            .task {
+                await appStore.hydrateCompletedSessionHistoryIfNeeded(priority: .utility)
+            }
             .sessionStartConfirmationDialog(
                 pendingStartRequest: $pendingStartRequest,
                 activeDraft: activeDraft,
@@ -233,7 +252,7 @@ struct TodayView: View {
                         AppStatePill(title: "Autosaved", systemImage: "bolt.fill", tone: .warning)
 
                         Text(draft.templateNameSnapshot)
-                            .font(.system(.title2, design: .rounded).weight(.bold))
+                            .font(.system(size: 28, weight: .black))
                             .foregroundStyle(AppColors.textPrimary)
 
                         Text("Last updated \(draft.lastUpdatedAt.formatted(date: .abbreviated, time: .shortened))")
@@ -270,10 +289,7 @@ struct TodayView: View {
                         .font(.headline)
                         .frame(maxWidth: .infinity)
                 }
-                .buttonStyle(.borderedProminent)
-                .buttonBorderShape(.roundedRectangle(radius: 16))
-                .tint(AppToneStyle.today.accent)
-                .controlSize(.large)
+                .appPrimaryActionButton(tone: .today)
                 .accessibilityIdentifier("today.resumeSessionButton")
             }
         }
@@ -291,7 +307,7 @@ struct TodayView: View {
                         AppStatePill(title: "Pinned Next", systemImage: "pin.fill", tone: .plans)
 
                         Text(reference.templateName)
-                            .font(.system(.title2, design: .rounded).weight(.bold))
+                            .font(.system(size: 28, weight: .black))
                             .foregroundStyle(AppColors.textPrimary)
 
                         Text(reference.planName)
@@ -356,10 +372,7 @@ struct TodayView: View {
                         .font(.headline)
                         .frame(maxWidth: .infinity)
                 }
-                .buttonStyle(.borderedProminent)
-                .buttonBorderShape(.roundedRectangle(radius: 16))
-                .tint(AppToneStyle.today.accent)
-                .controlSize(.large)
+                .appPrimaryActionButton(tone: .today)
                 .accessibilityIdentifier("today.pinnedStartButton")
             }
         }
@@ -380,11 +393,11 @@ struct TodayView: View {
                     .font(.subheadline)
                     .foregroundStyle(AppColors.textSecondary)
                     .frame(maxWidth: .infinity, alignment: .leading)
-                    .appSectionSurface()
+                    .appSectionSurface(tone: .today)
             } else {
-                ScrollView(.horizontal) {
-                    LazyHStack(spacing: 12) {
-                        ForEach(todayStore.quickStartTemplates) { reference in
+                TodayGroupedPanel(tone: .today) {
+                    VStack(spacing: 0) {
+                        ForEach(Array(todayStore.quickStartTemplates.enumerated()), id: \.element.id) { index, reference in
                             Button {
                                 handleSessionStart(
                                     activeDraft: activeDraft,
@@ -400,15 +413,17 @@ struct TodayView: View {
                                     }
                                 )
                             } label: {
-                                TodayQuickStartTile(reference: reference)
+                                TodayQuickStartRow(reference: reference)
                             }
                             .buttonStyle(.plain)
                             .accessibilityIdentifier("today.quickStart.\(reference.templateID.uuidString)")
+
+                            if index < todayStore.quickStartTemplates.count - 1 {
+                                SectionSurfaceDivider()
+                            }
                         }
                     }
-                    .padding(.vertical, 2)
                 }
-                .scrollIndicators(.hidden)
             }
         }
     }
@@ -429,10 +444,18 @@ struct TodayView: View {
                     .foregroundStyle(AppColors.textSecondary)
                     .padding(AppCardMetrics.compactPadding)
                     .frame(maxWidth: .infinity, alignment: .leading)
-                    .appSurface(cornerRadius: AppCardMetrics.compactCornerRadius, shadow: false)
+                    .appSurface(cornerRadius: AppCardMetrics.compactCornerRadius, shadow: false, tone: .success)
             } else {
-                ForEach(todayStore.recentPersonalRecords) { record in
-                    PersonalRecordSummaryCardView(record: record, weightUnit: weightUnit, tone: .success)
+                TodayGroupedPanel(tone: .success) {
+                    VStack(spacing: 0) {
+                        ForEach(Array(todayStore.recentPersonalRecords.enumerated()), id: \.element.id) { index, record in
+                            TodayPersonalRecordRow(record: record, weightUnit: weightUnit, tone: .success)
+
+                            if index < todayStore.recentPersonalRecords.count - 1 {
+                                SectionSurfaceDivider()
+                            }
+                        }
+                    }
                 }
             }
         }
@@ -454,10 +477,18 @@ struct TodayView: View {
                     .foregroundStyle(AppColors.textSecondary)
                     .padding(AppCardMetrics.compactPadding)
                     .frame(maxWidth: .infinity, alignment: .leading)
-                    .appSurface(cornerRadius: AppCardMetrics.compactCornerRadius, shadow: false)
+                    .appSurface(cornerRadius: AppCardMetrics.compactCornerRadius, shadow: false, tone: .progress)
             } else {
-                ForEach(todayStore.recentSessions) { session in
-                    CompletedSessionSummaryCardView(session: session, detailSuffix: " logged", tone: .progress)
+                TodayGroupedPanel(tone: .progress) {
+                    VStack(spacing: 0) {
+                        ForEach(Array(todayStore.recentSessions.enumerated()), id: \.element.id) { index, session in
+                            TodayCompletedSessionRow(session: session, tone: .progress)
+
+                            if index < todayStore.recentSessions.count - 1 {
+                                SectionSurfaceDivider()
+                            }
+                        }
+                    }
                 }
             }
         }
@@ -476,87 +507,76 @@ private struct TodaySpotlightCard<Content: View>: View {
     var body: some View {
         content
             .padding(18)
-            .background {
-                ZStack {
-                    RoundedRectangle(cornerRadius: TodayViewMetrics.spotlightCornerRadius, style: .continuous)
-                        .fill(
-                            LinearGradient(
-                                colors: [
-                                    AppColors.chrome.opacity(0.94),
-                                    tone.softFill.opacity(0.95),
-                                ],
-                                startPoint: .topLeading,
-                                endPoint: .bottomTrailing
-                            )
-                        )
-
-                    RoundedRectangle(cornerRadius: TodayViewMetrics.spotlightCornerRadius, style: .continuous)
-                        .fill(.ultraThinMaterial)
-                        .opacity(0.2)
-                }
-            }
-            .overlay(
-                RoundedRectangle(cornerRadius: TodayViewMetrics.spotlightCornerRadius, style: .continuous)
-                    .stroke(tone.softBorder, lineWidth: 1)
-            )
-            .shadow(color: .black.opacity(0.18), radius: 16, x: 0, y: 10)
+            .appSurface(cornerRadius: TodayViewMetrics.spotlightCornerRadius, tone: tone)
     }
 }
 
-private struct TodayQuickStartTile: View {
-    let reference: TemplateReference
+private struct TodayGroupedPanel<Content: View>: View {
+    let tone: AppToneStyle
+    let content: Content
 
-    private var visibleWeekdays: [Weekday] {
-        Array(reference.scheduledWeekdays.prefix(4))
+    init(tone: AppToneStyle, @ViewBuilder content: () -> Content) {
+        self.tone = tone
+        self.content = content()
     }
 
     var body: some View {
-        TodaySpotlightCard(tone: .plans) {
-            VStack(alignment: .leading, spacing: 14) {
-                HStack(alignment: .top) {
-                    AppStatePill(title: "Quick Start", systemImage: "bolt.fill", tone: .today)
+        content
+            .padding(.horizontal, 18)
+            .padding(.vertical, 4)
+            .appFeatureSurface(tone: tone)
+    }
+}
 
-                    Spacer()
+private struct SectionSurfaceDivider: View {
+    var body: some View {
+        Rectangle()
+            .fill(AppColors.stroke.opacity(0.78))
+            .frame(height: 1)
+    }
+}
 
-                    Image(systemName: "play.circle.fill")
-                        .font(.system(size: 28, weight: .semibold))
-                        .foregroundStyle(AppToneStyle.today.accent)
-                }
+private struct TodayQuickStartRow: View {
+    let reference: TemplateReference
 
-                VStack(alignment: .leading, spacing: 6) {
-                    Text(reference.templateName)
-                        .font(.system(.title3, design: .rounded).weight(.bold))
-                        .foregroundStyle(AppColors.textPrimary)
-                        .lineLimit(2)
+    private var scheduleLabel: String {
+        weekdaySummary(reference.scheduledWeekdays, emptyLabel: "READY ANY DAY")
+    }
 
-                    Text(reference.planName)
-                        .font(.subheadline)
-                        .foregroundStyle(AppColors.textSecondary)
-                        .lineLimit(1)
-                }
+    var body: some View {
+        HStack(alignment: .top, spacing: 14) {
+            Image(systemName: "bolt.fill")
+                .font(.system(size: 17, weight: .black))
+                .foregroundStyle(AppToneStyle.today.accent)
+                .frame(width: 40, height: 40)
+                .appInsetCard(
+                    cornerRadius: 8,
+                    fill: AppToneStyle.today.softFill.opacity(0.78),
+                    border: AppToneStyle.today.softBorder
+                )
 
-                Spacer(minLength: 0)
+            VStack(alignment: .leading, spacing: 6) {
+                Text("QUICK START")
+                    .font(.caption2.weight(.black))
+                    .tracking(0.8)
+                    .foregroundStyle(AppToneStyle.today.accent)
 
-                if visibleWeekdays.isEmpty {
-                    Text("Ready any day")
-                        .font(.caption.weight(.semibold))
-                        .foregroundStyle(AppToneStyle.plans.accent)
-                } else {
-                    HStack(spacing: 6) {
-                        ForEach(visibleWeekdays) { weekday in
-                            Text(weekday.shortLabel)
-                                .font(.caption.weight(.semibold))
-                                .foregroundStyle(AppToneStyle.plans.accent)
-                                .padding(.horizontal, 8)
-                                .padding(.vertical, 5)
-                                .appInsetCard(
-                                    cornerRadius: 999,
-                                    fill: AppToneStyle.plans.softFill.opacity(0.78),
-                                    border: AppToneStyle.plans.softBorder
-                                )
-                        }
-                    }
-                }
+                Text(reference.templateName)
+                    .font(.system(size: 21, weight: .black))
+                    .foregroundStyle(AppColors.textPrimary)
+                    .multilineTextAlignment(.leading)
+                    .fixedSize(horizontal: false, vertical: true)
+
+                Text(reference.planName)
+                    .font(.subheadline)
+                    .foregroundStyle(AppColors.textSecondary)
+                    .multilineTextAlignment(.leading)
+                    .fixedSize(horizontal: false, vertical: true)
+
+                Text(scheduleLabel)
+                    .font(.caption.weight(.black))
+                    .tracking(0.7)
+                    .foregroundStyle(AppColors.textPrimary.opacity(0.88))
 
                 if let lastStartedAt = reference.lastStartedAt {
                     Text("Last started \(lastStartedAt.formatted(date: .abbreviated, time: .omitted))")
@@ -568,9 +588,92 @@ private struct TodayQuickStartTile: View {
                         .foregroundStyle(AppColors.textSecondary)
                 }
             }
-            .frame(width: TodayViewMetrics.quickStartCardWidth, alignment: .leading)
-            .frame(minHeight: 196, alignment: .leading)
+            .layoutPriority(1)
+
+            Spacer(minLength: 12)
+
+            Image(systemName: "arrow.right")
+                .font(.caption.weight(.black))
+                .foregroundStyle(AppToneStyle.today.accent)
+                .padding(.top, 4)
         }
+        .padding(.vertical, 14)
+    }
+}
+
+private struct TodayPersonalRecordRow: View {
+    let record: PersonalRecord
+    let weightUnit: WeightUnit
+    let tone: AppToneStyle
+
+    var body: some View {
+        HStack(alignment: .top, spacing: 12) {
+            VStack(alignment: .leading, spacing: 6) {
+                Text("PR")
+                    .font(.caption2.weight(.black))
+                    .tracking(0.8)
+                    .foregroundStyle(tone.accent)
+
+                Text(record.displayName)
+                    .font(.system(size: 19, weight: .black))
+                    .foregroundStyle(AppColors.textPrimary)
+                    .multilineTextAlignment(.leading)
+                    .fixedSize(horizontal: false, vertical: true)
+
+                Text("\(WeightFormatter.displayString(record.weight, unit: weightUnit)) \(weightUnit.symbol) x \(record.reps)")
+                    .font(.subheadline.weight(.medium))
+                    .foregroundStyle(AppColors.textSecondary)
+            }
+
+            Spacer(minLength: 12)
+
+            VStack(alignment: .trailing, spacing: 6) {
+                Text(record.achievedAt.formatted(date: .abbreviated, time: .omitted).uppercased())
+                    .font(.caption2.weight(.black))
+                    .tracking(0.7)
+                    .foregroundStyle(AppColors.textSecondary)
+
+                Text("E1RM \(WeightFormatter.displayString(record.estimatedOneRepMax, unit: weightUnit))")
+                    .font(.caption.weight(.black))
+                    .monospacedDigit()
+                    .foregroundStyle(tone.accent)
+            }
+        }
+        .padding(.vertical, 12)
+    }
+}
+
+private struct TodayCompletedSessionRow: View {
+    let session: CompletedSession
+    let tone: AppToneStyle
+
+    var body: some View {
+        HStack(alignment: .top, spacing: 12) {
+            VStack(alignment: .leading, spacing: 6) {
+                Text("LOGGED")
+                    .font(.caption2.weight(.black))
+                    .tracking(0.8)
+                    .foregroundStyle(tone.accent)
+
+                Text(session.templateNameSnapshot)
+                    .font(.system(size: 19, weight: .black))
+                    .foregroundStyle(AppColors.textPrimary)
+                    .multilineTextAlignment(.leading)
+                    .fixedSize(horizontal: false, vertical: true)
+
+                Text("\(session.blocks.count) exercise block\(session.blocks.count == 1 ? "" : "s")")
+                    .font(.subheadline.weight(.medium))
+                    .foregroundStyle(AppColors.textSecondary)
+            }
+
+            Spacer(minLength: 12)
+
+            Text(session.completedAt.formatted(date: .abbreviated, time: .shortened).uppercased())
+                .font(.caption.weight(.black))
+                .monospacedDigit()
+                .foregroundStyle(AppColors.textSecondary)
+        }
+        .padding(.vertical, 12)
     }
 }
 
@@ -627,8 +730,6 @@ struct PlansView: View {
                 .scrollIndicators(.hidden)
             }
             .navigationTitle("Plans")
-            .toolbarBackground(AppColors.chrome, for: .navigationBar)
-            .toolbarBackground(.visible, for: .navigationBar)
             .toolbar {
                 ToolbarItem(placement: .topBarLeading) {
                     Menu {
@@ -747,7 +848,7 @@ struct PlansView: View {
             HStack(alignment: .top) {
                 VStack(alignment: .leading, spacing: 6) {
                     Text(plan.name)
-                        .font(.system(.title3, design: .rounded).weight(.bold))
+                        .font(.system(size: 22, weight: .black))
                         .foregroundStyle(AppColors.textPrimary)
 
                     Text("\(plan.templates.count) template\(plan.templates.count == 1 ? "" : "s")")
@@ -762,9 +863,7 @@ struct PlansView: View {
                 } label: {
                     Label("Add Template", systemImage: "plus")
                 }
-                .buttonStyle(.bordered)
-                .buttonBorderShape(.roundedRectangle(radius: 14))
-                .tint(AppToneStyle.plans.accent)
+                .appSecondaryActionButton(tone: .plans)
                 .accessibilityIdentifier("plans.addTemplateButton.\(plan.id.uuidString)")
 
                 Menu {
@@ -785,16 +884,20 @@ struct PlansView: View {
                     .font(.subheadline)
                     .foregroundStyle(AppColors.textSecondary)
                     .frame(maxWidth: .infinity, alignment: .leading)
-                    .appInsetContentCard(borderOpacity: 0.65)
+                    .padding(.vertical, 12)
             } else {
-                LazyVStack(spacing: 12) {
-                    ForEach(plan.templates) { template in
+                VStack(spacing: 0) {
+                    ForEach(Array(plan.templates.enumerated()), id: \.element.id) { index, template in
                         templateCard(plan: plan, template: template)
+
+                        if index < plan.templates.count - 1 {
+                            SectionSurfaceDivider()
+                        }
                     }
                 }
             }
         }
-        .appFeatureSurface()
+        .appFeatureSurface(tone: .plans)
     }
 
     private func templateCard(plan: Plan, template: WorkoutTemplate) -> some View {
@@ -808,16 +911,9 @@ struct PlansView: View {
 
                         if plan.pinnedTemplateID == template.id {
                             Text("PINNED")
-                                .font(.caption2.weight(.bold))
+                                .font(.caption2.weight(.black))
+                                .tracking(0.8)
                                 .foregroundStyle(AppToneStyle.plans.accent)
-                                .padding(.horizontal, 6)
-                                .padding(.vertical, 4)
-                                .appInsetCard(
-                                    cornerRadius: AppCardMetrics.chipCornerRadius,
-                                    fillOpacity: 0.86,
-                                    borderOpacity: 0.8,
-                                    border: AppToneStyle.plans.softBorder
-                                )
                         }
                     }
 
@@ -826,6 +922,11 @@ struct PlansView: View {
                             .font(.caption)
                             .foregroundStyle(AppColors.textSecondary)
                     }
+
+                    Text(weekdaySummary(template.scheduledWeekdays, emptyLabel: "ANY DAY"))
+                        .font(.caption.weight(.black))
+                        .tracking(0.7)
+                        .foregroundStyle(AppColors.textPrimary.opacity(0.88))
                 }
 
                 Spacer()
@@ -836,60 +937,18 @@ struct PlansView: View {
                     Image(systemName: plan.pinnedTemplateID == template.id ? "pin.fill" : "pin")
                         .font(.subheadline.weight(.semibold))
                 }
-                .buttonStyle(.bordered)
-                .buttonBorderShape(.roundedRectangle(radius: 12))
-                .tint(plan.pinnedTemplateID == template.id ? AppToneStyle.plans.accent : AppColors.textSecondary)
+                .appSecondaryActionButton(tone: .plans, controlSize: .small)
                 .accessibilityLabel(plan.pinnedTemplateID == template.id ? "Pinned to Today" : "Pin to Today")
                 .accessibilityIdentifier("plans.pinTemplate.\(template.id.uuidString)")
             }
 
-            if !template.scheduledWeekdays.isEmpty {
-                HStack(spacing: 8) {
-                    ForEach(template.scheduledWeekdays) { weekday in
-                        Text(weekday.shortLabel)
-                            .font(.caption.weight(.semibold))
-                            .foregroundStyle(AppToneStyle.plans.accent)
-                            .padding(.horizontal, 7)
-                            .padding(.vertical, 5)
-                            .appInsetCard(
-                                cornerRadius: AppCardMetrics.chipCornerRadius,
-                                fillOpacity: 0.82,
-                                borderOpacity: 0.75,
-                                border: AppToneStyle.plans.softBorder
-                            )
+            VStack(spacing: 0) {
+                ForEach(Array(template.blocks.enumerated()), id: \.element.id) { index, block in
+                    TemplateBlockSummaryRow(block: block)
+
+                    if index < template.blocks.count - 1 {
+                        SectionSurfaceDivider()
                     }
-                }
-            }
-
-            LazyVStack(spacing: 10) {
-                ForEach(template.blocks) { block in
-                    HStack(alignment: .top) {
-                        VStack(alignment: .leading, spacing: 4) {
-                            Text(block.exerciseNameSnapshot)
-                                .font(.subheadline.weight(.semibold))
-                                .foregroundStyle(AppColors.textPrimary)
-
-                            Text("\(block.targets.count) sets • \(repSummary(for: block.targets)) reps")
-                                .font(.caption)
-                                .foregroundStyle(AppColors.textSecondary)
-
-                            if let supersetGroup = block.supersetGroup, !supersetGroup.isEmpty {
-                                Text("Superset \(supersetGroup)")
-                                    .font(.caption2)
-                                    .foregroundStyle(AppToneStyle.plans.accent)
-                            }
-                        }
-
-                        Spacer()
-
-                        MetricBadge(
-                            label: "Rule",
-                            value: block.progressionRule.kind.displayLabel,
-                            systemImage: "arrow.up.right",
-                            tone: .progress
-                        )
-                    }
-                    .appInsetContentCard(fillOpacity: 0.78)
                 }
             }
 
@@ -912,9 +971,7 @@ struct PlansView: View {
                     Label("Start", systemImage: "play.fill")
                         .frame(maxWidth: .infinity)
                 }
-                .buttonStyle(.borderedProminent)
-                .buttonBorderShape(.roundedRectangle(radius: 14))
-                .tint(AppToneStyle.today.accent)
+                .appPrimaryActionButton(tone: .today, controlSize: .regular)
                 .accessibilityIdentifier("plans.startTemplate.\(template.id.uuidString)")
 
                 Button {
@@ -923,29 +980,51 @@ struct PlansView: View {
                     Label("Edit", systemImage: "square.and.pencil")
                         .frame(maxWidth: .infinity)
                 }
-                .buttonStyle(.bordered)
-                .buttonBorderShape(.roundedRectangle(radius: 14))
-                .tint(AppToneStyle.plans.accent)
+                .appSecondaryActionButton(tone: .plans, controlSize: .regular)
 
                 Button(role: .destructive) {
                     appStore.deleteTemplate(planID: plan.id, templateID: template.id)
                 } label: {
                     Image(systemName: "trash")
                 }
-                .buttonStyle(.bordered)
+                .appSecondaryActionButton(tone: .danger, controlSize: .regular)
             }
         }
-        .appEditorInsetCard()
+        .padding(.vertical, 14)
     }
+}
 
-    private func repSummary(for targets: [SetTarget]) -> String {
-        let labels = targets.reduce(into: [String]()) { partialResult, target in
-            let label = target.repRange.displayLabel
-            if partialResult.last != label {
-                partialResult.append(label)
+private struct TemplateBlockSummaryRow: View {
+    let block: ExerciseBlock
+
+    var body: some View {
+        HStack(alignment: .top, spacing: 12) {
+            VStack(alignment: .leading, spacing: 4) {
+                Text(block.exerciseNameSnapshot)
+                    .font(.subheadline.weight(.semibold))
+                    .foregroundStyle(AppColors.textPrimary)
+                    .multilineTextAlignment(.leading)
+                    .fixedSize(horizontal: false, vertical: true)
+
+                Text("\(block.targets.count) sets • \(setTargetRepSummary(for: block.targets)) reps")
+                    .font(.caption)
+                    .foregroundStyle(AppColors.textSecondary)
+
+                if let supersetGroup = block.supersetGroup, !supersetGroup.isEmpty {
+                    Text("SUPERSET \(supersetGroup)")
+                        .font(.caption2.weight(.black))
+                        .tracking(0.7)
+                        .foregroundStyle(AppToneStyle.plans.accent)
+                }
             }
-        }
 
-        return labels.isEmpty ? "-" : labels.joined(separator: "/")
+            Spacer(minLength: 12)
+
+            Text(block.progressionRule.kind.displayLabel.uppercased())
+                .font(.caption2.weight(.black))
+                .tracking(0.7)
+                .foregroundStyle(AppToneStyle.progress.accent)
+        }
+        .padding(.vertical, 10)
     }
 }

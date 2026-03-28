@@ -52,18 +52,43 @@ private enum WeeklyMomentumState {
     }
 }
 
+private struct ProgressChartSectionState: Equatable {
+    var exerciseSummaries: [ExerciseAnalyticsSummary]
+    var selectedExerciseID: UUID?
+    var selectedExerciseSummary: ExerciseAnalyticsSummary?
+    var selectedExerciseChartSeries: ExerciseChartSeries?
+    var weightUnit: WeightUnit
+}
+
 struct ProgressDashboardView: View {
+    @Environment(AppStore.self) private var appStore
+    @Environment(SettingsStore.self) private var settingsStore
     @Environment(ProgressStore.self) private var progressStore
+    @Environment(SessionStore.self) private var sessionStore
 
     var onDisplayed: (() -> Void)?
 
     @State private var displayedMonth = Calendar.autoupdatingCurrent.startOfDay(for: .now)
+    @State private var displayTask: Task<Void, Never>?
+    @State private var didReportDisplayed = false
+
+    private var chartSectionState: ProgressChartSectionState {
+        ProgressChartSectionState(
+            exerciseSummaries: progressStore.exerciseSummaries,
+            selectedExerciseID: progressStore.selectedExerciseID,
+            selectedExerciseSummary: progressStore.selectedExerciseSummary,
+            selectedExerciseChartSeries: progressStore.selectedExerciseChartSeries,
+            weightUnit: settingsStore.weightUnit
+        )
+    }
 
     var body: some View {
         NavigationStack {
             ZStack {
                 AppBackground()
-                if progressStore.overview.totalSessions == 0 {
+                if sessionStore.hasLoadedCompletedSessionHistory == false {
+                    ProgressHistoryLoadingCardView()
+                } else if progressStore.overview.totalSessions == 0 {
                     AppEmptyStateCard(
                         systemImage: "chart.xyaxis.line",
                         title: "No progress yet",
@@ -72,10 +97,13 @@ struct ProgressDashboardView: View {
                     )
                 } else {
                     ScrollView {
-                        VStack(spacing: 16) {
+                        LazyVStack(spacing: 16) {
                             ProgressOverviewSectionView()
                             ProgressRecordsSectionView()
-                            ProgressChartSectionView()
+                            ProgressChartSectionView(
+                                state: chartSectionState,
+                                onSelectExercise: progressStore.selectExercise
+                            )
                             ProgressCalendarSectionView(displayedMonth: $displayedMonth)
                             ProgressHistorySectionView()
                         }
@@ -86,12 +114,56 @@ struct ProgressDashboardView: View {
                 }
             }
             .navigationTitle("Progress")
-            .toolbarBackground(AppColors.chrome, for: .navigationBar)
-            .toolbarBackground(.visible, for: .navigationBar)
             .onAppear {
-                onDisplayed?()
+                displayTask?.cancel()
+                displayTask = Task {
+                    await appStore.hydrateCompletedSessionHistoryIfNeeded(priority: .userInitiated)
+                    guard !Task.isCancelled else {
+                        return
+                    }
+
+                    reportDisplayed()
+                }
+            }
+            .onDisappear {
+                displayTask?.cancel()
+                displayTask = nil
+                didReportDisplayed = false
             }
         }
+    }
+
+    private func reportDisplayed() {
+        guard didReportDisplayed == false else {
+            return
+        }
+
+        didReportDisplayed = true
+        onDisplayed?()
+    }
+}
+
+private struct ProgressHistoryLoadingCardView: View {
+    var body: some View {
+        VStack(spacing: 14) {
+            ProgressView()
+                .progressViewStyle(.circular)
+                .tint(AppColors.accentProgress)
+                .scaleEffect(1.08)
+
+            Text("Hydrating progress history...")
+                .font(.headline.weight(.bold))
+                .foregroundStyle(AppColors.textPrimary)
+
+            Text("Large session logs are loading in the background so the tab can open immediately.")
+                .font(.subheadline)
+                .multilineTextAlignment(.center)
+                .foregroundStyle(AppColors.textSecondary)
+        }
+        .padding(.vertical, 22)
+        .padding(.horizontal, 24)
+        .appSurface(cornerRadius: AppCardMetrics.featureCornerRadius, shadow: false, tone: .progress)
+        .padding(.horizontal, 24)
     }
 }
 
@@ -244,23 +316,24 @@ private struct ProgressRecordsSectionView: View {
     }
 }
 
+@MainActor
 private struct ProgressChartSectionView: View {
-    @Environment(SettingsStore.self) private var settingsStore
-    @Environment(ProgressStore.self) private var progressStore
+    let state: ProgressChartSectionState
+    let onSelectExercise: @MainActor (UUID?) -> Void
 
     var body: some View {
         VStack(alignment: .leading, spacing: 12) {
             AppSectionHeader(
                 title: "Exercise Trends",
                 systemImage: "chart.line.uptrend.xyaxis",
-                subtitle: progressStore.exerciseSummaries.isEmpty
+                subtitle: state.exerciseSummaries.isEmpty
                     ? "Weighted logs unlock exercise-level trend lines and PR callouts."
                     : "Follow top-set load and estimated strength over time for a single exercise.",
-                trailing: progressStore.selectedExerciseSummary.map { "\($0.pointCount) points" },
+                trailing: state.selectedExerciseSummary.map { "\($0.pointCount) points" },
                 tone: .progress
             )
 
-            if progressStore.exerciseSummaries.isEmpty {
+            if state.exerciseSummaries.isEmpty {
                 AppEmptyStateCard(
                     systemImage: "chart.line.uptrend.xyaxis",
                     title: "No trend data yet",
@@ -279,11 +352,13 @@ private struct ProgressChartSectionView: View {
                     Picker(
                         "Exercise",
                         selection: Binding(
-                            get: { progressStore.selectedExerciseID },
-                            set: { progressStore.selectExercise($0) }
+                            get: { state.selectedExerciseID },
+                            set: { selection in
+                                onSelectExercise(selection)
+                            }
                         )
                     ) {
-                        ForEach(progressStore.exerciseSummaries) { summary in
+                        ForEach(state.exerciseSummaries) { summary in
                             Text(summary.displayName).tag(Optional(summary.exerciseID))
                         }
                     }
@@ -295,10 +370,10 @@ private struct ProgressChartSectionView: View {
                     border: AppToneStyle.today.softBorder
                 )
 
-                if let summary = progressStore.selectedExerciseSummary,
-                    let chartSeries = progressStore.selectedExerciseChartSeries
+                if let summary = state.selectedExerciseSummary,
+                    let chartSeries = state.selectedExerciseChartSeries
                 {
-                    ProgressExerciseSummaryCardView(summary: summary, weightUnit: settingsStore.weightUnit)
+                    ProgressExerciseSummaryCardView(summary: summary, weightUnit: state.weightUnit)
 
                     VStack(alignment: .leading, spacing: 12) {
                         AppSectionHeader(
@@ -308,27 +383,15 @@ private struct ProgressChartSectionView: View {
                             trailing: summary.currentPR.map {
                                 let oneRepMax = WeightFormatter.displayString(
                                     $0.estimatedOneRepMax,
-                                    unit: settingsStore.weightUnit
+                                    unit: state.weightUnit
                                 )
-                                return "e1RM PR \(oneRepMax) \(settingsStore.weightUnit.symbol)"
+                                return "e1RM PR \(oneRepMax) \(state.weightUnit.symbol)"
                             },
                             tone: .progress
                         )
 
                         Chart {
                             ForEach(chartSeries.trendPoints) { point in
-                                AreaMark(
-                                    x: .value("Date", point.date),
-                                    y: .value("Top Weight", point.topWeight)
-                                )
-                                .foregroundStyle(
-                                    LinearGradient(
-                                        colors: [AppColors.accentProgress.opacity(0.34), AppColors.accentProgress.opacity(0.05)],
-                                        startPoint: .top,
-                                        endPoint: .bottom
-                                    )
-                                )
-
                                 LineMark(
                                     x: .value("Date", point.date),
                                     y: .value("Top Weight", point.topWeight)
@@ -403,8 +466,8 @@ private struct ProgressChartSectionView: View {
                                     if let axisWeight = value.as(Double.self) {
                                         Text(
                                             WeightFormatter.displayString(
-                                                displayValue: settingsStore.weightUnit.displayValue(fromStoredPounds: axisWeight),
-                                                unit: settingsStore.weightUnit
+                                                displayValue: state.weightUnit.displayValue(fromStoredPounds: axisWeight),
+                                                unit: state.weightUnit
                                             )
                                         )
                                         .font(.caption2)
@@ -432,7 +495,7 @@ private struct ProgressChartSectionView: View {
                             )
                             MetricBadge(
                                 label: "Volume",
-                                value: WeightFormatter.displayString(summary.totalVolume, unit: settingsStore.weightUnit),
+                                value: WeightFormatter.displayString(summary.totalVolume, unit: state.weightUnit),
                                 systemImage: "scalemass",
                                 tone: .warning
                             )
@@ -440,7 +503,7 @@ private struct ProgressChartSectionView: View {
                             if let currentPR = summary.currentPR {
                                 MetricBadge(
                                     label: "e1RM PR",
-                                    value: WeightFormatter.displayString(currentPR.estimatedOneRepMax, unit: settingsStore.weightUnit),
+                                    value: WeightFormatter.displayString(currentPR.estimatedOneRepMax, unit: state.weightUnit),
                                     systemImage: "rosette",
                                     tone: .success
                                 )
@@ -455,7 +518,7 @@ private struct ProgressChartSectionView: View {
             }
         }
         .padding(AppCardMetrics.featurePadding)
-        .appSurface(cornerRadius: AppCardMetrics.featureCornerRadius, shadow: false)
+        .appSurface(cornerRadius: AppCardMetrics.featureCornerRadius, shadow: false, tone: .progress)
     }
 }
 
@@ -496,7 +559,7 @@ private struct ProgressCalendarSectionView: View {
             }
         }
         .padding(AppCardMetrics.featurePadding)
-        .appSurface(cornerRadius: AppCardMetrics.featureCornerRadius, shadow: false)
+        .appSurface(cornerRadius: AppCardMetrics.featureCornerRadius, shadow: false, tone: .progress)
     }
 }
 
@@ -570,30 +633,7 @@ private struct ProgressSpotlightCard<Content: View>: View {
     var body: some View {
         content
             .padding(18)
-            .background {
-                ZStack {
-                    RoundedRectangle(cornerRadius: 22, style: .continuous)
-                        .fill(
-                            LinearGradient(
-                                colors: [
-                                    AppColors.chrome.opacity(0.95),
-                                    tone.softFill.opacity(0.94),
-                                ],
-                                startPoint: .topLeading,
-                                endPoint: .bottomTrailing
-                            )
-                        )
-
-                    RoundedRectangle(cornerRadius: 22, style: .continuous)
-                        .fill(.ultraThinMaterial)
-                        .opacity(0.18)
-                }
-            }
-            .overlay(
-                RoundedRectangle(cornerRadius: 22, style: .continuous)
-                    .stroke(tone.softBorder, lineWidth: 1)
-            )
-            .shadow(color: .black.opacity(0.14), radius: 16, x: 0, y: 10)
+            .appFeatureSurface(tone: tone)
     }
 }
 
@@ -613,7 +653,7 @@ private struct ProgressRecordSpotlightCardView: View {
                 )
 
                 Text(record.displayName)
-                    .font(.system(.title2, design: .rounded).weight(.bold))
+                    .font(.system(size: 26, weight: .black))
                     .foregroundStyle(AppColors.textPrimary)
 
                 let loggedWeight = WeightFormatter.displayString(record.weight, unit: weightUnit)
@@ -735,12 +775,17 @@ private struct ProgressLegendPill: View {
     let tone: AppToneStyle
 
     var body: some View {
-        Label(title, systemImage: systemImage)
-            .font(.caption.weight(.semibold))
-            .foregroundStyle(tone.accent)
-            .padding(.horizontal, 10)
-            .padding(.vertical, 7)
-            .appInsetCard(cornerRadius: 999, fill: tone.softFill.opacity(0.76), border: tone.softBorder)
+        HStack(spacing: 6) {
+            Image(systemName: systemImage)
+                .font(.caption2.weight(.black))
+            Text(title.uppercased())
+                .font(.caption2.weight(.black))
+                .tracking(0.8)
+        }
+        .foregroundStyle(tone.accent)
+        .padding(.horizontal, 10)
+        .padding(.vertical, 7)
+        .appInsetCard(cornerRadius: 6, fill: tone.softFill.opacity(0.76), border: tone.softBorder)
     }
 }
 
@@ -863,10 +908,10 @@ private struct AppCalendarDayCellView: View, Equatable {
                                     height: ProgressDashboardMetrics.calendarWorkoutIndicatorSize
                                 )
                         } else if calendar.isDateInToday(date) {
-                            Circle()
+                            Rectangle()
                                 .fill(AppColors.warning)
                                 .frame(
-                                    width: ProgressDashboardMetrics.calendarWorkoutIndicatorSize,
+                                    width: ProgressDashboardMetrics.calendarWorkoutIndicatorWidth,
                                     height: ProgressDashboardMetrics.calendarWorkoutIndicatorSize
                                 )
                         } else {
@@ -969,7 +1014,7 @@ private struct AppCalendarGrid: View {
 
                 VStack(spacing: 4) {
                     Text(monthLayout.title)
-                        .font(.system(.title3, design: .rounded).weight(.bold))
+                        .font(.system(size: 22, weight: .black))
                         .foregroundStyle(AppColors.textPrimary)
 
                     Text(selectedDay?.formatted(date: .abbreviated, time: .omitted) ?? "Tap a highlighted day")

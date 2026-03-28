@@ -7,6 +7,8 @@ import SwiftData
 final class AppStore {
     @ObservationIgnored private let launchArguments: Set<String>
     @ObservationIgnored private var hasHydrated = false
+    @ObservationIgnored private var completedSessionHistoryLoadGeneration = 0
+    @ObservationIgnored private var completedSessionHistoryTask: Task<[CompletedSession], Never>?
     @ObservationIgnored private let hydrationLoader: PersistenceHydrationLoader
     @ObservationIgnored private let derivedStateController: AppDerivedStateController
     @ObservationIgnored private let planCoordinator: AppPlanCoordinator
@@ -88,8 +90,9 @@ final class AppStore {
         }
 
         hasHydrated = true
+        let isEmptyStoreLaunch = launchArguments.contains("--uitesting-empty-store")
 
-        if launchArguments.contains("--uitesting-empty-store") {
+        if isEmptyStoreLaunch {
             resetAllDataForFreshStart()
         }
 
@@ -97,15 +100,53 @@ final class AppStore {
             settingsStore.hasCompletedOnboarding = true
         }
 
-        let hydrationSnapshot = await hydrationLoader.load()
+        let hydrationSnapshot = await hydrationLoader.loadStartupSnapshot()
         plansStore.hydrate(with: hydrationSnapshot.plans)
-        sessionStore.hydrate(with: hydrationSnapshot.sessions)
+        sessionStore.hydrate(
+            with: SessionStore.HydrationSnapshot(
+                activeDraft: hydrationSnapshot.sessions.activeDraft,
+                completedSessions: hydrationSnapshot.sessions.completedSessions,
+                includesCompleteHistory: isEmptyStoreLaunch
+            )
+        )
         await derivedStateController.hydrate(plansStore: plansStore, sessionStore: sessionStore)
         isHydrated = true
     }
 
     func resetAllDataForFreshStart() {
+        cancelCompletedSessionHistoryLoad()
         planCoordinator.resetAllDataForFreshStart()
+    }
+
+    func hydrateCompletedSessionHistoryIfNeeded(priority: TaskPriority = .utility) async {
+        guard hasHydrated, sessionStore.hasLoadedCompletedSessionHistory == false else {
+            return
+        }
+
+        let generation = completedSessionHistoryLoadGeneration
+
+        if let existingTask = completedSessionHistoryTask {
+            let sessions = await existingTask.value
+            guard generation == completedSessionHistoryLoadGeneration else {
+                return
+            }
+
+            await applyCompletedSessionHistoryIfNeeded(sessions)
+            return
+        }
+
+        sessionStore.setCompletedSessionHistoryLoading(true)
+        let task = Task(priority: priority) { [hydrationLoader] in
+            await hydrationLoader.loadCompletedSessionHistory()
+        }
+        completedSessionHistoryTask = task
+        let sessions = await task.value
+        guard generation == completedSessionHistoryLoadGeneration else {
+            return
+        }
+
+        completedSessionHistoryTask = nil
+        await applyCompletedSessionHistoryIfNeeded(sessions)
     }
 
     func completeOnboarding(with presetPack: PresetPack?) {
@@ -237,5 +278,23 @@ final class AppStore {
 
     func flushPendingPlanPersistence() {
         plansStore.flushPendingPersistence()
+    }
+
+    private func applyCompletedSessionHistoryIfNeeded(_ sessions: [CompletedSession]) async {
+        guard sessionStore.hasLoadedCompletedSessionHistory == false else {
+            return
+        }
+
+        sessionStore.mergeCompletedSessionHistory(sessions)
+        await derivedStateController.refreshDerivedStores(
+            plansStore: plansStore,
+            sessionStore: sessionStore
+        )
+    }
+
+    private func cancelCompletedSessionHistoryLoad() {
+        completedSessionHistoryLoadGeneration &+= 1
+        completedSessionHistoryTask?.cancel()
+        completedSessionHistoryTask = nil
     }
 }

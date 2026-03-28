@@ -121,6 +121,7 @@ final class SessionStore {
     struct HydrationSnapshot: Sendable {
         var activeDraft: SessionDraft?
         var completedSessions: [CompletedSession]
+        var includesCompleteHistory = true
     }
 
     enum DraftPersistenceBehavior {
@@ -139,6 +140,8 @@ final class SessionStore {
     var activeDraft: SessionDraft?
     private(set) var activeDraftProgress = ActiveSessionProgress(draft: nil)
     var completedSessions: [CompletedSession] = []
+    private(set) var hasLoadedCompletedSessionHistory = true
+    private(set) var isLoadingCompletedSessionHistory = false
     var isPresentingSession = false
     var lastFinishedSummary: SessionFinishSummary?
     private var undoStack: [SessionUndoEntry] = []
@@ -159,6 +162,8 @@ final class SessionStore {
     func hydrate(with snapshot: HydrationSnapshot) {
         replaceActiveDraft(snapshot.activeDraft)
         completedSessions = snapshot.completedSessions
+        hasLoadedCompletedSessionHistory = snapshot.includesCompleteHistory
+        isLoadingCompletedSessionHistory = snapshot.includesCompleteHistory == false
         bumpCompletedSessionsRevision()
     }
 
@@ -167,10 +172,35 @@ final class SessionStore {
         persistenceController.scheduleDeleteEverything()
         replaceActiveDraft(nil)
         completedSessions = []
+        hasLoadedCompletedSessionHistory = true
+        isLoadingCompletedSessionHistory = false
         bumpCompletedSessionsRevision()
         isPresentingSession = false
         lastFinishedSummary = nil
         undoStack = []
+    }
+
+    func setCompletedSessionHistoryLoading(_ isLoading: Bool) {
+        guard hasLoadedCompletedSessionHistory == false else {
+            isLoadingCompletedSessionHistory = false
+            return
+        }
+
+        isLoadingCompletedSessionHistory = isLoading
+    }
+
+    func mergeCompletedSessionHistory(_ sessions: [CompletedSession]) {
+        var sessionsByID = Dictionary(uniqueKeysWithValues: sessions.map { ($0.id, $0) })
+        sessionsByID.reserveCapacity(max(sessionsByID.count, completedSessions.count))
+
+        for session in completedSessions {
+            sessionsByID[session.id] = session
+        }
+
+        completedSessions = sessionsByID.values.sorted(by: { $0.completedAt < $1.completedAt })
+        hasLoadedCompletedSessionHistory = true
+        isLoadingCompletedSessionHistory = false
+        bumpCompletedSessionsRevision()
     }
 
     func presentActiveSession() {

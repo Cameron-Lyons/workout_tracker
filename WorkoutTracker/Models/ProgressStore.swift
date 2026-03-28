@@ -8,8 +8,8 @@ struct ExerciseChartSeries: Equatable, Sendable {
 }
 
 private enum ExerciseChartDefaults {
-    static let maxTrendPointCount = 160
-    static let maxMarkerPointCount = 24
+    static let maxTrendPointCount = 96
+    static let maxMarkerPointCount = 12
 }
 
 @MainActor

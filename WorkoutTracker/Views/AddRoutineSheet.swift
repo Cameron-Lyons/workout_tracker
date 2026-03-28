@@ -82,52 +82,20 @@ struct OnboardingView: View {
 
                     VStack(alignment: .leading, spacing: 12) {
                         AppSectionHeader(
-                            title: "Preset Packs",
-                            systemImage: "shippingbox.fill",
-                            subtitle: "Start with a ready-made training style and refine it later.",
-                            trailing: "\(presetPacks.count)",
+                            title: "Choose A Path",
+                            systemImage: "point.3.filled.connected.trianglepath.dotted",
+                            subtitle: "Pick a preset or start blank. The structure can be edited later.",
+                            trailing: "\(presetPacks.count + 1)",
                             tone: .plans
                         )
 
-                        ForEach(presetPacks) { pack in
-                            Button {
-                                beginPresetOnboarding(pack)
-                            } label: {
-                                OnboardingPresetCard(pack: pack)
-                            }
-                            .buttonStyle(.plain)
-                            .accessibilityIdentifier("onboarding.preset.\(pack.rawValue)")
-                        }
-                    }
-
-                    FlowAccentCard(tone: .today) {
-                        VStack(alignment: .leading, spacing: 14) {
-                            AppSectionHeader(
-                                title: "Start Blank",
-                                systemImage: "square.and.pencil",
-                                subtitle:
-                                    "Prefer to build your own structure? Start empty and add plans, templates, and exercises as you go.",
-                                tone: .today
-                            )
-
-                            HStack(spacing: 8) {
-                                AppStatePill(title: "No Presets", systemImage: "square.grid.3x3.slash", tone: .today)
-                                AppStatePill(title: "Manual Setup", systemImage: "slider.horizontal.3", tone: .plans)
-                            }
-
-                            Button {
+                        OnboardingOptionsPanel(
+                            presetPacks: presetPacks,
+                            onSelectPack: beginPresetOnboarding,
+                            onStartBlank: {
                                 appStore.completeOnboarding(with: nil)
-                            } label: {
-                                Label("Start Blank", systemImage: "arrow.right.circle.fill")
-                                    .font(.headline)
-                                    .frame(maxWidth: .infinity)
                             }
-                            .buttonStyle(.borderedProminent)
-                            .buttonBorderShape(.roundedRectangle(radius: 16))
-                            .tint(AppToneStyle.today.accent)
-                            .controlSize(.large)
-                            .accessibilityIdentifier("onboarding.startBlank")
-                        }
+                        )
                     }
                 }
                 .padding(.horizontal, 16)
@@ -248,7 +216,6 @@ struct ExercisePickerSheet: View {
                                 text: $searchText
                             )
                         }
-                        .appFeatureSurface()
 
                         if let onCreateCustom {
                             FlowAccentCard(tone: .plans) {
@@ -274,51 +241,58 @@ struct ExercisePickerSheet: View {
                                         onCreateCustom(trimmedName)
                                         dismiss()
                                     } label: {
-                                        Label("Create Custom Exercise", systemImage: "plus.circle")
+                                        Label("Create Custom Exercise", systemImage: "plus")
                                             .font(.headline)
                                             .frame(maxWidth: .infinity)
                                     }
-                                    .buttonStyle(.borderedProminent)
-                                    .buttonBorderShape(.roundedRectangle(radius: 16))
-                                    .tint(AppToneStyle.plans.accent)
+                                    .appPrimaryActionButton(tone: .plans)
                                     .disabled(customExerciseName.nonEmptyTrimmed == nil)
                                 }
                             }
                         }
 
                         VStack(alignment: .leading, spacing: 12) {
-                            AppSectionHeader(
-                                title: "Results",
-                                systemImage: "list.bullet.rectangle",
-                                subtitle: trimmedSearchText.isEmpty
-                                    ? "The full exercise catalog is ready to browse."
-                                    : "Matching names and aliases for your current search.",
-                                trailing: "\(visibleCatalog.count)",
-                                tone: .plans
-                            )
+                            FlowAccentCard(tone: .plans) {
+                                VStack(alignment: .leading, spacing: 14) {
+                                    AppSectionHeader(
+                                        title: "Results",
+                                        systemImage: "list.bullet.rectangle",
+                                        subtitle: trimmedSearchText.isEmpty
+                                            ? "The full exercise catalog is ready to browse."
+                                            : "Matching names and aliases for your current search.",
+                                        trailing: "\(visibleCatalog.count)",
+                                        tone: .plans
+                                    )
 
-                            if visibleCatalog.isEmpty {
-                                AppEmptyStateCard(
-                                    systemImage: "magnifyingglass",
-                                    title: "No matches found",
-                                    message: onCreateCustom == nil
-                                        ? "Try a broader search term or browse the full catalog."
-                                        : "Try a broader search term, or create a custom exercise below.",
-                                    tone: .warning
-                                )
-                            } else {
-                                LazyVStack(spacing: 10) {
-                                    ForEach(visibleCatalog) { item in
-                                        Button {
-                                            onPick(item)
-                                            dismiss()
-                                        } label: {
-                                            ExercisePickerResultCard(item: item)
+                                    if visibleCatalog.isEmpty {
+                                        InlineResultsEmptyState(
+                                            title: "No matches found",
+                                            message: onCreateCustom == nil
+                                                ? "Try a broader search term or browse the full catalog."
+                                                : "Try a broader search term, or create a custom exercise below.",
+                                            tone: .warning
+                                        )
+                                    } else {
+                                        VStack(spacing: 0) {
+                                            ForEach(Array(visibleCatalog.enumerated()), id: \.element.id) { index, item in
+                                                Button {
+                                                    onPick(item)
+                                                    dismiss()
+                                                } label: {
+                                                    ExercisePickerResultRow(item: item)
+                                                }
+                                                .buttonStyle(.plain)
+                                                .accessibilityElement(children: .combine)
+                                                .accessibilityLabel(item.name)
+                                                .accessibilityIdentifier("exercisePicker.item.\(item.name)")
+
+                                                if index < visibleCatalog.count - 1 {
+                                                    Rectangle()
+                                                        .fill(AppColors.stroke.opacity(0.78))
+                                                        .frame(height: 1)
+                                                }
+                                            }
                                         }
-                                        .buttonStyle(.plain)
-                                        .accessibilityElement(children: .combine)
-                                        .accessibilityLabel(item.name)
-                                        .accessibilityIdentifier("exercisePicker.item.\(item.name)")
                                     }
                                 }
                             }
@@ -330,8 +304,6 @@ struct ExercisePickerSheet: View {
                 .scrollIndicators(.hidden)
             }
             .navigationTitle(title)
-            .toolbarBackground(AppColors.chrome, for: .navigationBar)
-            .toolbarBackground(.visible, for: .navigationBar)
             .toolbar {
                 ToolbarItem(placement: .topBarTrailing) {
                     Button("Done") {
@@ -358,83 +330,188 @@ private struct FlowAccentCard<Content: View>: View {
     var body: some View {
         content
             .padding(18)
-            .background {
-                ZStack {
-                    RoundedRectangle(cornerRadius: 22, style: .continuous)
-                        .fill(
-                            LinearGradient(
-                                colors: [
-                                    AppColors.chrome.opacity(0.94),
-                                    tone.softFill.opacity(0.92),
-                                ],
-                                startPoint: .topLeading,
-                                endPoint: .bottomTrailing
-                            )
-                        )
-
-                    RoundedRectangle(cornerRadius: 22, style: .continuous)
-                        .fill(.ultraThinMaterial)
-                        .opacity(0.18)
-                }
-            }
-            .overlay(
-                RoundedRectangle(cornerRadius: 22, style: .continuous)
-                    .stroke(tone.softBorder, lineWidth: 1)
-            )
-            .shadow(color: .black.opacity(0.16), radius: 16, x: 0, y: 10)
+            .appFeatureSurface(tone: tone)
     }
 }
 
-private struct OnboardingPresetCard: View {
+private struct OnboardingOptionsPanel: View {
+    let presetPacks: [PresetPack]
+    let onSelectPack: (PresetPack) -> Void
+    let onStartBlank: () -> Void
+
+    var body: some View {
+        FlowAccentCard(tone: .plans) {
+            VStack(spacing: 0) {
+                ForEach(Array(presetPacks.enumerated()), id: \.element.id) { index, pack in
+                    Button {
+                        onSelectPack(pack)
+                    } label: {
+                        OnboardingPresetRow(pack: pack)
+                    }
+                    .buttonStyle(.plain)
+                    .accessibilityIdentifier("onboarding.preset.\(pack.rawValue)")
+
+                    if index < presetPacks.count - 1 {
+                        Rectangle()
+                            .fill(AppColors.stroke.opacity(0.78))
+                            .frame(height: 1)
+                    }
+                }
+
+                Rectangle()
+                    .fill(AppColors.strokeStrong.opacity(0.88))
+                    .frame(height: 1)
+                    .padding(.vertical, 4)
+
+                Button {
+                    onStartBlank()
+                } label: {
+                    OnboardingBlankRow()
+                }
+                .buttonStyle(.plain)
+                .accessibilityIdentifier("onboarding.startBlank")
+            }
+        }
+    }
+}
+
+private struct OnboardingPresetRow: View {
     let pack: PresetPack
 
     var body: some View {
-        FlowAccentCard(tone: pack.onboardingTone) {
-            VStack(alignment: .leading, spacing: 14) {
-                HStack(alignment: .top, spacing: 12) {
-                    VStack(alignment: .leading, spacing: 8) {
-                        AppStatePill(
-                            title: pack.onboardingLabel,
-                            systemImage: pack.systemImage,
-                            tone: pack.onboardingTone
-                        )
+        let tone = pack.onboardingTone
 
-                        Text(pack.displayName)
-                            .font(.system(.title3, design: .rounded).weight(.bold))
-                            .foregroundStyle(AppColors.textPrimary)
+        HStack(alignment: .top, spacing: 14) {
+            Image(systemName: pack.systemImage)
+                .font(.system(size: 18, weight: .black))
+                .foregroundStyle(tone.accent)
+                .frame(width: 40, height: 40)
+                .appInsetCard(
+                    cornerRadius: 8,
+                    fill: tone.softFill.opacity(0.72),
+                    border: tone.softBorder
+                )
 
-                        Text(pack.description)
-                            .font(.subheadline)
-                            .foregroundStyle(AppColors.textSecondary)
-                    }
+            VStack(alignment: .leading, spacing: 6) {
+                Text(pack.onboardingLabel.uppercased())
+                    .font(.caption2.weight(.black))
+                    .tracking(0.8)
+                    .foregroundStyle(tone.accent)
 
-                    Spacer(minLength: 12)
-
-                    Image(systemName: "arrow.right.circle.fill")
-                        .font(.system(size: 28, weight: .semibold))
-                        .foregroundStyle(pack.onboardingTone.accent)
-                }
-
-                HStack(spacing: 8) {
-                    ForEach(pack.onboardingHighlights, id: \.self) { highlight in
-                        Text(highlight)
-                            .font(.caption.weight(.semibold))
-                            .foregroundStyle(pack.onboardingTone.accent)
-                            .padding(.horizontal, 10)
-                            .padding(.vertical, 6)
-                            .appInsetCard(
-                                cornerRadius: 999,
-                                fill: pack.onboardingTone.softFill.opacity(0.82),
-                                border: pack.onboardingTone.softBorder
-                            )
-                    }
-                }
-
-                Text("Install pack")
-                    .font(.caption.weight(.semibold))
+                Text(pack.displayName)
+                    .font(.system(size: 21, weight: .black))
                     .foregroundStyle(AppColors.textPrimary)
+                    .multilineTextAlignment(.leading)
+                    .fixedSize(horizontal: false, vertical: true)
+
+                Text(pack.description)
+                    .font(.subheadline)
+                    .foregroundStyle(AppColors.textSecondary)
+                    .multilineTextAlignment(.leading)
+                    .fixedSize(horizontal: false, vertical: true)
+
+                Text(pack.onboardingHighlights.map { $0.uppercased() }.joined(separator: " • "))
+                    .font(.caption.weight(.black))
+                    .tracking(0.7)
+                    .foregroundStyle(AppColors.textPrimary.opacity(0.88))
+                    .fixedSize(horizontal: false, vertical: true)
             }
+            .layoutPriority(1)
+
+            Spacer(minLength: 12)
+
+            Image(systemName: "arrow.right")
+                .font(.caption.weight(.black))
+                .foregroundStyle(tone.accent)
+                .padding(.top, 4)
         }
+        .frame(maxWidth: .infinity, alignment: .leading)
+        .padding(.vertical, 14)
+    }
+}
+
+private struct OnboardingBlankRow: View {
+    var body: some View {
+        HStack(alignment: .top, spacing: 14) {
+            Image(systemName: "square.and.pencil")
+                .font(.system(size: 18, weight: .black))
+                .foregroundStyle(AppToneStyle.today.accent)
+                .frame(width: 40, height: 40)
+                .appInsetCard(
+                    cornerRadius: 8,
+                    fill: AppToneStyle.today.softFill.opacity(0.72),
+                    border: AppToneStyle.today.softBorder
+                )
+
+            VStack(alignment: .leading, spacing: 6) {
+                Text("BUILD YOUR OWN")
+                    .font(.caption2.weight(.black))
+                    .tracking(0.8)
+                    .foregroundStyle(AppToneStyle.today.accent)
+
+                Text("Start Blank")
+                    .font(.system(size: 21, weight: .black))
+                    .foregroundStyle(AppColors.textPrimary)
+
+                Text("Begin with an empty setup and add plans, templates, and exercises as you go.")
+                    .font(.subheadline)
+                    .foregroundStyle(AppColors.textSecondary)
+                    .multilineTextAlignment(.leading)
+                    .fixedSize(horizontal: false, vertical: true)
+
+                Text("NO PRESETS • FULL CONTROL")
+                    .font(.caption.weight(.black))
+                    .tracking(0.7)
+                    .foregroundStyle(AppColors.textPrimary.opacity(0.88))
+            }
+            .layoutPriority(1)
+
+            Spacer(minLength: 12)
+
+            Image(systemName: "arrow.right")
+                .font(.caption.weight(.black))
+                .foregroundStyle(AppToneStyle.today.accent)
+                .padding(.top, 4)
+        }
+        .frame(maxWidth: .infinity, alignment: .leading)
+        .padding(.vertical, 14)
+    }
+}
+
+private struct InlineResultsEmptyState: View {
+    let title: String
+    let message: String
+    let tone: AppToneStyle
+
+    var body: some View {
+        HStack(alignment: .top, spacing: 14) {
+            Image(systemName: "magnifyingglass")
+                .font(.system(size: 16, weight: .black))
+                .foregroundStyle(tone.accent)
+                .frame(width: 36, height: 36)
+                .appInsetCard(
+                    cornerRadius: 8,
+                    fill: tone.softFill.opacity(0.72),
+                    border: tone.softBorder
+                )
+
+            VStack(alignment: .leading, spacing: 6) {
+                Text(title)
+                    .font(.headline.weight(.black))
+                    .foregroundStyle(AppColors.textPrimary)
+
+                Text(message)
+                    .font(.subheadline)
+                    .foregroundStyle(AppColors.textSecondary)
+                    .multilineTextAlignment(.leading)
+                    .fixedSize(horizontal: false, vertical: true)
+            }
+            .layoutPriority(1)
+
+            Spacer()
+        }
+        .frame(maxWidth: .infinity, alignment: .leading)
+        .padding(.vertical, 12)
     }
 }
 
@@ -454,8 +531,15 @@ private struct SearchInputField: View {
                 Button {
                     text = ""
                 } label: {
-                    Image(systemName: "xmark.circle.fill")
+                    Image(systemName: "xmark")
+                        .font(.caption.weight(.black))
                         .foregroundStyle(AppColors.textSecondary)
+                        .padding(8)
+                        .appInsetCard(
+                            cornerRadius: 6,
+                            fill: AppColors.surfaceStrong.opacity(0.88),
+                            border: AppColors.strokeStrong
+                        )
                 }
                 .buttonStyle(.plain)
             }
@@ -464,54 +548,55 @@ private struct SearchInputField: View {
     }
 }
 
-private struct ExercisePickerResultCard: View {
+private struct ExercisePickerResultRow: View {
     let item: ExerciseCatalogItem
 
     var body: some View {
+        let tone = item.category.pickerTone
+
         HStack(alignment: .top, spacing: 12) {
             Image(systemName: item.category.pickerSystemImage)
                 .font(.system(size: 18, weight: .semibold))
-                .foregroundStyle(item.category.pickerTone.accent)
-                .frame(width: 42, height: 42)
+                .foregroundStyle(tone.accent)
+                .frame(width: 40, height: 40)
                 .appInsetCard(
-                    cornerRadius: 14,
-                    fill: item.category.pickerTone.softFill.opacity(0.78),
-                    border: item.category.pickerTone.softBorder
+                    cornerRadius: 8,
+                    fill: tone.softFill.opacity(0.78),
+                    border: tone.softBorder
                 )
 
             VStack(alignment: .leading, spacing: 8) {
                 Text(item.name)
-                    .font(.headline.weight(.semibold))
+                    .font(.system(size: 19, weight: .black))
                     .foregroundStyle(AppColors.textPrimary)
                     .frame(maxWidth: .infinity, alignment: .leading)
+                    .multilineTextAlignment(.leading)
+                    .fixedSize(horizontal: false, vertical: true)
 
-                HStack(spacing: 8) {
-                    AppStatePill(
-                        title: item.category.pickerLabel,
-                        systemImage: item.category.pickerSystemImage,
-                        tone: item.category.pickerTone
-                    )
+                Text(item.category.pickerLabel.uppercased())
+                    .font(.caption2.weight(.black))
+                    .tracking(0.8)
+                    .foregroundStyle(tone.accent)
 
-                    if let aliasPreview = item.aliasPreview {
-                        Text(aliasPreview)
-                            .font(.caption)
-                            .foregroundStyle(AppColors.textSecondary)
-                            .lineLimit(1)
-                    }
+                if let aliasPreview = item.aliasPreview {
+                    Text(aliasPreview)
+                        .font(.caption)
+                        .foregroundStyle(AppColors.textSecondary)
+                        .lineLimit(2)
+                        .fixedSize(horizontal: false, vertical: true)
                 }
             }
+            .layoutPriority(1)
 
             Spacer(minLength: 12)
 
-            Image(systemName: "arrow.up.forward.circle.fill")
-                .font(.system(size: 20, weight: .semibold))
-                .foregroundStyle(AppToneStyle.today.accent)
+            Image(systemName: "arrow.up.forward")
+                .font(.caption.weight(.black))
+                .foregroundStyle(tone.accent)
+                .padding(.top, 4)
         }
         .frame(maxWidth: .infinity, alignment: .leading)
-        .appSurfaceCard(
-            padding: AppCardMetrics.featurePadding,
-            cornerRadius: AppCardMetrics.panelCornerRadius
-        )
+        .padding(.vertical, 12)
     }
 }
 

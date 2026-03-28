@@ -169,8 +169,6 @@ struct ActiveSessionView: View {
                 }
             }
             .navigationTitle(draft?.templateNameSnapshot ?? "Session")
-            .toolbarBackground(AppColors.chrome, for: .navigationBar)
-            .toolbarBackground(.visible, for: .navigationBar)
             .toolbar {
                 ToolbarItem(placement: .topBarLeading) {
                     Button("Close") {
@@ -309,7 +307,7 @@ private struct ActiveSessionNotesCardView: View, Equatable {
             .lineLimit(2...4)
             .appInputField()
         }
-        .appSectionSurface()
+        .appSectionSurface(tone: .plans)
     }
 }
 
@@ -331,7 +329,7 @@ private struct SessionBlockCardView: View, Equatable {
             HStack(alignment: .top) {
                 VStack(alignment: .leading, spacing: 6) {
                     Text(block.exerciseNameSnapshot)
-                        .font(.system(.title3, design: .rounded).weight(.bold))
+                        .font(.system(size: 22, weight: .black))
                         .foregroundStyle(AppColors.textPrimary)
 
                     if showsDetailedChrome {
@@ -414,31 +412,30 @@ private struct SessionBlockCardView: View, Equatable {
                 }
             }
 
-            HStack(spacing: 10) {
-                Button {
-                    actions.addSet(block.id)
-                } label: {
-                    Label("Add Set", systemImage: "plus")
-                        .frame(maxWidth: .infinity)
-                }
-                .buttonStyle(.bordered)
-                .buttonBorderShape(.roundedRectangle(radius: 14))
-                .tint(AppToneStyle.today.accent)
+            GlassEffectContainer(spacing: 10) {
+                HStack(spacing: 10) {
+                    Button {
+                        actions.addSet(block.id)
+                    } label: {
+                        Label("Add Set", systemImage: "plus")
+                            .frame(maxWidth: .infinity)
+                    }
+                    .appSecondaryActionButton(tone: .today)
 
-                Button {
-                    actions.copyLastSet(block.id)
-                } label: {
-                    Label("Copy Last", systemImage: "doc.on.doc")
-                        .frame(maxWidth: .infinity)
+                    Button {
+                        actions.copyLastSet(block.id)
+                    } label: {
+                        Label("Copy Last", systemImage: "doc.on.doc")
+                            .frame(maxWidth: .infinity)
+                    }
+                    .appSecondaryActionButton(tone: .plans)
                 }
-                .buttonStyle(.bordered)
-                .buttonBorderShape(.roundedRectangle(radius: 14))
-                .tint(AppToneStyle.plans.accent)
             }
         }
         .appSurfaceCard(
             padding: AppCardMetrics.compactPadding,
-            cornerRadius: AppCardMetrics.panelCornerRadius
+            cornerRadius: AppCardMetrics.panelCornerRadius,
+            tone: completedSetCount == block.sets.count ? .success : .today
         )
     }
 
@@ -655,7 +652,8 @@ private struct SessionSetRowView: View, Equatable {
                 .foregroundStyle(AppColors.textSecondary)
 
             Text(displayValue)
-                .font(.system(size: 20, weight: .bold, design: .rounded))
+                .font(.system(size: 24, weight: .black))
+                .monospacedDigit()
                 .foregroundStyle(AppColors.textPrimary)
                 .lineLimit(1)
                 .minimumScaleFactor(0.7)
@@ -689,16 +687,11 @@ private struct SessionSetRowView: View, Equatable {
         }
         .frame(maxWidth: .infinity, minHeight: ActiveSessionViewMetrics.statControlHeight, alignment: .leading)
         .padding(showsDetailedChrome ? 12 : 10)
-        .background {
-            RoundedRectangle(cornerRadius: 14, style: .continuous)
-                .fill(showsDetailedChrome ? AppColors.surfaceStrong.opacity(0.82) : tone.softFill.opacity(0.5))
-        }
-        .overlay {
-            if showsDetailedChrome {
-                RoundedRectangle(cornerRadius: 14, style: .continuous)
-                    .stroke(tone.softBorder, lineWidth: 1)
-            }
-        }
+        .appInsetCard(
+            cornerRadius: 10,
+            fill: showsDetailedChrome ? AppColors.surfaceStrong.opacity(0.92) : tone.softFill.opacity(0.5),
+            border: showsDetailedChrome ? AppColors.strokeStrong : tone.softBorder
+        )
     }
 
     private func adjustButton(
@@ -714,16 +707,8 @@ private struct SessionSetRowView: View, Equatable {
                 .font(.body.weight(.bold))
                 .foregroundStyle(AppColors.textPrimary)
                 .frame(width: 34, height: 34)
-                .background(
-                    Circle()
-                        .fill(tone.softFill.opacity(0.9))
-                )
-                .overlay(
-                    Circle()
-                        .stroke(tone.softBorder, lineWidth: 1)
-                )
         }
-        .buttonStyle(.plain)
+        .appSecondaryActionButton(tone: tone, controlSize: .mini)
         .accessibilityLabel(accessibilityLabel)
         .accessibilityValue(accessibilityValue)
         .accessibilityIdentifier(accessibilityIdentifier)
@@ -785,22 +770,7 @@ private struct ActiveSessionFooterView: View {
         .padding(.horizontal, 16)
         .padding(.top, 12)
         .padding(.bottom, 12)
-        .background {
-            ZStack {
-                Rectangle()
-                    .fill(AppColors.chrome.opacity(0.94))
-
-                Rectangle()
-                    .fill(.ultraThinMaterial)
-                    .opacity(0.28)
-            }
-            .ignoresSafeArea(edges: .bottom)
-        }
-        .overlay(alignment: .top) {
-            Rectangle()
-                .fill(AppColors.stroke.opacity(0.72))
-                .frame(height: 1)
-        }
+        .background(Color.clear.ignoresSafeArea(edges: .bottom))
     }
 
     @ViewBuilder
@@ -826,31 +796,35 @@ private struct ActiveSessionFooterView: View {
                 )
             }
 
-            HStack(spacing: 12) {
-                Button {
-                    onClearRest()
-                } label: {
-                    Label("Clear Rest", systemImage: "timer")
-                        .frame(maxWidth: .infinity)
-                }
-                .buttonStyle(.bordered)
-                .buttonBorderShape(.roundedRectangle(radius: 16))
-                .tint(AppToneStyle.warning.accent)
-                .disabled(state.restTimerEndsAt == nil)
+            GlassEffectContainer(spacing: 12) {
+                HStack(spacing: 12) {
+                    Button {
+                        onClearRest()
+                    } label: {
+                        Label("Clear Rest", systemImage: "timer")
+                            .frame(maxWidth: .infinity)
+                    }
+                    .appSecondaryActionButton(tone: .warning)
+                    .disabled(state.restTimerEndsAt == nil)
 
-                Button {
-                    onFinishWorkout()
-                } label: {
-                    Label("Finish Workout", systemImage: "checkmark.circle.fill")
-                        .frame(maxWidth: .infinity)
+                    Button {
+                        onFinishWorkout()
+                    } label: {
+                        Label("Finish Workout", systemImage: "checkmark.circle.fill")
+                            .frame(maxWidth: .infinity)
+                    }
+                    .appPrimaryActionButton(tone: .success)
+                    .disabled(!state.progress.canFinishWorkout)
+                    .accessibilityIdentifier("session.finishButton")
                 }
-                .buttonStyle(.borderedProminent)
-                .buttonBorderShape(.roundedRectangle(radius: 16))
-                .tint(AppToneStyle.success.accent)
-                .disabled(!state.progress.canFinishWorkout)
-                .accessibilityIdentifier("session.finishButton")
             }
         }
+        .padding(14)
+        .background {
+            RoundedRectangle(cornerRadius: 18, style: .continuous)
+                .fill(AppColors.chrome.opacity(0.20))
+        }
+        .glassEffect(.regular.tint(AppColors.glassTint), in: .rect(cornerRadius: 18))
     }
 }
 

@@ -47,6 +47,44 @@ final class WorkoutStoreTests: XCTestCase {
     }
 
     @MainActor
+    func testCompletedSessionHistoryLoadsOnDemandAfterStartupHydration() async throws {
+        let container = WorkoutModelContainerFactory.makeContainer(isStoredInMemoryOnly: true)
+        let seededStore = makeStore(container: container)
+        await seededStore.hydrateIfNeeded()
+        seededStore.completeOnboarding(with: nil)
+
+        let plan = makeSingleTemplatePlan(
+            name: "Test Plan",
+            templateName: "Bench Day",
+            store: seededStore,
+            weight: 185
+        )
+        seededStore.savePlan(plan)
+        seededStore.startSession(planID: plan.id, templateID: try XCTUnwrap(plan.templates.first?.id))
+
+        let block = try XCTUnwrap(seededStore.sessionStore.activeDraft?.blocks.first)
+        let workingRow = try XCTUnwrap(block.sets.first(where: { $0.target.setKind == .working }))
+        seededStore.toggleSetCompletion(blockID: block.id, setID: workingRow.id)
+        XCTAssertTrue(seededStore.finishActiveSession())
+        seededStore.flushPendingSessionPersistence()
+
+        let rehydratedStore = makeStore(container: container)
+        await rehydratedStore.hydrateIfNeeded()
+
+        XCTAssertFalse(rehydratedStore.sessionStore.hasLoadedCompletedSessionHistory)
+        XCTAssertTrue(rehydratedStore.sessionStore.completedSessions.isEmpty)
+        XCTAssertTrue(rehydratedStore.todayStore.recentSessions.isEmpty)
+        XCTAssertEqual(rehydratedStore.progressStore.overview.totalSessions, 0)
+
+        await rehydratedStore.hydrateCompletedSessionHistoryIfNeeded(priority: .userInitiated)
+
+        XCTAssertTrue(rehydratedStore.sessionStore.hasLoadedCompletedSessionHistory)
+        XCTAssertEqual(rehydratedStore.sessionStore.completedSessions.count, 1)
+        XCTAssertEqual(rehydratedStore.todayStore.recentSessions.first?.templateNameSnapshot, "Bench Day")
+        XCTAssertEqual(rehydratedStore.progressStore.overview.totalSessions, 1)
+    }
+
+    @MainActor
     func testEmptySessionDoesNotFinishOrPersist() async throws {
         let store = makeStore()
         await store.hydrateIfNeeded()

@@ -3,37 +3,39 @@ import SwiftUI
 import UIKit
 
 enum AppColors {
-    static let canvasTop = Color(red: 0.05, green: 0.07, blue: 0.12)
-    static let canvasMid = Color(red: 0.03, green: 0.05, blue: 0.10)
-    static let canvasBottom = Color(red: 0.01, green: 0.02, blue: 0.05)
-    static let chrome = Color(red: 0.04, green: 0.06, blue: 0.10)
-    static let surfaceStrong = Color(red: 0.14, green: 0.16, blue: 0.22).opacity(0.78)
-    static let surface = Color(red: 0.10, green: 0.13, blue: 0.20).opacity(0.70)
-    static let surfaceSoft = Color(red: 0.07, green: 0.10, blue: 0.16).opacity(0.62)
-    static let stroke = Color(red: 0.57, green: 0.64, blue: 0.77).opacity(0.36)
-    static let textPrimary = Color(red: 0.96, green: 0.97, blue: 0.99)
-    static let textSecondary = Color(red: 0.76, green: 0.81, blue: 0.90)
-    static let accent = Color(red: 0.48, green: 0.60, blue: 0.95)
-    static let accentAlt = Color(red: 0.55, green: 0.64, blue: 0.89)
-    static let accentPlans = Color(red: 0.39, green: 0.82, blue: 0.75)
-    static let accentProgress = Color(red: 0.96, green: 0.74, blue: 0.35)
-    static let success = Color(red: 0.42, green: 0.85, blue: 0.57)
-    static let warning = Color(red: 0.98, green: 0.67, blue: 0.30)
-    static let danger = Color(red: 0.95, green: 0.42, blue: 0.43)
-    static let input = Color(red: 0.03, green: 0.05, blue: 0.10)
+    static let canvasTop = Color(red: 0.12, green: 0.12, blue: 0.14)
+    static let canvasMid = Color(red: 0.06, green: 0.06, blue: 0.07)
+    static let canvasBottom = Color(red: 0.03, green: 0.03, blue: 0.04)
+    static let chrome = Color(red: 0.08, green: 0.08, blue: 0.10)
+    static let surfaceStrong = Color(red: 0.15, green: 0.15, blue: 0.18)
+    static let surface = Color(red: 0.09, green: 0.09, blue: 0.11)
+    static let surfaceSoft = Color(red: 0.06, green: 0.06, blue: 0.08)
+    static let stroke = Color.white.opacity(0.12)
+    static let strokeStrong = Color.white.opacity(0.34)
+    static let textPrimary = Color(red: 0.97, green: 0.97, blue: 0.95)
+    static let textSecondary = Color(red: 0.74, green: 0.74, blue: 0.70)
+    static let accent = Color(red: 0.70, green: 0.82, blue: 0.98)
+    static let accentAlt = Color(red: 0.86, green: 0.92, blue: 1.00)
+    static let accentPlans = Color(red: 0.58, green: 0.90, blue: 0.78)
+    static let accentProgress = Color(red: 0.98, green: 0.82, blue: 0.47)
+    static let success = Color(red: 0.72, green: 0.95, blue: 0.64)
+    static let warning = Color(red: 1.00, green: 0.73, blue: 0.40)
+    static let danger = Color(red: 0.98, green: 0.52, blue: 0.54)
+    static let input = Color.black.opacity(0.34)
+    static let glassTint = Color.white.opacity(0.06)
 }
 
 enum AppCardMetrics {
-    static let compactPadding: CGFloat = 14
-    static let compactCornerRadius: CGFloat = 14
-    static let featurePadding: CGFloat = 16
-    static let featureCornerRadius: CGFloat = 18
-    static let panelCornerRadius: CGFloat = 16
+    static let compactPadding: CGFloat = 16
+    static let compactCornerRadius: CGFloat = 10
+    static let featurePadding: CGFloat = 18
+    static let featureCornerRadius: CGFloat = 12
+    static let panelCornerRadius: CGFloat = 12
     static let insetPadding: CGFloat = 12
-    static let insetCornerRadius: CGFloat = 12
-    static let chipCornerRadius: CGFloat = 8
-    static let heroIconSize: CGFloat = 42
-    static let emptyStateIconSize: CGFloat = 68
+    static let insetCornerRadius: CGFloat = 10
+    static let chipCornerRadius: CGFloat = 6
+    static let heroIconSize: CGFloat = 56
+    static let emptyStateIconSize: CGFloat = 56
 }
 
 enum AppToneStyle: Equatable {
@@ -80,11 +82,15 @@ enum AppToneStyle: Equatable {
     }
 
     var softFill: Color {
-        accent.opacity(0.16)
+        accent.opacity(0.12)
     }
 
     var softBorder: Color {
-        accent.opacity(0.42)
+        accent.opacity(0.64)
+    }
+
+    var glassTint: Color {
+        accent.opacity(0.18)
     }
 }
 
@@ -97,9 +103,9 @@ enum AppAppearance {
         didConfigure = true
 
         let tabBarAppearance = UITabBarAppearance()
-        tabBarAppearance.configureWithOpaqueBackground()
-        tabBarAppearance.backgroundColor = UIColor(AppColors.chrome)
-        tabBarAppearance.shadowColor = UIColor(AppColors.stroke)
+        tabBarAppearance.configureWithTransparentBackground()
+        tabBarAppearance.backgroundColor = .clear
+        tabBarAppearance.shadowColor = .clear
         tabBarAppearance.stackedLayoutAppearance.normal.iconColor = UIColor(AppColors.textSecondary)
         tabBarAppearance.stackedLayoutAppearance.normal.titleTextAttributes = [
             .foregroundColor: UIColor(AppColors.textSecondary)
@@ -112,16 +118,16 @@ enum AppAppearance {
         UITabBar.appearance().scrollEdgeAppearance = tabBarAppearance
 
         let navAppearance = UINavigationBarAppearance()
-        navAppearance.configureWithOpaqueBackground()
-        navAppearance.backgroundColor = UIColor(AppColors.chrome)
+        navAppearance.configureWithTransparentBackground()
+        navAppearance.backgroundColor = .clear
         navAppearance.shadowColor = .clear
         navAppearance.titleTextAttributes = [
             .foregroundColor: UIColor(AppColors.textPrimary),
-            .font: UIFont.systemFont(ofSize: 17, weight: .semibold),
+            .font: UIFont.systemFont(ofSize: 17, weight: .bold),
         ]
         navAppearance.largeTitleTextAttributes = [
             .foregroundColor: UIColor(AppColors.textPrimary),
-            .font: UIFont.systemFont(ofSize: 33, weight: .bold),
+            .font: UIFont.systemFont(ofSize: 32, weight: .black),
         ]
         UINavigationBar.appearance().standardAppearance = navAppearance
         UINavigationBar.appearance().scrollEdgeAppearance = navAppearance
@@ -131,32 +137,40 @@ enum AppAppearance {
 
 struct AppBackground: View {
     var body: some View {
-        LinearGradient(
-            colors: [AppColors.canvasTop, AppColors.canvasMid, AppColors.canvasBottom],
-            startPoint: .topLeading,
-            endPoint: .bottomTrailing
-        )
-        .overlay {
-            RadialGradient(
-                colors: [AppColors.accent.opacity(0.22), .clear],
-                center: .topTrailing,
-                startRadius: 40,
-                endRadius: 420
-            )
-            .blur(radius: 24)
-        }
-        .overlay {
-            RadialGradient(
-                colors: [AppColors.accentAlt.opacity(0.16), .clear],
-                center: .bottomLeading,
-                startRadius: 20,
-                endRadius: 360
-            )
-            .blur(radius: 30)
-        }
-        .overlay {
+        ZStack {
+            AppColors.canvasBottom
+
+            VStack(spacing: 0) {
+                Rectangle()
+                    .fill(AppColors.canvasTop)
+                    .frame(height: 172)
+                Spacer(minLength: 0)
+            }
+
+            VStack(spacing: 0) {
+                Rectangle()
+                    .fill(AppColors.strokeStrong.opacity(0.7))
+                    .frame(height: 1)
+                Spacer(minLength: 0)
+            }
+
+            HStack(spacing: 0) {
+                Rectangle()
+                    .fill(AppColors.surfaceStrong.opacity(0.7))
+                    .frame(width: 8)
+                Spacer(minLength: 0)
+            }
+
             Rectangle()
-                .fill(.black.opacity(0.18))
+                .stroke(AppColors.strokeStrong.opacity(0.22), lineWidth: 1)
+                .frame(width: 172, height: 172)
+                .rotationEffect(.degrees(12))
+                .offset(x: 120, y: 260)
+
+            Rectangle()
+                .stroke(AppColors.stroke.opacity(0.46), lineWidth: 1)
+                .frame(width: 96, height: 96)
+                .offset(x: -140, y: -248)
         }
         .ignoresSafeArea()
     }
@@ -165,29 +179,34 @@ struct AppBackground: View {
 private struct AppSurfaceModifier: ViewModifier {
     let cornerRadius: CGFloat
     let shadowOpacity: Double
+    let tone: AppToneStyle?
 
     func body(content: Content) -> some View {
         content
             .background {
-                ZStack {
+                RoundedRectangle(cornerRadius: cornerRadius, style: .continuous)
+                    .fill(AppColors.surface)
+                    .overlay {
+                        RoundedRectangle(cornerRadius: cornerRadius, style: .continuous)
+                            .fill(AppColors.surfaceStrong.opacity(0.38))
+                            .padding(1)
+                    }
+            }
+            .overlay {
+                ZStack(alignment: .topLeading) {
                     RoundedRectangle(cornerRadius: cornerRadius, style: .continuous)
-                        .fill(
-                            LinearGradient(
-                                colors: [AppColors.surfaceStrong, AppColors.surface, AppColors.surfaceSoft],
-                                startPoint: .topLeading,
-                                endPoint: .bottomTrailing
-                            )
-                        )
-                    RoundedRectangle(cornerRadius: cornerRadius, style: .continuous)
-                        .fill(.ultraThinMaterial)
-                        .opacity(0.62)
+                        .stroke(AppColors.strokeStrong, lineWidth: 1)
+
+                    if let tone {
+                        Rectangle()
+                            .fill(tone.accent)
+                            .frame(width: 88, height: 4)
+                            .padding(1)
+                            .clipShape(RoundedRectangle(cornerRadius: 2, style: .continuous))
+                    }
                 }
             }
-            .overlay(
-                RoundedRectangle(cornerRadius: cornerRadius, style: .continuous)
-                    .stroke(AppColors.stroke, lineWidth: 0.8)
-            )
-            .shadow(color: .black.opacity(shadowOpacity), radius: 14, x: 0, y: 8)
+            .shadow(color: .black.opacity(shadowOpacity), radius: 8, x: 0, y: 3)
     }
 }
 
@@ -196,14 +215,15 @@ private struct AppInputFieldModifier: ViewModifier {
         content
             .padding(.horizontal, 12)
             .padding(.vertical, 10)
-            .background(
+            .background {
                 RoundedRectangle(cornerRadius: 10, style: .continuous)
-                    .fill(AppColors.input.opacity(0.88))
-            )
+                    .fill(AppColors.input)
+            }
             .overlay(
                 RoundedRectangle(cornerRadius: 10, style: .continuous)
-                    .stroke(AppColors.stroke.opacity(0.6), lineWidth: 1)
+                    .stroke(AppColors.strokeStrong.opacity(0.88), lineWidth: 1)
             )
+            .glassEffect(.regular.tint(AppColors.glassTint).interactive(), in: .rect(cornerRadius: 10))
     }
 }
 
@@ -218,11 +238,11 @@ private struct AppInsetCardModifier: ViewModifier {
         content
             .background(
                 RoundedRectangle(cornerRadius: cornerRadius, style: .continuous)
-                    .fill(fill ?? AppColors.input.opacity(fillOpacity))
+                    .fill(fill ?? AppColors.surfaceStrong.opacity(fillOpacity))
             )
             .overlay(
                 RoundedRectangle(cornerRadius: cornerRadius, style: .continuous)
-                    .stroke(border ?? AppColors.stroke.opacity(borderOpacity), lineWidth: 1)
+                    .stroke(border ?? AppColors.strokeStrong.opacity(borderOpacity), lineWidth: 1)
             )
     }
 }
@@ -234,10 +254,10 @@ private struct AppRevealModifier: ViewModifier {
     func body(content: Content) -> some View {
         content
             .opacity(isVisible ? 1 : 0)
-            .offset(y: isVisible ? 0 : 10)
+            .offset(y: isVisible ? 0 : 6)
             .onAppear {
                 guard !isVisible else { return }
-                withAnimation(.spring(response: 0.46, dampingFraction: 0.86).delay(delay)) {
+                withAnimation(.spring(response: 0.36, dampingFraction: 0.9).delay(delay)) {
                     isVisible = true
                 }
             }
@@ -260,88 +280,111 @@ struct AppHeroCard: View {
     var tone: AppToneStyle = .base
 
     var body: some View {
-        VStack(alignment: .leading, spacing: 14) {
-            HStack(alignment: .top, spacing: 12) {
-                ZStack {
-                    Circle()
-                        .fill(
-                            LinearGradient(
-                                colors: [
-                                    tone.softFill.opacity(1.2),
-                                    tone.accentSecondary.opacity(0.22),
-                                ],
-                                startPoint: .topLeading,
-                                endPoint: .bottomTrailing
-                            )
-                        )
-
-                    Circle()
-                        .stroke(tone.softBorder, lineWidth: 1)
-
-                    Image(systemName: systemImage)
-                        .font(.system(size: 18, weight: .semibold))
-                        .foregroundStyle(tone.accent)
-                }
-                .frame(width: AppCardMetrics.heroIconSize, height: AppCardMetrics.heroIconSize)
-
-                VStack(alignment: .leading, spacing: 5) {
+        VStack(alignment: .leading, spacing: 18) {
+            HStack(alignment: .top, spacing: 16) {
+                VStack(alignment: .leading, spacing: 8) {
                     if let eyebrow, !eyebrow.isEmpty {
                         Text(eyebrow.uppercased())
-                            .font(.caption2.weight(.semibold))
-                            .tracking(0.6)
+                            .font(.caption.weight(.black))
+                            .tracking(1.1)
                             .foregroundStyle(tone.accent)
                     }
 
                     Text(title)
-                        .font(.system(size: 25, weight: .bold, design: .rounded))
+                        .font(.system(size: 29, weight: .black))
                         .foregroundStyle(AppColors.textPrimary)
+                        .multilineTextAlignment(.leading)
+                        .fixedSize(horizontal: false, vertical: true)
 
                     Text(subtitle)
-                        .font(.subheadline)
+                        .font(.subheadline.weight(.medium))
                         .foregroundStyle(AppColors.textSecondary)
+                        .multilineTextAlignment(.leading)
+                        .fixedSize(horizontal: false, vertical: true)
                 }
+                .layoutPriority(1)
+
+                Spacer(minLength: 12)
+
+                ZStack {
+                    Rectangle()
+                        .fill(tone.softFill.opacity(0.82))
+
+                    Rectangle()
+                        .stroke(tone.softBorder, lineWidth: 1)
+
+                    Image(systemName: systemImage)
+                        .font(.system(size: 23, weight: .black))
+                        .foregroundStyle(tone.accent)
+                }
+                .frame(width: AppCardMetrics.heroIconSize, height: AppCardMetrics.heroIconSize)
             }
 
             if !metrics.isEmpty {
-                LazyVGrid(
-                    columns: [
-                        GridItem(.flexible(minimum: 110), spacing: 10),
-                        GridItem(.flexible(minimum: 110), spacing: 10),
-                    ],
-                    alignment: .leading,
-                    spacing: 10
-                ) {
-                    ForEach(metrics) { metric in
-                        VStack(alignment: .leading, spacing: 4) {
-                            HStack(spacing: 6) {
-                                Image(systemName: metric.systemImage)
-                                    .font(.caption.weight(.semibold))
-                                    .foregroundStyle(tone.accent)
+                VStack(spacing: 0) {
+                    Rectangle()
+                        .fill(AppColors.strokeStrong.opacity(0.7))
+                        .frame(height: 1)
 
-                                Text(metric.label.uppercased())
-                                    .font(.caption2.weight(.semibold))
-                                    .tracking(0.4)
-                                    .foregroundStyle(AppColors.textSecondary)
-                            }
-
-                            Text(metric.value)
-                                .font(.system(size: 17, weight: .semibold, design: .rounded))
-                                .foregroundStyle(AppColors.textPrimary)
+                    LazyVGrid(
+                        columns: [
+                            GridItem(.flexible(minimum: 110), spacing: 0),
+                            GridItem(.flexible(minimum: 110), spacing: 0),
+                        ],
+                        alignment: .leading,
+                        spacing: 0
+                    ) {
+                        ForEach(Array(metrics.enumerated()), id: \.element.id) { index, metric in
+                            AppHeroMetricCell(metric: metric, tone: tone)
+                                .padding(.horizontal, 12)
+                                .padding(.vertical, 12)
+                                .overlay(alignment: .top) {
+                                    if index >= 2 {
+                                        Rectangle()
+                                            .fill(AppColors.stroke.opacity(0.82))
+                                            .frame(height: 1)
+                                    }
+                                }
+                                .overlay(alignment: .leading) {
+                                    if index.isMultiple(of: 2) == false {
+                                        Rectangle()
+                                            .fill(AppColors.stroke.opacity(0.82))
+                                            .frame(width: 1)
+                                    }
+                                }
                         }
-                        .frame(maxWidth: .infinity, alignment: .leading)
-                        .padding(.horizontal, 11)
-                        .padding(.vertical, 9)
-                        .appInsetCard(
-                            cornerRadius: 11,
-                            fillOpacity: 0.78,
-                            borderOpacity: 0.65,
-                            border: tone.softBorder
-                        )
                     }
                 }
             }
         }
-        .appFeatureSurface()
+        .appFeatureSurface(tone: tone)
+    }
+}
+
+private struct AppHeroMetricCell: View {
+    let metric: AppHeroMetric
+    let tone: AppToneStyle
+
+    var body: some View {
+        VStack(alignment: .leading, spacing: 8) {
+            HStack(alignment: .firstTextBaseline, spacing: 8) {
+                Image(systemName: metric.systemImage)
+                    .font(.caption.weight(.black))
+                    .foregroundStyle(tone.accent)
+
+                Text(metric.label.uppercased())
+                    .font(.caption2.weight(.black))
+                    .tracking(0.8)
+                    .foregroundStyle(AppColors.textSecondary)
+            }
+
+            Text(metric.value)
+                .font(.system(size: 22, weight: .black))
+                .monospacedDigit()
+                .foregroundStyle(AppColors.textPrimary)
+                .fixedSize(horizontal: false, vertical: true)
+        }
+        .frame(maxWidth: .infinity, alignment: .leading)
     }
 }
 
@@ -352,41 +395,40 @@ struct AppEmptyStateCard: View {
     var tone: AppToneStyle = .base
 
     var body: some View {
-        VStack(spacing: 12) {
-            ZStack {
-                Circle()
-                    .fill(
-                        LinearGradient(
-                            colors: [
-                                tone.softFill.opacity(1.4),
-                                tone.softFill.opacity(0.45),
-                            ],
-                            startPoint: .topLeading,
-                            endPoint: .bottomTrailing
-                        )
-                    )
+        VStack(alignment: .leading, spacing: 16) {
+            HStack(alignment: .top, spacing: 16) {
+                ZStack {
+                    Rectangle()
+                        .fill(tone.softFill.opacity(0.82))
 
-                Circle()
-                    .stroke(tone.softBorder, lineWidth: 1)
+                    Rectangle()
+                        .stroke(tone.softBorder, lineWidth: 1)
 
-                Image(systemName: systemImage)
-                    .font(.system(size: 36, weight: .semibold))
-                    .foregroundStyle(tone.accent)
+                    Image(systemName: systemImage)
+                        .font(.system(size: 28, weight: .black))
+                        .foregroundStyle(tone.accent)
+                }
+                .frame(width: AppCardMetrics.emptyStateIconSize, height: AppCardMetrics.emptyStateIconSize)
+
+                VStack(alignment: .leading, spacing: 8) {
+                    Text(title)
+                        .font(.system(size: 28, weight: .black))
+                        .foregroundStyle(AppColors.textPrimary)
+                        .multilineTextAlignment(.leading)
+                        .fixedSize(horizontal: false, vertical: true)
+
+                    Text(message)
+                        .font(.subheadline.weight(.medium))
+                        .foregroundStyle(AppColors.textSecondary)
+                        .multilineTextAlignment(.leading)
+                        .fixedSize(horizontal: false, vertical: true)
+                }
+                .layoutPriority(1)
             }
-            .frame(width: AppCardMetrics.emptyStateIconSize, height: AppCardMetrics.emptyStateIconSize)
-
-            Text(title)
-                .font(.system(size: 28, weight: .bold, design: .rounded))
-                .foregroundStyle(AppColors.textPrimary)
-
-            Text(message)
-                .font(.subheadline)
-                .foregroundStyle(AppColors.textSecondary)
-                .multilineTextAlignment(.center)
         }
         .padding(24)
-        .appSurface()
-        .padding(.horizontal, 20)
+        .frame(maxWidth: .infinity, alignment: .leading)
+        .appFeatureSurface(tone: tone)
     }
 }
 
@@ -396,12 +438,17 @@ struct AppStatePill: View {
     var tone: AppToneStyle = .base
 
     var body: some View {
-        Label(title, systemImage: systemImage)
-            .font(.caption.weight(.semibold))
-            .foregroundStyle(tone.accent)
+        HStack(spacing: 6) {
+            Image(systemName: systemImage)
+                .font(.caption2.weight(.black))
+            Text(title.uppercased())
+                .font(.caption2.weight(.black))
+                .tracking(0.8)
+        }
+        .foregroundStyle(tone.accent)
             .padding(.horizontal, 10)
             .padding(.vertical, 7)
-            .appInsetCard(cornerRadius: 999, fill: tone.softFill.opacity(0.8), border: tone.softBorder)
+            .appInsetCard(cornerRadius: 6, fill: tone.softFill.opacity(0.65), border: tone.softBorder)
     }
 }
 
@@ -414,20 +461,23 @@ struct AppSectionHeader: View {
 
     var body: some View {
         HStack(alignment: .top, spacing: 12) {
-            VStack(alignment: .leading, spacing: 4) {
+            VStack(alignment: .leading, spacing: 6) {
                 Label {
-                    Text(title)
+                    Text(title.uppercased())
                 } icon: {
                     Image(systemName: systemImage)
                         .foregroundStyle(tone.accent)
                 }
-                .font(.headline.weight(.semibold))
+                .font(.caption.weight(.black))
+                .tracking(1)
                 .foregroundStyle(AppColors.textPrimary)
 
                 if let subtitle, !subtitle.isEmpty {
                     Text(subtitle)
-                        .font(.caption)
+                        .font(.footnote.weight(.medium))
                         .foregroundStyle(AppColors.textSecondary)
+                        .multilineTextAlignment(.leading)
+                        .fixedSize(horizontal: false, vertical: true)
                 }
             }
 
@@ -435,11 +485,12 @@ struct AppSectionHeader: View {
 
             if let trailing, !trailing.isEmpty {
                 Text(trailing)
-                    .font(.caption.weight(.semibold))
+                    .font(.caption.weight(.black))
+                    .monospacedDigit()
                     .foregroundStyle(AppColors.textPrimary)
                     .padding(.horizontal, 10)
                     .padding(.vertical, 7)
-                    .appInsetCard(cornerRadius: 999, fill: tone.softFill.opacity(0.8), border: tone.softBorder)
+                    .appInsetCard(cornerRadius: 6, fill: tone.softFill.opacity(0.65), border: tone.softBorder)
             }
         }
     }
@@ -452,22 +503,26 @@ struct MetricBadge: View {
     var tone: AppToneStyle = .base
 
     var body: some View {
-        HStack(spacing: 6) {
-            Image(systemName: systemImage)
-                .font(.caption.weight(.semibold))
-                .foregroundStyle(tone.accent)
+        VStack(alignment: .leading, spacing: 4) {
+            HStack(spacing: 6) {
+                Image(systemName: systemImage)
+                    .font(.caption2.weight(.black))
+                    .foregroundStyle(tone.accent)
 
-            Text(label)
-                .font(.caption.weight(.medium))
-                .foregroundStyle(AppColors.textSecondary)
+                Text(label.uppercased())
+                    .font(.caption2.weight(.black))
+                    .tracking(0.7)
+                    .foregroundStyle(AppColors.textSecondary)
+            }
 
             Text(value)
-                .font(.caption.weight(.semibold))
+                .font(.caption.weight(.black))
+                .monospacedDigit()
                 .foregroundStyle(AppColors.textPrimary)
         }
         .padding(.horizontal, 10)
         .padding(.vertical, 7)
-        .appInsetCard(cornerRadius: 10, fillOpacity: 0.75, borderOpacity: 0.6, border: tone.softBorder)
+        .appInsetCard(cornerRadius: 8, borderOpacity: 0.8, fill: AppColors.surfaceStrong.opacity(0.9), border: tone.softBorder)
     }
 }
 
@@ -571,7 +626,7 @@ private struct OnboardingSetupView: View {
 
                 VStack(spacing: 8) {
                     Text("Setting Up Your Plans")
-                        .font(.system(.title2, design: .rounded).weight(.bold))
+                        .font(.system(size: 28, weight: .black))
                         .foregroundStyle(AppColors.textPrimary)
 
                     Text("Bringing your preset pack into the app so Today is ready when it appears.")
@@ -582,20 +637,35 @@ private struct OnboardingSetupView: View {
             }
             .padding(28)
             .frame(maxWidth: 340)
-            .appFeatureSurface()
+            .appFeatureSurface(tone: .today)
         }
     }
 }
 
 struct RootTabView: View {
-    private enum Tab: Hashable {
+    private enum Tab: String, Hashable {
         case today
         case plans
         case progress
+
+        static var launchSelection: Tab? {
+            let arguments = ProcessInfo.processInfo.arguments
+            guard let flagIndex = arguments.firstIndex(of: "-codex-initial-tab"),
+                arguments.indices.contains(flagIndex + 1)
+            else {
+                return nil
+            }
+
+            return Tab(rawValue: arguments[flagIndex + 1].lowercased())
+        }
     }
 
-    @State private var selectedTab: Tab = .today
+    @State private var selectedTab: Tab
     @State private var progressSelectionSignpost: PerformanceSignpost.Interval?
+
+    init() {
+        _selectedTab = State(initialValue: Tab.launchSelection ?? .today)
+    }
 
     var body: some View {
         TabView(selection: $selectedTab) {
@@ -618,8 +688,6 @@ struct RootTabView: View {
                 }
         }
         .tint(AppColors.accent)
-        .toolbarBackground(AppColors.chrome, for: .tabBar)
-        .toolbarBackground(.visible, for: .tabBar)
         .onChange(of: selectedTab) { _, newValue in
             if newValue == .progress {
                 progressSelectionSignpost = PerformanceSignpost.begin("Progress Tab Selection")
@@ -675,8 +743,6 @@ struct SessionFinishSummaryView: View {
                 }
             }
             .navigationTitle("Summary")
-            .toolbarBackground(AppColors.chrome, for: .navigationBar)
-            .toolbarBackground(.visible, for: .navigationBar)
             .toolbar {
                 ToolbarItem(placement: .topBarTrailing) {
                     Button("Done") {
@@ -743,9 +809,13 @@ private struct SessionFinishRecordsSectionView: View, Equatable {
 
     var body: some View {
         VStack(alignment: .leading, spacing: 12) {
-            Text("New Personal Records")
-                .font(.headline.weight(.semibold))
-                .foregroundStyle(AppColors.textPrimary)
+            AppSectionHeader(
+                title: "New Personal Records",
+                systemImage: "rosette",
+                subtitle: "\(records.count) milestone\(records.count == 1 ? "" : "s") captured in this session.",
+                trailing: "\(records.count)",
+                tone: .success
+            )
 
             LazyVStack(spacing: 12) {
                 ForEach(records) { record in
@@ -766,26 +836,34 @@ private struct SessionFinishRecordCardView: View, Equatable {
     }
 
     var body: some View {
-        VStack(alignment: .leading, spacing: 6) {
-            Text(record.displayName)
-                .font(.headline.weight(.semibold))
-                .foregroundStyle(AppColors.textPrimary)
+        VStack(alignment: .leading, spacing: 10) {
+            HStack(alignment: .top) {
+                VStack(alignment: .leading, spacing: 6) {
+                    Text(record.displayName)
+                        .font(.system(size: 20, weight: .black))
+                        .foregroundStyle(AppColors.textPrimary)
 
-            Text(
-                "\(WeightFormatter.displayString(record.weight, unit: weightUnit)) \(weightUnit.symbol) x \(record.reps)"
-            )
-            .font(.subheadline)
-            .foregroundStyle(AppColors.textSecondary)
+                    Text(
+                        "\(WeightFormatter.displayString(record.weight, unit: weightUnit)) \(weightUnit.symbol) x \(record.reps)"
+                    )
+                    .font(.subheadline.weight(.medium))
+                    .foregroundStyle(AppColors.textSecondary)
+                }
+
+                Spacer()
+
+                AppStatePill(title: "PR", systemImage: "rosette", tone: .success)
+            }
 
             Text(
                 "Estimated 1RM \(WeightFormatter.displayString(record.estimatedOneRepMax, unit: weightUnit)) \(weightUnit.symbol)"
             )
-            .font(.caption)
+            .font(.caption.weight(.black))
             .foregroundStyle(AppColors.success)
         }
         .padding(AppCardMetrics.compactPadding)
         .frame(maxWidth: .infinity, alignment: .leading)
-        .appSurface(cornerRadius: AppCardMetrics.compactCornerRadius, shadow: false)
+        .appSurface(cornerRadius: AppCardMetrics.compactCornerRadius, shadow: false, tone: .success)
     }
 }
 
@@ -805,27 +883,32 @@ struct PersonalRecordSummaryCardView: View, Equatable {
     }
 
     var body: some View {
-        HStack(alignment: .top) {
-            VStack(alignment: .leading, spacing: 6) {
+        HStack(alignment: .top, spacing: 12) {
+            VStack(alignment: .leading, spacing: 8) {
                 Text(record.displayName)
-                    .font(.headline.weight(.semibold))
+                    .font(.system(size: 20, weight: .black))
                     .foregroundStyle(AppColors.textPrimary)
 
                 Text(
                     "\(WeightFormatter.displayString(record.weight, unit: weightUnit)) \(weightUnit.symbol) x \(record.reps)"
                 )
-                .font(.subheadline)
+                .font(.subheadline.weight(.medium))
                 .foregroundStyle(AppColors.textSecondary)
             }
 
             Spacer()
 
-            Text(record.achievedAt.formatted(date: .abbreviated, time: .omitted))
-                .font(.caption)
-                .foregroundStyle(tone.accent)
+            VStack(alignment: .trailing, spacing: 8) {
+                AppStatePill(title: "Record", systemImage: "rosette.fill", tone: tone)
+
+                Text(record.achievedAt.formatted(date: .abbreviated, time: .omitted))
+                    .font(.caption.weight(.black))
+                    .monospacedDigit()
+                    .foregroundStyle(tone.accent)
+            }
         }
         .padding(AppCardMetrics.compactPadding)
-        .appSurface(cornerRadius: AppCardMetrics.compactCornerRadius, shadow: false)
+        .appSurface(cornerRadius: AppCardMetrics.compactCornerRadius, shadow: false, tone: tone)
     }
 }
 
@@ -849,47 +932,62 @@ struct CompletedSessionSummaryCardView: View, Equatable {
     }
 
     var body: some View {
-        VStack(alignment: .leading, spacing: 6) {
-            Text(session.templateNameSnapshot)
-                .font(.headline.weight(.semibold))
-                .foregroundStyle(AppColors.textPrimary)
+        VStack(alignment: .leading, spacing: 10) {
+            HStack(alignment: .top) {
+                VStack(alignment: .leading, spacing: 6) {
+                    Text(session.templateNameSnapshot)
+                        .font(.system(size: 20, weight: .black))
+                        .foregroundStyle(AppColors.textPrimary)
 
-            Text(session.completedAt.formatted(date: .abbreviated, time: .shortened))
-                .font(.caption)
-                .foregroundStyle(AppColors.textSecondary)
+                    Text(session.completedAt.formatted(date: .abbreviated, time: .shortened))
+                        .font(.caption.weight(.medium))
+                        .monospacedDigit()
+                        .foregroundStyle(AppColors.textSecondary)
+                }
+
+                Spacer()
+
+                AppStatePill(title: "Logged", systemImage: "checkmark.circle.fill", tone: tone)
+            }
 
             Text(detailText)
-                .font(.caption)
+                .font(.caption.weight(.black))
                 .foregroundStyle(tone.accent)
         }
         .padding(AppCardMetrics.compactPadding)
         .frame(maxWidth: .infinity, alignment: .leading)
-        .appSurface(cornerRadius: AppCardMetrics.compactCornerRadius, shadow: false)
+        .appSurface(cornerRadius: AppCardMetrics.compactCornerRadius, shadow: false, tone: tone)
     }
 }
 
 extension View {
-    func appSurface(cornerRadius: CGFloat = AppCardMetrics.compactCornerRadius, shadow: Bool = true) -> some View {
-        modifier(AppSurfaceModifier(cornerRadius: cornerRadius, shadowOpacity: shadow ? 0.24 : 0))
+    func appSurface(
+        cornerRadius: CGFloat = AppCardMetrics.compactCornerRadius,
+        shadow: Bool = false,
+        tone: AppToneStyle? = nil
+    ) -> some View {
+        modifier(AppSurfaceModifier(cornerRadius: cornerRadius, shadowOpacity: shadow ? 0.18 : 0, tone: tone))
     }
 
     func appSurfaceCard(
         padding: CGFloat = AppCardMetrics.compactPadding,
         cornerRadius: CGFloat = AppCardMetrics.compactCornerRadius,
-        shadow: Bool = false
+        shadow: Bool = false,
+        tone: AppToneStyle? = nil
     ) -> some View {
         self.padding(padding)
-            .appSurface(cornerRadius: cornerRadius, shadow: shadow)
+            .appSurface(cornerRadius: cornerRadius, shadow: shadow, tone: tone)
     }
 
-    func appSectionSurface() -> some View {
-        appSurfaceCard()
+    func appSectionSurface(tone: AppToneStyle? = nil) -> some View {
+        appSurfaceCard(tone: tone)
     }
 
-    func appFeatureSurface() -> some View {
+    func appFeatureSurface(tone: AppToneStyle? = nil) -> some View {
         appSurfaceCard(
             padding: AppCardMetrics.featurePadding,
-            cornerRadius: AppCardMetrics.featureCornerRadius
+            cornerRadius: AppCardMetrics.featureCornerRadius,
+            tone: tone
         )
     }
 
@@ -944,5 +1042,21 @@ extension View {
 
     func appReveal(delay: Double = 0) -> some View {
         modifier(AppRevealModifier(delay: delay))
+    }
+
+    func appPrimaryActionButton(tone: AppToneStyle, controlSize: ControlSize = .large) -> some View {
+        self
+            .buttonStyle(.glassProminent)
+            .buttonBorderShape(.roundedRectangle(radius: controlSize == .large ? 12 : 10))
+            .controlSize(controlSize)
+            .tint(tone.accent)
+    }
+
+    func appSecondaryActionButton(tone: AppToneStyle, controlSize: ControlSize = .regular) -> some View {
+        self
+            .buttonStyle(.glass(.regular.tint(tone.glassTint).interactive()))
+            .buttonBorderShape(.roundedRectangle(radius: controlSize == .large ? 12 : 10))
+            .controlSize(controlSize)
+            .tint(tone.accent)
     }
 }

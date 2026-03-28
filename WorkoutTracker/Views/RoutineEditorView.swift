@@ -198,7 +198,7 @@ struct PlanEditorSheet: View {
                                 .font(.caption)
                                 .foregroundStyle(AppColors.textSecondary)
                         }
-                        .appFeatureSurface()
+                        .appFeatureSurface(tone: .plans)
                     }
                     .padding(.horizontal, 16)
                     .padding(.vertical, 14)
@@ -206,8 +206,6 @@ struct PlanEditorSheet: View {
                 .scrollIndicators(.hidden)
             }
             .navigationTitle(existingPlan == nil ? "New Plan" : "Edit Plan")
-            .toolbarBackground(AppColors.chrome, for: .navigationBar)
-            .toolbarBackground(.visible, for: .navigationBar)
             .toolbar {
                 ToolbarItem(placement: .topBarLeading) {
                     Button("Cancel") {
@@ -333,7 +331,7 @@ struct TemplateEditorSheet: View {
                                     .lineLimit(2...4)
                                     .appInputField()
                             }
-                            .appFeatureSurface()
+                            .appFeatureSurface(tone: .plans)
 
                             VStack(alignment: .leading, spacing: 12) {
                                 AppSectionHeader(
@@ -379,7 +377,7 @@ struct TemplateEditorSheet: View {
                                     }
                                 }
                             }
-                            .appFeatureSurface()
+                            .appFeatureSurface(tone: .today)
 
                             VStack(alignment: .leading, spacing: 12) {
                                 HStack(alignment: .top, spacing: 12) {
@@ -404,9 +402,7 @@ struct TemplateEditorSheet: View {
                                     } label: {
                                         Label("Add Block", systemImage: "plus")
                                     }
-                                    .buttonStyle(.borderedProminent)
-                                    .buttonBorderShape(.roundedRectangle(radius: 14))
-                                    .tint(AppToneStyle.today.accent)
+                                    .appPrimaryActionButton(tone: .today, controlSize: .regular)
                                     .accessibilityIdentifier("plans.template.addBlockButton")
                                 }
 
@@ -447,7 +443,7 @@ struct TemplateEditorSheet: View {
                                     }
                                 }
                             }
-                            .appFeatureSurface()
+                            .appFeatureSurface(tone: .today)
                         }
                         .scrollIndicators(.hidden)
                     }
@@ -456,8 +452,6 @@ struct TemplateEditorSheet: View {
                 }
             }
             .navigationTitle(existingTemplate == nil ? "New Template" : "Edit Template")
-            .toolbarBackground(AppColors.chrome, for: .navigationBar)
-            .toolbarBackground(.visible, for: .navigationBar)
             .toolbar {
                 ToolbarItem(placement: .topBarLeading) {
                     Button("Cancel") {
@@ -774,7 +768,7 @@ private struct TemplateDraftBlockEditorView: View {
                     )
 
                     Text(exerciseTitle)
-                        .font(.system(.title3, design: .rounded).weight(.bold))
+                        .font(.system(size: 22, weight: .black))
                         .foregroundStyle(AppColors.textPrimary)
 
                     Text(
@@ -794,9 +788,7 @@ private struct TemplateDraftBlockEditorView: View {
                     } label: {
                         Text("Pick")
                     }
-                    .buttonStyle(.bordered)
-                    .buttonBorderShape(.roundedRectangle(radius: 12))
-                    .tint(AppToneStyle.plans.accent)
+                    .appSecondaryActionButton(tone: .plans, controlSize: .small)
                     .accessibilityIdentifier("plans.template.pickExerciseButton")
 
                     Button(role: .destructive) {
@@ -804,8 +796,7 @@ private struct TemplateDraftBlockEditorView: View {
                     } label: {
                         Image(systemName: "trash")
                     }
-                    .buttonStyle(.bordered)
-                    .buttonBorderShape(.roundedRectangle(radius: 12))
+                    .appSecondaryActionButton(tone: .danger, controlSize: .small)
                 }
             }
 
