@@ -307,7 +307,7 @@ private struct ActiveSessionNotesCardView: View, Equatable {
             .lineLimit(2...4)
             .appInputField()
         }
-        .appSectionSurface(tone: .plans)
+        .appSectionFrame(tone: .plans)
     }
 }
 
@@ -398,8 +398,8 @@ private struct SessionBlockCardView: View, Equatable {
             .lineLimit(2...3)
             .appInputField()
 
-            LazyVStack(spacing: 12) {
-                ForEach(block.sets) { row in
+            VStack(spacing: 0) {
+                ForEach(Array(block.sets.enumerated()), id: \.element.id) { index, row in
                     SessionSetRowView(
                         blockID: block.id,
                         row: row,
@@ -409,6 +409,12 @@ private struct SessionBlockCardView: View, Equatable {
                         showsDetailedChrome: showsDetailedChrome
                     )
                     .equatable()
+
+                    if index < block.sets.count - 1 {
+                        Rectangle()
+                            .fill(AppColors.stroke.opacity(0.78))
+                            .frame(height: 1)
+                    }
                 }
             }
 
@@ -432,10 +438,10 @@ private struct SessionBlockCardView: View, Equatable {
                 }
             }
         }
-        .appSurfaceCard(
-            padding: AppCardMetrics.compactPadding,
-            cornerRadius: AppCardMetrics.panelCornerRadius,
-            tone: completedSetCount == block.sets.count ? .success : .today
+        .appSectionFrame(
+            tone: completedSetCount == block.sets.count ? .success : .today,
+            topPadding: 16,
+            bottomPadding: 8
         )
     }
 
@@ -577,8 +583,7 @@ private struct SessionSetRowView: View, Equatable {
         }
         .modifier(
             SessionRowSurfaceModifier(
-                isDetailed: showsDetailedChrome,
-                isCompleted: row.log.isCompleted
+                isDetailed: showsDetailedChrome
             )
         )
     }
@@ -717,22 +722,10 @@ private struct SessionSetRowView: View, Equatable {
 
 private struct SessionRowSurfaceModifier: ViewModifier {
     let isDetailed: Bool
-    let isCompleted: Bool
 
     func body(content: Content) -> some View {
-        if isDetailed {
-            content.appInsetContentCard(
-                fill: isCompleted ? AppColors.success.opacity(0.13) : nil,
-                border: isCompleted ? AppToneStyle.success.softBorder : nil
-            )
-        } else {
-            content
-                .padding(AppCardMetrics.insetPadding)
-                .background {
-                    RoundedRectangle(cornerRadius: AppCardMetrics.insetCornerRadius, style: .continuous)
-                        .fill(isCompleted ? AppColors.success.opacity(0.1) : AppColors.surface.opacity(0.82))
-                }
-        }
+        content
+            .padding(.vertical, isDetailed ? 14 : 12)
     }
 }
 

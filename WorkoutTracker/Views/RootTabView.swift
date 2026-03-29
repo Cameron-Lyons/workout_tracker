@@ -247,6 +247,34 @@ private struct AppInsetCardModifier: ViewModifier {
     }
 }
 
+private struct AppSectionFrameModifier: ViewModifier {
+    let tone: AppToneStyle?
+    let topPadding: CGFloat
+    let bottomPadding: CGFloat
+
+    func body(content: Content) -> some View {
+        content
+            .padding(.top, topPadding)
+            .padding(.bottom, bottomPadding)
+            .overlay(alignment: .top) {
+                ZStack(alignment: .leading) {
+                    Rectangle()
+                        .fill(AppColors.stroke.opacity(0.34))
+                        .frame(height: 1)
+
+                    Rectangle()
+                        .fill((tone?.accent ?? AppColors.strokeStrong).opacity(0.92))
+                        .frame(width: 72, height: 2)
+                }
+            }
+            .overlay(alignment: .bottom) {
+                Rectangle()
+                    .fill(AppColors.stroke.opacity(0.74))
+                    .frame(height: 1)
+            }
+    }
+}
+
 private struct AppRevealModifier: ViewModifier {
     let delay: Double
     @State private var isVisible = false
@@ -269,6 +297,11 @@ struct AppHeroMetric: Identifiable {
     let label: String
     let value: String
     let systemImage: String
+}
+
+enum AppRowStyle: Equatable {
+    case surface
+    case plain
 }
 
 struct AppHeroCard: View {
@@ -429,6 +462,44 @@ struct AppEmptyStateCard: View {
         .padding(24)
         .frame(maxWidth: .infinity, alignment: .leading)
         .appFeatureSurface(tone: tone)
+    }
+}
+
+struct AppInlineMessage: View {
+    let systemImage: String
+    let title: String
+    let message: String
+    var tone: AppToneStyle = .base
+
+    var body: some View {
+        HStack(alignment: .top, spacing: 14) {
+            Image(systemName: systemImage)
+                .font(.system(size: 16, weight: .black))
+                .foregroundStyle(tone.accent)
+                .frame(width: 36, height: 36)
+                .appInsetCard(
+                    cornerRadius: 8,
+                    fill: tone.softFill.opacity(0.72),
+                    border: tone.softBorder
+                )
+
+            VStack(alignment: .leading, spacing: 6) {
+                Text(title)
+                    .font(.headline.weight(.black))
+                    .foregroundStyle(AppColors.textPrimary)
+
+                Text(message)
+                    .font(.subheadline)
+                    .foregroundStyle(AppColors.textSecondary)
+                    .multilineTextAlignment(.leading)
+                    .fixedSize(horizontal: false, vertical: true)
+            }
+            .layoutPriority(1)
+
+            Spacer(minLength: 0)
+        }
+        .frame(maxWidth: .infinity, alignment: .leading)
+        .padding(.vertical, 12)
     }
 }
 
@@ -871,18 +942,41 @@ struct PersonalRecordSummaryCardView: View, Equatable {
     let record: PersonalRecord
     let weightUnit: WeightUnit
     let tone: AppToneStyle
+    let style: AppRowStyle
 
-    init(record: PersonalRecord, weightUnit: WeightUnit, tone: AppToneStyle = .success) {
+    init(
+        record: PersonalRecord,
+        weightUnit: WeightUnit,
+        tone: AppToneStyle = .success,
+        style: AppRowStyle = .surface
+    ) {
         self.record = record
         self.weightUnit = weightUnit
         self.tone = tone
+        self.style = style
     }
 
     nonisolated static func == (lhs: PersonalRecordSummaryCardView, rhs: PersonalRecordSummaryCardView) -> Bool {
-        lhs.record == rhs.record && lhs.weightUnit == rhs.weightUnit && lhs.tone == rhs.tone
+        lhs.record == rhs.record
+            && lhs.weightUnit == rhs.weightUnit
+            && lhs.tone == rhs.tone
+            && lhs.style == rhs.style
     }
 
     var body: some View {
+        Group {
+            if style == .surface {
+                rowContent
+                    .padding(AppCardMetrics.compactPadding)
+                    .appSurface(cornerRadius: AppCardMetrics.compactCornerRadius, shadow: false, tone: tone)
+            } else {
+                rowContent
+                    .padding(.vertical, 14)
+            }
+        }
+    }
+
+    private var rowContent: some View {
         HStack(alignment: .top, spacing: 12) {
             VStack(alignment: .leading, spacing: 8) {
                 Text(record.displayName)
@@ -907,8 +1001,7 @@ struct PersonalRecordSummaryCardView: View, Equatable {
                     .foregroundStyle(tone.accent)
             }
         }
-        .padding(AppCardMetrics.compactPadding)
-        .appSurface(cornerRadius: AppCardMetrics.compactCornerRadius, shadow: false, tone: tone)
+        .frame(maxWidth: .infinity, alignment: .leading)
     }
 }
 
@@ -916,15 +1009,25 @@ struct CompletedSessionSummaryCardView: View, Equatable {
     let session: CompletedSession
     let detailSuffix: String
     let tone: AppToneStyle
+    let style: AppRowStyle
 
-    init(session: CompletedSession, detailSuffix: String = "", tone: AppToneStyle = .base) {
+    init(
+        session: CompletedSession,
+        detailSuffix: String = "",
+        tone: AppToneStyle = .base,
+        style: AppRowStyle = .surface
+    ) {
         self.session = session
         self.detailSuffix = detailSuffix
         self.tone = tone
+        self.style = style
     }
 
     nonisolated static func == (lhs: CompletedSessionSummaryCardView, rhs: CompletedSessionSummaryCardView) -> Bool {
-        lhs.session == rhs.session && lhs.detailSuffix == rhs.detailSuffix && lhs.tone == rhs.tone
+        lhs.session == rhs.session
+            && lhs.detailSuffix == rhs.detailSuffix
+            && lhs.tone == rhs.tone
+            && lhs.style == rhs.style
     }
 
     private var detailText: String {
@@ -932,6 +1035,21 @@ struct CompletedSessionSummaryCardView: View, Equatable {
     }
 
     var body: some View {
+        Group {
+            if style == .surface {
+                rowContent
+                    .padding(AppCardMetrics.compactPadding)
+                    .frame(maxWidth: .infinity, alignment: .leading)
+                    .appSurface(cornerRadius: AppCardMetrics.compactCornerRadius, shadow: false, tone: tone)
+            } else {
+                rowContent
+                    .padding(.vertical, 14)
+                    .frame(maxWidth: .infinity, alignment: .leading)
+            }
+        }
+    }
+
+    private var rowContent: some View {
         VStack(alignment: .leading, spacing: 10) {
             HStack(alignment: .top) {
                 VStack(alignment: .leading, spacing: 6) {
@@ -954,9 +1072,6 @@ struct CompletedSessionSummaryCardView: View, Equatable {
                 .font(.caption.weight(.black))
                 .foregroundStyle(tone.accent)
         }
-        .padding(AppCardMetrics.compactPadding)
-        .frame(maxWidth: .infinity, alignment: .leading)
-        .appSurface(cornerRadius: AppCardMetrics.compactCornerRadius, shadow: false, tone: tone)
     }
 }
 
@@ -981,6 +1096,14 @@ extension View {
 
     func appSectionSurface(tone: AppToneStyle? = nil) -> some View {
         appSurfaceCard(tone: tone)
+    }
+
+    func appSectionFrame(
+        tone: AppToneStyle? = nil,
+        topPadding: CGFloat = 14,
+        bottomPadding: CGFloat = 6
+    ) -> some View {
+        modifier(AppSectionFrameModifier(tone: tone, topPadding: topPadding, bottomPadding: bottomPadding))
     }
 
     func appFeatureSurface(tone: AppToneStyle? = nil) -> some View {

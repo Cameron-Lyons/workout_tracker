@@ -389,11 +389,13 @@ struct TodayView: View {
             )
 
             if todayStore.quickStartTemplates.isEmpty {
-                Text("Templates you launch recently will show up here.")
-                    .font(.subheadline)
-                    .foregroundStyle(AppColors.textSecondary)
-                    .frame(maxWidth: .infinity, alignment: .leading)
-                    .appSectionSurface(tone: .today)
+                AppInlineMessage(
+                    systemImage: "bolt.fill",
+                    title: "No quick starts yet",
+                    message: "Templates you launch recently will show up here.",
+                    tone: .today
+                )
+                .appSectionFrame(tone: .today)
             } else {
                 TodayGroupedPanel(tone: .today) {
                     VStack(spacing: 0) {
@@ -439,12 +441,13 @@ struct TodayView: View {
             )
 
             if todayStore.recentPersonalRecords.isEmpty {
-                Text("Finish sessions and the latest PRs will appear here.")
-                    .font(.subheadline)
-                    .foregroundStyle(AppColors.textSecondary)
-                    .padding(AppCardMetrics.compactPadding)
-                    .frame(maxWidth: .infinity, alignment: .leading)
-                    .appSurface(cornerRadius: AppCardMetrics.compactCornerRadius, shadow: false, tone: .success)
+                AppInlineMessage(
+                    systemImage: "rosette",
+                    title: "No PRs yet",
+                    message: "Finish sessions and the latest PRs will appear here.",
+                    tone: .success
+                )
+                .appSectionFrame(tone: .success)
             } else {
                 TodayGroupedPanel(tone: .success) {
                     VStack(spacing: 0) {
@@ -472,12 +475,13 @@ struct TodayView: View {
             )
 
             if todayStore.recentSessions.isEmpty {
-                Text("Your finished workouts will show up here.")
-                    .font(.subheadline)
-                    .foregroundStyle(AppColors.textSecondary)
-                    .padding(AppCardMetrics.compactPadding)
-                    .frame(maxWidth: .infinity, alignment: .leading)
-                    .appSurface(cornerRadius: AppCardMetrics.compactCornerRadius, shadow: false, tone: .progress)
+                AppInlineMessage(
+                    systemImage: "clock.arrow.circlepath",
+                    title: "No sessions logged yet",
+                    message: "Your finished workouts will show up here.",
+                    tone: .progress
+                )
+                .appSectionFrame(tone: .progress)
             } else {
                 TodayGroupedPanel(tone: .progress) {
                     VStack(spacing: 0) {
@@ -522,9 +526,7 @@ private struct TodayGroupedPanel<Content: View>: View {
 
     var body: some View {
         content
-            .padding(.horizontal, 18)
-            .padding(.vertical, 4)
-            .appFeatureSurface(tone: tone)
+            .appSectionFrame(tone: tone, topPadding: 12, bottomPadding: 4)
     }
 }
 
@@ -897,7 +899,7 @@ struct PlansView: View {
                 }
             }
         }
-        .appFeatureSurface(tone: .plans)
+        .appSectionFrame(tone: .plans, topPadding: 16, bottomPadding: 8)
     }
 
     private func templateCard(plan: Plan, template: WorkoutTemplate) -> some View {

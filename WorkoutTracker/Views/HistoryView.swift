@@ -298,19 +298,34 @@ private struct ProgressRecordsSectionView: View {
                 ProgressRecordSpotlightCardView(record: featuredRecord, weightUnit: settingsStore.weightUnit)
 
                 if recentRecords.count > 1 {
-                    LazyVStack(spacing: 10) {
-                        ForEach(Array(recentRecords.dropFirst())) { record in
-                            PersonalRecordSummaryCardView(record: record, weightUnit: settingsStore.weightUnit, tone: .success)
+                    let additionalRecords = Array(recentRecords.dropFirst())
+
+                    VStack(spacing: 0) {
+                        ForEach(Array(additionalRecords.enumerated()), id: \.element.id) { index, record in
+                            PersonalRecordSummaryCardView(
+                                record: record,
+                                weightUnit: settingsStore.weightUnit,
+                                tone: .success,
+                                style: .plain
+                            )
+
+                            if index < additionalRecords.count - 1 {
+                                Rectangle()
+                                    .fill(AppColors.stroke.opacity(0.78))
+                                    .frame(height: 1)
+                            }
                         }
                     }
+                    .appSectionFrame(tone: .success)
                 }
             } else {
-                AppEmptyStateCard(
+                AppInlineMessage(
                     systemImage: "rosette",
                     title: "No PRs yet",
                     message: "Your first standout sets will show up here once a logged session beats an earlier benchmark.",
                     tone: .success
                 )
+                .appSectionFrame(tone: .success)
             }
         }
     }
@@ -334,7 +349,7 @@ private struct ProgressChartSectionView: View {
             )
 
             if state.exerciseSummaries.isEmpty {
-                AppEmptyStateCard(
+                AppInlineMessage(
                     systemImage: "chart.line.uptrend.xyaxis",
                     title: "No trend data yet",
                     message: "Weighted logs will unlock exercise trend charts and strength callouts.",
@@ -517,8 +532,7 @@ private struct ProgressChartSectionView: View {
                 }
             }
         }
-        .padding(AppCardMetrics.featurePadding)
-        .appSurface(cornerRadius: AppCardMetrics.featureCornerRadius, shadow: false, tone: .progress)
+        .appSectionFrame(tone: .progress, topPadding: 16, bottomPadding: 8)
     }
 }
 
@@ -558,8 +572,7 @@ private struct ProgressCalendarSectionView: View {
                 ProgressLegendPill(title: "Today", systemImage: "sun.max.fill", tone: .warning)
             }
         }
-        .padding(AppCardMetrics.featurePadding)
-        .appSurface(cornerRadius: AppCardMetrics.featureCornerRadius, shadow: false, tone: .progress)
+        .appSectionFrame(tone: .progress, topPadding: 16, bottomPadding: 8)
     }
 }
 
@@ -602,20 +615,33 @@ private struct ProgressHistorySectionView: View {
             }
 
             if progressStore.historySessions.isEmpty {
-                AppEmptyStateCard(
+                AppInlineMessage(
                     systemImage: "calendar.badge.exclamationmark",
                     title: "No sessions for this filter",
                     message: "Choose another logged day or clear the calendar filter to see every completed workout.",
                     tone: .warning
                 )
+                .appSectionFrame(tone: .warning)
             } else {
-                ForEach(progressStore.historySessions) { session in
-                    CompletedSessionSummaryCardView(
-                        session: session,
-                        detailSuffix: " logged",
-                        tone: progressStore.selectedDay == nil ? .progress : .success
-                    )
+                let listTone: AppToneStyle = progressStore.selectedDay == nil ? .progress : .success
+
+                VStack(spacing: 0) {
+                    ForEach(Array(progressStore.historySessions.enumerated()), id: \.element.id) { index, session in
+                        CompletedSessionSummaryCardView(
+                            session: session,
+                            detailSuffix: " logged",
+                            tone: listTone,
+                            style: .plain
+                        )
+
+                        if index < progressStore.historySessions.count - 1 {
+                            Rectangle()
+                                .fill(AppColors.stroke.opacity(0.78))
+                                .frame(height: 1)
+                        }
+                    }
                 }
+                .appSectionFrame(tone: listTone)
             }
         }
     }
@@ -633,7 +659,7 @@ private struct ProgressSpotlightCard<Content: View>: View {
     var body: some View {
         content
             .padding(18)
-            .appFeatureSurface(tone: tone)
+            .appSectionFrame(tone: tone, topPadding: 14, bottomPadding: 6)
     }
 }
 

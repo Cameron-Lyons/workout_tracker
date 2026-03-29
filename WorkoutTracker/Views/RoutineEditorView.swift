@@ -198,7 +198,7 @@ struct PlanEditorSheet: View {
                                 .font(.caption)
                                 .foregroundStyle(AppColors.textSecondary)
                         }
-                        .appFeatureSurface(tone: .plans)
+                        .appSectionFrame(tone: .plans)
                     }
                     .padding(.horizontal, 16)
                     .padding(.vertical, 14)
@@ -331,7 +331,7 @@ struct TemplateEditorSheet: View {
                                     .lineLimit(2...4)
                                     .appInputField()
                             }
-                            .appFeatureSurface(tone: .plans)
+                            .appSectionFrame(tone: .plans)
 
                             VStack(alignment: .leading, spacing: 12) {
                                 AppSectionHeader(
@@ -377,7 +377,7 @@ struct TemplateEditorSheet: View {
                                     }
                                 }
                             }
-                            .appFeatureSurface(tone: .today)
+                            .appSectionFrame(tone: .today)
 
                             VStack(alignment: .leading, spacing: 12) {
                                 HStack(alignment: .top, spacing: 12) {
@@ -443,7 +443,7 @@ struct TemplateEditorSheet: View {
                                     }
                                 }
                             }
-                            .appFeatureSurface(tone: .today)
+                            .appSectionFrame(tone: .today, topPadding: 16, bottomPadding: 8)
                         }
                         .scrollIndicators(.hidden)
                     }
@@ -949,7 +949,7 @@ private struct TemplateDraftBlockEditorView: View {
             }
             .tint(AppToneStyle.progress.accent)
         }
-        .appEditorInsetCard(borderOpacity: 0.78)
+        .appSectionFrame(tone: tone, topPadding: 16, bottomPadding: 8)
         .onChange(of: block.progressionKind) { _, newValue in
             if newValue == .percentageWave {
                 block.setKind = .working

@@ -330,7 +330,7 @@ private struct FlowAccentCard<Content: View>: View {
     var body: some View {
         content
             .padding(18)
-            .appFeatureSurface(tone: tone)
+            .appSectionFrame(tone: tone, topPadding: 14, bottomPadding: 6)
     }
 }
 
