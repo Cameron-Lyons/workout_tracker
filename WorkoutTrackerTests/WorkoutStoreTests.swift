@@ -1216,7 +1216,57 @@ final class WorkoutStoreTests: XCTestCase {
     }
 
     @MainActor
-    func testContainerFactoryRecoversFromInvalidPersistentStorePath() throws {
+    func testPlanRepositoryDropsBlocksWithInvalidProgressionRulePayloads() throws {
+        let container = WorkoutModelContainerFactory.makeContainer(isStoredInMemoryOnly: true)
+        let context = ModelContext(container)
+        context.autosaveEnabled = false
+
+        let plan = StoredPlan(
+            id: UUID(),
+            name: "Starter",
+            createdAt: .now,
+            pinnedTemplateID: nil
+        )
+        let template = StoredTemplate(
+            id: UUID(),
+            name: "Bench Day",
+            note: "",
+            scheduledWeekdaysData: Data("[]".utf8),
+            lastStartedAt: nil,
+            orderIndex: 0
+        )
+        let block = StoredTemplateBlock(
+            id: UUID(),
+            exerciseID: CatalogSeed.benchPress,
+            exerciseNameSnapshot: "Bench Press",
+            blockNote: "",
+            restSeconds: 90,
+            supersetGroup: nil,
+            allowsAutoWarmups: true,
+            orderIndex: 0,
+            progressionRuleData: Data("invalid".utf8)
+        )
+
+        template.plan = plan
+        template.blocks = [block]
+        block.template = template
+
+        context.insert(plan)
+        context.insert(template)
+        context.insert(block)
+        try context.save()
+
+        let repository = PlanRepository(modelContext: context)
+        let loadedPlan = try XCTUnwrap(repository.loadPlans().first)
+        let loadedTemplate = try XCTUnwrap(loadedPlan.templates.first)
+
+        XCTAssertEqual(loadedPlan.name, "Starter")
+        XCTAssertEqual(loadedTemplate.name, "Bench Day")
+        XCTAssertTrue(loadedTemplate.blocks.isEmpty)
+    }
+
+    @MainActor
+    func testContainerFactoryFallsBackWithoutResetForInvalidPersistentStorePath() throws {
         let storeDirectory = FileManager.default.temporaryDirectory
             .appendingPathComponent(UUID().uuidString, isDirectory: true)
         let storeURL = storeDirectory.appendingPathComponent("WorkoutTracker.store")
@@ -1230,7 +1280,6 @@ final class WorkoutStoreTests: XCTestCase {
 
         let container = WorkoutModelContainerFactory.makeContainer(storeURL: storeURL)
         let issue = try XCTUnwrap(WorkoutModelContainerFactory.consumeStartupIssue())
-        let recoveryDirectoryURL = try XCTUnwrap(issue.recoveryDirectoryURL)
         let context = ModelContext(container)
         context.autosaveEnabled = false
         let repository = PlanRepository(modelContext: context)
@@ -1240,12 +1289,12 @@ final class WorkoutStoreTests: XCTestCase {
             category: .chest
         )
 
-        XCTAssertEqual(issue.title, "Storage Reset")
-        XCTAssertTrue(issue.message.contains("backup"))
-        XCTAssertTrue(FileManager.default.fileExists(atPath: recoveryDirectoryURL.path))
-        XCTAssertTrue(
+        XCTAssertEqual(issue.title, "Storage Unavailable")
+        XCTAssertNil(issue.recoveryDirectoryURL)
+        XCTAssertTrue(FileManager.default.fileExists(atPath: storeURL.path))
+        XCTAssertFalse(
             FileManager.default.fileExists(
-                atPath: recoveryDirectoryURL.appendingPathComponent("WorkoutTracker.store").path
+                atPath: storeDirectory.appendingPathComponent("Recovery").path
             )
         )
         XCTAssertTrue(repository.saveCatalog([catalogItem]))

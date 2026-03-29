@@ -11,12 +11,22 @@ class RepositoryBase {
         self.modelContext = modelContext
     }
 
-    func encode<Value: Encodable>(_ value: Value) -> Data? {
-        try? encoder.encode(value)
+    func encode<Value: Encodable>(_ value: Value, operation: String) -> Data? {
+        do {
+            return try encoder.encode(value)
+        } catch {
+            PersistenceDiagnostics.record("Failed to encode \(operation)", error: error)
+            return nil
+        }
     }
 
-    func decode<Value: Decodable>(_ type: Value.Type, from data: Data) -> Value? {
-        try? decoder.decode(Value.self, from: data)
+    func decode<Value: Decodable>(_ type: Value.Type, from data: Data, operation: String) -> Value? {
+        do {
+            return try decoder.decode(Value.self, from: data)
+        } catch {
+            PersistenceDiagnostics.record("Failed to decode \(operation)", error: error)
+            return nil
+        }
     }
 
     @discardableResult
@@ -241,7 +251,11 @@ final class PlanRepository: RepositoryBase {
         ExerciseCatalogItem(
             id: record.id,
             name: record.name,
-            aliases: decode([String].self, from: record.aliasesData) ?? [],
+            aliases: decode(
+                [String].self,
+                from: record.aliasesData,
+                operation: "catalog item aliases for \(record.id.uuidString)"
+            ) ?? [],
             category: ExerciseCategory(rawValue: record.categoryRaw) ?? .custom
         )
     }
@@ -262,7 +276,11 @@ final class PlanRepository: RepositoryBase {
             id: record.id,
             name: record.name,
             note: record.note,
-            scheduledWeekdays: decode([Weekday].self, from: record.scheduledWeekdaysData) ?? [],
+            scheduledWeekdays: decode(
+                [Weekday].self,
+                from: record.scheduledWeekdaysData,
+                operation: "template weekdays for \(record.id.uuidString)"
+            ) ?? [],
             blocks: orderedRecordsIfNeeded(record.blocks, by: \.orderIndex)
                 .compactMap(templateBlock(from:)),
             lastStartedAt: record.lastStartedAt
@@ -270,14 +288,22 @@ final class PlanRepository: RepositoryBase {
     }
 
     private func templateBlock(from record: StoredTemplateBlock) -> ExerciseBlock? {
-        ExerciseBlock(
+        guard let progressionRule = decode(
+            ProgressionRule.self,
+            from: record.progressionRuleData,
+            operation: "template block progression rule for \(record.id.uuidString)"
+        ) else {
+            return nil
+        }
+
+        return ExerciseBlock(
             id: record.id,
             exerciseID: record.exerciseID,
             exerciseNameSnapshot: record.exerciseNameSnapshot,
             blockNote: record.blockNote,
             restSeconds: record.restSeconds,
             supersetGroup: record.supersetGroup,
-            progressionRule: decode(ProgressionRule.self, from: record.progressionRuleData) ?? .manual,
+            progressionRule: progressionRule,
             targets: orderedRecordsIfNeeded(record.targets, by: \.orderIndex)
                 .compactMap(templateTarget(from:)),
             allowsAutoWarmups: record.allowsAutoWarmups
@@ -310,8 +336,11 @@ final class PlanRepository: RepositoryBase {
             record.name = item.name
         }
 
-        let aliasesData = encode(item.aliases) ?? emptyArrayData
-        if record.aliasesData != aliasesData {
+        if let aliasesData = encode(
+            item.aliases,
+            operation: "catalog item aliases for \(item.id.uuidString)"
+        ), record.aliasesData != aliasesData
+        {
             record.aliasesData = aliasesData
         }
 
@@ -379,8 +408,11 @@ final class PlanRepository: RepositoryBase {
             record.note = template.note
         }
 
-        let weekdaysData = encode(template.scheduledWeekdays) ?? emptyArrayData
-        if record.scheduledWeekdaysData != weekdaysData {
+        if let weekdaysData = encode(
+            template.scheduledWeekdays,
+            operation: "template weekdays for \(template.id.uuidString)"
+        ), record.scheduledWeekdaysData != weekdaysData
+        {
             record.scheduledWeekdaysData = weekdaysData
         }
 
@@ -412,7 +444,10 @@ final class PlanRepository: RepositoryBase {
                     supersetGroup: block.supersetGroup,
                     allowsAutoWarmups: block.allowsAutoWarmups,
                     orderIndex: index,
-                    progressionRuleData: encode(block.progressionRule) ?? Data()
+                    progressionRuleData: encode(
+                        block.progressionRule,
+                        operation: "template block progression rule for \(block.id.uuidString)"
+                    ) ?? Data()
                 )
                 modelContext.insert(record)
             }
@@ -461,8 +496,11 @@ final class PlanRepository: RepositoryBase {
             record.orderIndex = orderIndex
         }
 
-        let progressionRuleData = encode(block.progressionRule) ?? Data()
-        if record.progressionRuleData != progressionRuleData {
+        if let progressionRuleData = encode(
+            block.progressionRule,
+            operation: "template block progression rule for \(block.id.uuidString)"
+        ), record.progressionRuleData != progressionRuleData
+        {
             record.progressionRuleData = progressionRuleData
         }
     }

@@ -94,14 +94,22 @@ final class SessionRepository: RepositoryBase {
     }
 
     private func activeBlock(from record: StoredActiveSessionBlock) -> SessionBlock? {
-        SessionBlock(
+        guard let progressionRule = decode(
+            ProgressionRule.self,
+            from: record.progressionRuleData,
+            operation: "active session block progression rule for \(record.id.uuidString)"
+        ) else {
+            return nil
+        }
+
+        return SessionBlock(
             id: record.id,
             exerciseID: record.exerciseID,
             exerciseNameSnapshot: record.exerciseNameSnapshot,
             blockNote: record.blockNote,
             restSeconds: record.restSeconds,
             supersetGroup: record.supersetGroup,
-            progressionRule: decode(ProgressionRule.self, from: record.progressionRuleData) ?? .manual,
+            progressionRule: progressionRule,
             sets: orderedSessionRows(from: record.rows)
         )
     }
@@ -121,14 +129,22 @@ final class SessionRepository: RepositoryBase {
     }
 
     private func completedBlock(from record: StoredCompletedSessionBlock) -> CompletedSessionBlock? {
-        CompletedSessionBlock(
+        guard let progressionRule = decode(
+            ProgressionRule.self,
+            from: record.progressionRuleData,
+            operation: "completed session block progression rule for \(record.id.uuidString)"
+        ) else {
+            return nil
+        }
+
+        return CompletedSessionBlock(
             id: record.id,
             exerciseID: record.exerciseID,
             exerciseNameSnapshot: record.exerciseNameSnapshot,
             blockNote: record.blockNote,
             restSeconds: record.restSeconds,
             supersetGroup: record.supersetGroup,
-            progressionRule: decode(ProgressionRule.self, from: record.progressionRuleData) ?? .manual,
+            progressionRule: progressionRule,
             sets: orderedSessionRows(from: record.rows)
         )
     }
@@ -161,7 +177,10 @@ final class SessionRepository: RepositoryBase {
                 let snapshot = StoredSessionBlockSnapshot(
                     block: block,
                     orderIndex: index,
-                    progressionRuleData: encode(block.progressionRule) ?? Data()
+                    progressionRuleData: encode(
+                        block.progressionRule,
+                        operation: "active session block progression rule for \(block.id.uuidString)"
+                    ) ?? Data()
                 )
                 let record = StoredActiveSessionBlock(
                     id: snapshot.id,
@@ -267,7 +286,10 @@ final class SessionRepository: RepositoryBase {
                 let snapshot = StoredSessionBlockSnapshot(
                     block: block,
                     orderIndex: index,
-                    progressionRuleData: encode(block.progressionRule) ?? Data()
+                    progressionRuleData: encode(
+                        block.progressionRule,
+                        operation: "completed session block progression rule for \(block.id.uuidString)"
+                    ) ?? Data()
                 )
                 let record = StoredCompletedSessionBlock(
                     id: snapshot.id,
@@ -456,8 +478,11 @@ final class SessionRepository: RepositoryBase {
             record.supersetGroup = block.supersetGroup
         }
 
-        let progressionRuleData = encode(block.progressionRule) ?? Data()
-        if record.progressionRuleData != progressionRuleData {
+        if let progressionRuleData = encode(
+            block.progressionRule,
+            operation: "session block progression rule for \(block.id.uuidString)"
+        ), record.progressionRuleData != progressionRuleData
+        {
             record.progressionRuleData = progressionRuleData
         }
     }

@@ -50,8 +50,11 @@ final class SettingsStore {
 
     var warmupRamp: [WarmupRampStep] {
         didSet {
-            if let data = try? encoder.encode(warmupRamp) {
+            do {
+                let data = try encoder.encode(warmupRamp)
                 defaults.set(data, forKey: Keys.warmupRamp)
+            } catch {
+                PersistenceDiagnostics.record("Failed to encode warmup ramp settings", error: error)
             }
         }
     }
@@ -70,11 +73,18 @@ final class SettingsStore {
             defaults.object(forKey: Keys.defaultRestSeconds) as? Int
             ?? ExerciseBlockDefaults.restSeconds
         self.hasCompletedOnboarding = defaults.bool(forKey: Keys.completedOnboarding)
-        if let data = defaults.data(forKey: Keys.warmupRamp),
-            let decoded = try? decoder.decode([WarmupRampStep].self, from: data),
-            !decoded.isEmpty
-        {
-            self.warmupRamp = decoded
+        if let data = defaults.data(forKey: Keys.warmupRamp) {
+            do {
+                let decoded = try decoder.decode([WarmupRampStep].self, from: data)
+                if decoded.isEmpty {
+                    self.warmupRamp = WarmupDefaults.ramp
+                } else {
+                    self.warmupRamp = decoded
+                }
+            } catch {
+                PersistenceDiagnostics.record("Failed to decode warmup ramp settings", error: error)
+                self.warmupRamp = WarmupDefaults.ramp
+            }
         } else {
             self.warmupRamp = WarmupDefaults.ramp
         }

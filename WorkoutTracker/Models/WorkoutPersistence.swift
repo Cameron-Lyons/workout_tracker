@@ -1,3 +1,4 @@
+import CoreData
 import Foundation
 import SwiftData
 import os
@@ -466,8 +467,79 @@ enum PersistenceDiagnostics {
 
     static func record(_ message: String, error: any Error) {
         logger.error(
-            "\(message, privacy: .public): \(String(describing: error), privacy: .public)"
+            "\(message, privacy: .public): \(String(describing: error), privacy: .private)"
         )
+    }
+}
+
+private enum PersistenceRecoveryClassifier {
+    private static let resettableSQLiteCodes: Set<Int> = [
+        11, // SQLITE_CORRUPT
+        26, // SQLITE_NOTADB
+    ]
+    private static let resettableCocoaCodes: Set<Int> = [
+        NSPersistentStoreIncompatibleSchemaError,
+        NSPersistentStoreIncompatibleVersionHashError,
+        NSMigrationError,
+        NSMigrationMissingSourceModelError,
+    ]
+
+    static func shouldAttemptReset(after error: any Error) -> Bool {
+        flattenedErrors(from: error).contains(where: isResettableStoreError)
+    }
+
+    private static func isResettableStoreError(_ error: NSError) -> Bool {
+        if error.domain == "NSSQLiteErrorDomain",
+            resettableSQLiteCodes.contains(error.code)
+        {
+            return true
+        }
+
+        if error.domain == NSCocoaErrorDomain,
+            resettableCocoaCodes.contains(error.code)
+        {
+            return true
+        }
+
+        let description = [
+            error.localizedDescription,
+            error.userInfo[NSLocalizedFailureReasonErrorKey] as? String,
+        ]
+        .compactMap { $0?.lowercased() }
+        .joined(separator: " ")
+
+        return description.contains("corrupt")
+            || description.contains("malformed")
+            || description.contains("not a database")
+    }
+
+    private static func flattenedErrors(from error: any Error) -> [NSError] {
+        var flattened: [NSError] = []
+        var visited = Set<ObjectIdentifier>()
+
+        func append(_ error: NSError) {
+            let identifier = ObjectIdentifier(error)
+            guard visited.insert(identifier).inserted else {
+                return
+            }
+
+            flattened.append(error)
+
+            if let underlyingError = error.userInfo[NSUnderlyingErrorKey] as? NSError {
+                append(underlyingError)
+            }
+
+            if let detailedErrors = error.userInfo[NSDetailedErrorsKey] as? [NSError] {
+                detailedErrors.forEach(append)
+            }
+
+            if let multipleUnderlyingErrors = error.userInfo["NSMultipleUnderlyingErrorsKey"] as? [NSError] {
+                multipleUnderlyingErrors.forEach(append)
+            }
+        }
+
+        append(error as NSError)
+        return flattened
     }
 }
 
@@ -512,6 +584,16 @@ enum WorkoutModelContainerFactory {
         } catch {
             PersistenceDiagnostics.record("Failed to initialize persistent SwiftData container", error: error)
 
+            guard PersistenceRecoveryClassifier.shouldAttemptReset(after: error) else {
+                PersistenceDiagnostics.record(
+                    "Persistent store failure did not match a resettable corruption signature. Falling back to in-memory storage."
+                )
+                return fallbackInMemoryContainer(
+                    title: "Storage Unavailable",
+                    message: storageUnavailableMessage
+                )
+            }
+
             do {
                 let backupURL = try backupPersistentStoreArtifacts(at: resolvedStoreURL)
                 try removePersistentStoreArtifacts(at: resolvedStoreURL)
@@ -522,7 +604,7 @@ enum WorkoutModelContainerFactory {
                     recoveryDirectoryURL: backupURL
                 )
                 PersistenceDiagnostics.record(
-                    "Recovered persistent store by resetting local database. Backup saved to \(backupURL.path)"
+                    "Recovered persistent store by resetting the local database. A backup was saved locally."
                 )
                 return recoveredContainer
             } catch {
