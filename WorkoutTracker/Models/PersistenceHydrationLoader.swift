@@ -40,7 +40,9 @@ actor PersistenceHydrationLoader {
             plans: PlansStore.HydrationSnapshot(
                 catalog: catalog,
                 plans: [],
-                profiles: planRepository.loadProfiles(),
+                profiles: [],
+                includesProfiles: false,
+                profileCount: planRepository.loadProfileCount(),
                 planSummaries: planRepository.loadPlanSummaries(),
                 includesFullPlanLibrary: false
             ),

@@ -85,6 +85,45 @@ final class WorkoutStoreTests: XCTestCase {
     }
 
     @MainActor
+    func testPreloadDeferredTabDataWarmsPlansAndProgressAfterStartupHydration() async throws {
+        let container = WorkoutModelContainerFactory.makeContainer(isStoredInMemoryOnly: true)
+        let seededStore = makeStore(container: container)
+        await seededStore.hydrateIfNeeded()
+        seededStore.completeOnboarding(with: nil)
+
+        let plan = makeSingleTemplatePlan(
+            name: "Deferred Plan",
+            templateName: "Bench Day",
+            store: seededStore,
+            weight: 185
+        )
+        seededStore.savePlan(plan)
+        seededStore.startSession(planID: plan.id, templateID: try XCTUnwrap(plan.templates.first?.id))
+
+        let block = try XCTUnwrap(seededStore.sessionStore.activeDraft?.blocks.first)
+        let workingRow = try XCTUnwrap(block.sets.first(where: { $0.target.setKind == .working }))
+        seededStore.toggleSetCompletion(blockID: block.id, setID: workingRow.id)
+        XCTAssertTrue(seededStore.finishActiveSession())
+        seededStore.flushPendingSessionPersistence()
+        seededStore.flushPendingPlanPersistence()
+
+        let rehydratedStore = makeStore(container: container)
+        await rehydratedStore.hydrateIfNeeded()
+
+        XCTAssertFalse(rehydratedStore.plansStore.hasLoadedPlanLibrary)
+        XCTAssertFalse(rehydratedStore.sessionStore.hasLoadedCompletedSessionHistory)
+
+        await rehydratedStore.preloadDeferredTabDataIfNeeded(priority: .utility)
+
+        XCTAssertTrue(rehydratedStore.plansStore.hasLoadedPlanLibrary)
+        XCTAssertEqual(rehydratedStore.plansStore.plans.count, 1)
+        XCTAssertTrue(rehydratedStore.sessionStore.hasLoadedCompletedSessionHistory)
+        XCTAssertEqual(rehydratedStore.sessionStore.completedSessions.count, 1)
+        XCTAssertEqual(rehydratedStore.todayStore.recentSessions.first?.templateNameSnapshot, "Bench Day")
+        XCTAssertEqual(rehydratedStore.progressStore.overview.totalSessions, 1)
+    }
+
+    @MainActor
     func testStartupHydrationDefersFullPlanLibraryButKeepsReferencesUsable() async throws {
         let container = WorkoutModelContainerFactory.makeContainer(isStoredInMemoryOnly: true)
         let seededStore = makeStore(container: container)
@@ -112,6 +151,87 @@ final class WorkoutStoreTests: XCTestCase {
         rehydratedStore.startSession(planID: loadedPlan.id, templateID: templateID)
 
         XCTAssertEqual(rehydratedStore.sessionStore.activeDraft?.templateNameSnapshot, "Upper 1")
+    }
+
+    @MainActor
+    func testStartupHydrationDefersProfilesButLoadsThemOnDemand() async throws {
+        let container = WorkoutModelContainerFactory.makeContainer(isStoredInMemoryOnly: true)
+        let seededStore = makeStore(container: container)
+        await seededStore.hydrateIfNeeded()
+        seededStore.completeOnboarding(with: nil)
+
+        let profile = ExerciseProfile(
+            exerciseID: CatalogSeed.benchPress,
+            trainingMax: 235,
+            preferredIncrement: 5
+        )
+        seededStore.saveProfiles([profile])
+        seededStore.flushPendingPlanPersistence()
+
+        let rehydratedStore = makeStore(container: container)
+        await rehydratedStore.hydrateIfNeeded()
+
+        XCTAssertTrue(rehydratedStore.plansStore.profiles.isEmpty)
+        XCTAssertEqual(rehydratedStore.plansStore.profileCount, 1)
+
+        let loadedProfile = try XCTUnwrap(rehydratedStore.plansStore.profile(for: CatalogSeed.benchPress))
+
+        XCTAssertEqual(loadedProfile.trainingMax, 235)
+        XCTAssertEqual(loadedProfile.preferredIncrement, 5)
+        XCTAssertEqual(rehydratedStore.plansStore.profiles.count, 1)
+        XCTAssertEqual(rehydratedStore.plansStore.profileCount, 1)
+    }
+
+    @MainActor
+    func testStartingSessionAfterStartupHydrationUsesDeferredProfiles() async throws {
+        let container = WorkoutModelContainerFactory.makeContainer(isStoredInMemoryOnly: true)
+        let seededStore = makeStore(container: container)
+        await seededStore.hydrateIfNeeded()
+        seededStore.completeOnboarding(with: nil)
+
+        var plan = seededStore.makePlan(name: "Wave Bench")
+        let template = WorkoutTemplate(
+            name: "Bench Day",
+            blocks: [
+                ExerciseBlock(
+                    exerciseID: CatalogSeed.benchPress,
+                    exerciseNameSnapshot: seededStore.plansStore.exerciseName(for: CatalogSeed.benchPress),
+                    progressionRule: ProgressionRule(
+                        kind: .percentageWave,
+                        percentageWave: PercentageWaveRule.fiveThreeOne(trainingMax: 200, cycleIncrement: 5)
+                    ),
+                    targets: []
+                )
+            ]
+        )
+        plan.templates = [template]
+        plan.pinnedTemplateID = template.id
+
+        let profile = ExerciseProfile(
+            exerciseID: CatalogSeed.benchPress,
+            trainingMax: 235,
+            preferredIncrement: 5
+        )
+
+        seededStore.savePlan(plan)
+        seededStore.saveProfiles([profile])
+        seededStore.flushPendingPlanPersistence()
+
+        let rehydratedStore = makeStore(container: container)
+        await rehydratedStore.hydrateIfNeeded()
+
+        XCTAssertTrue(rehydratedStore.plansStore.profiles.isEmpty)
+        XCTAssertEqual(rehydratedStore.plansStore.profileCount, 1)
+
+        rehydratedStore.startSession(planID: plan.id, templateID: template.id)
+
+        let startedBlock = try XCTUnwrap(rehydratedStore.sessionStore.activeDraft?.blocks.first)
+        let workingTargets = startedBlock.sets
+            .filter { $0.target.setKind == .working }
+            .compactMap(\.target.targetWeight)
+
+        XCTAssertEqual(workingTargets, [152.5, 177.5, 200])
+        XCTAssertEqual(rehydratedStore.plansStore.profiles.count, 1)
     }
 
     @MainActor
@@ -1173,6 +1293,133 @@ final class WorkoutStoreTests: XCTestCase {
 
         XCTAssertFalse(TemplateReferenceSelection.isAlternatingPlan(plan))
         XCTAssertEqual(pinned.templateName, "Workout A")
+    }
+
+    @MainActor
+    func testPlanRepositoryLoadPlanSummariesPreservesStartingStrengthRotation() throws {
+        let container = WorkoutModelContainerFactory.makeContainer(isStoredInMemoryOnly: true)
+        let context = ModelContext(container)
+        context.autosaveEnabled = false
+        let repository = PlanRepository(modelContext: context)
+
+        var calendar = Calendar(identifier: .gregorian)
+        calendar.timeZone = try XCTUnwrap(TimeZone(secondsFromGMT: 0))
+        let monday = try XCTUnwrap(
+            calendar.date(from: DateComponents(year: 2026, month: 3, day: 9))
+        )
+        let completedAt = try XCTUnwrap(
+            calendar.date(from: DateComponents(year: 2026, month: 3, day: 6))
+        )
+
+        let plan = makeStartingStrengthPlan()
+        XCTAssertTrue(repository.savePlans([plan]))
+
+        let summary = try XCTUnwrap(repository.loadPlanSummaries().first)
+        let references = plan.templates.map { template in
+            makeReference(plan: plan, template: template)
+        }
+        let sessions = [
+            CompletedSession(
+                planID: plan.id,
+                templateID: try XCTUnwrap(plan.templates.first(where: { $0.name == "Workout A" })?.id),
+                templateNameSnapshot: "Workout A",
+                startedAt: completedAt.addingTimeInterval(-5_400),
+                completedAt: completedAt,
+                blocks: []
+            )
+        ]
+
+        let pinned = try XCTUnwrap(
+            TemplateReferenceSelection.pinnedTemplate(
+                from: [summary],
+                references: references,
+                sessions: sessions,
+                now: monday,
+                calendar: calendar
+            )
+        )
+
+        XCTAssertTrue(TemplateReferenceSelection.isAlternatingPlan(summary))
+        XCTAssertEqual(pinned.templateName, "Workout B")
+    }
+
+    @MainActor
+    func testPlanRepositoryLoadPlanSummariesKeepsCustomWorkoutABNonAlternating() throws {
+        let container = WorkoutModelContainerFactory.makeContainer(isStoredInMemoryOnly: true)
+        let context = ModelContext(container)
+        context.autosaveEnabled = false
+        let repository = PlanRepository(modelContext: context)
+
+        var calendar = Calendar(identifier: .gregorian)
+        calendar.timeZone = try XCTUnwrap(TimeZone(secondsFromGMT: 0))
+        let friday = try XCTUnwrap(
+            calendar.date(from: DateComponents(year: 2026, month: 3, day: 13))
+        )
+        let completedAt = try XCTUnwrap(
+            calendar.date(from: DateComponents(year: 2026, month: 3, day: 9))
+        )
+
+        let plan = makeCustomNamedWorkoutABPlan()
+        XCTAssertTrue(repository.savePlans([plan]))
+
+        let summary = try XCTUnwrap(repository.loadPlanSummaries().first)
+        let references = plan.templates.map { template in
+            makeReference(plan: plan, template: template)
+        }
+        let sessions = [
+            CompletedSession(
+                planID: plan.id,
+                templateID: try XCTUnwrap(plan.templates.first(where: { $0.name == "Workout A" })?.id),
+                templateNameSnapshot: "Workout A",
+                startedAt: completedAt.addingTimeInterval(-5_400),
+                completedAt: completedAt,
+                blocks: []
+            )
+        ]
+
+        let pinned = try XCTUnwrap(
+            TemplateReferenceSelection.pinnedTemplate(
+                from: [summary],
+                references: references,
+                sessions: sessions,
+                now: friday,
+                calendar: calendar
+            )
+        )
+
+        XCTAssertFalse(TemplateReferenceSelection.isAlternatingPlan(summary))
+        XCTAssertEqual(pinned.templateName, "Workout A")
+    }
+
+    @MainActor
+    func testPlanRepositoryLoadPlanSummariesSkipsBlockExerciseIDsForPlansWithMoreThanTwoTemplates() throws {
+        let container = WorkoutModelContainerFactory.makeContainer(isStoredInMemoryOnly: true)
+        let context = ModelContext(container)
+        context.autosaveEnabled = false
+        let repository = PlanRepository(modelContext: context)
+
+        let firstTemplate = WorkoutTemplate(
+            name: "Day 1",
+            blocks: [makeStartingStrengthBlock(id: CatalogSeed.backSquat, name: "Back Squat")]
+        )
+        let secondTemplate = WorkoutTemplate(
+            name: "Day 2",
+            blocks: [makeStartingStrengthBlock(id: CatalogSeed.benchPress, name: "Bench Press")]
+        )
+        let thirdTemplate = WorkoutTemplate(
+            name: "Day 3",
+            blocks: [makeStartingStrengthBlock(id: CatalogSeed.deadlift, name: "Deadlift")]
+        )
+        let plan = Plan(
+            name: "Three Day Split",
+            pinnedTemplateID: firstTemplate.id,
+            templates: [firstTemplate, secondTemplate, thirdTemplate]
+        )
+
+        XCTAssertTrue(repository.savePlans([plan]))
+
+        let summary = try XCTUnwrap(repository.loadPlanSummaries().first)
+        XCTAssertTrue(summary.templates.allSatisfy { $0.blockExerciseIDs.isEmpty })
     }
 
     @MainActor

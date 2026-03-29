@@ -865,7 +865,7 @@ struct PlansView: View {
                 AppHeroMetric(
                     id: "profiles",
                     label: "Profiles",
-                    value: "\(plansStore.profiles.count)",
+                    value: "\(plansStore.profileCount)",
                     systemImage: "slider.horizontal.3"
                 ),
             ],

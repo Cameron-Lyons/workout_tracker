@@ -18,8 +18,8 @@ final class AppFlowBenchmarks: BenchmarkTestCase {
         )
         static let persistenceHydrationLoaderLoadStartupSnapshotLargeLibrary = BenchmarkThreshold(
             measuredIterationCount: 3,
-            averageSecondsUpperBound: 0.450,
-            maxSecondsUpperBound: 0.500
+            averageSecondsUpperBound: 0.120,
+            maxSecondsUpperBound: 0.150
         )
         static let persistenceHydrationLoaderLoadCompletedSessionHistoryLargeHistory = BenchmarkThreshold(
             measuredIterationCount: 3,

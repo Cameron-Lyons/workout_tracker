@@ -8,6 +8,8 @@ final class PlansStore {
         var catalog: [ExerciseCatalogItem]
         var plans: [Plan]
         var profiles: [ExerciseProfile]
+        var includesProfiles = true
+        var profileCount: Int? = nil
         var planSummaries: [PlanSummary]? = nil
         var includesFullPlanLibrary = true
     }
@@ -21,11 +23,13 @@ final class PlansStore {
     @ObservationIgnored private var profilesByExerciseID: [UUID: ExerciseProfile] = [:]
     @ObservationIgnored private var cachedTemplateReferences: [TemplateReference] = []
     @ObservationIgnored private var fullPlanLibraryLoadTask: Task<[Plan], Never>?
+    @ObservationIgnored private var hasLoadedProfiles = true
 
     var catalog: [ExerciseCatalogItem] = []
     var planSummaries: [PlanSummary] = []
     var plans: [Plan] = []
     var profiles: [ExerciseProfile] = []
+    var profileCount = 0
     var hasLoadedPlanLibrary = true
     var isLoadingPlanLibrary = false
 
@@ -37,8 +41,10 @@ final class PlansStore {
         catalog = snapshot.catalog
         plans = snapshot.plans
         profiles = snapshot.profiles
+        profileCount = snapshot.profileCount ?? snapshot.profiles.count
         planSummaries = snapshot.planSummaries ?? snapshot.plans.map(PlanSummary.init)
         loadedPlansByID = Dictionary(uniqueKeysWithValues: snapshot.plans.map { ($0.id, $0) })
+        hasLoadedProfiles = snapshot.includesProfiles
         hasLoadedPlanLibrary = snapshot.includesFullPlanLibrary
         isLoadingPlanLibrary = false
         fullPlanLibraryLoadTask = nil
@@ -54,7 +60,9 @@ final class PlansStore {
         planSummaries = []
         plans = []
         profiles = []
+        profileCount = 0
         loadedPlansByID = [:]
+        hasLoadedProfiles = true
         hasLoadedPlanLibrary = true
         isLoadingPlanLibrary = false
         rebuildCaches()
@@ -257,13 +265,16 @@ final class PlansStore {
     }
 
     func profile(for exerciseID: UUID) -> ExerciseProfile? {
-        profilesByExerciseID[exerciseID]
+        ensureProfilesLoaded()
+        return profilesByExerciseID[exerciseID]
     }
 
     func saveProfiles(_ updatedProfiles: [ExerciseProfile]) {
         guard !updatedProfiles.isEmpty else {
             return
         }
+
+        ensureProfilesLoaded()
 
         for profile in updatedProfiles {
             if let index = profiles.firstIndex(where: { $0.id == profile.id }) {
@@ -317,7 +328,8 @@ final class PlansStore {
     }
 
     var profileLookupByExerciseID: [UUID: ExerciseProfile] {
-        profilesByExerciseID
+        ensureProfilesLoaded()
+        return profilesByExerciseID
     }
 
     func updatePlanProgression(
@@ -456,6 +468,9 @@ final class PlansStore {
 
     private func rebuildProfileCaches() {
         profilesByExerciseID = Dictionary(uniqueKeysWithValues: profiles.map { ($0.exerciseID, $0) })
+        if hasLoadedProfiles {
+            profileCount = profiles.count
+        }
     }
 
     private func bumpCatalogRevision() {
@@ -535,6 +550,16 @@ final class PlansStore {
             }
         }
 
+        rebuildProfileCaches()
+    }
+
+    private func ensureProfilesLoaded() {
+        guard hasLoadedProfiles == false else {
+            return
+        }
+
+        profiles = persistenceController.loadProfiles()
+        hasLoadedProfiles = true
         rebuildProfileCaches()
     }
 }

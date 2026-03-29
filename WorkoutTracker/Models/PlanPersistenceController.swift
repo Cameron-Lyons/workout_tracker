@@ -151,4 +151,12 @@ final class PlanPersistenceController: @unchecked Sendable {
         context.autosaveEnabled = false
         return PlanRepository(modelContext: context).loadPlan(planID)
     }
+
+    func loadProfiles() -> [ExerciseProfile] {
+        flush()
+
+        let context = ModelContext(modelContainer)
+        context.autosaveEnabled = false
+        return PlanRepository(modelContext: context).loadProfiles()
+    }
 }

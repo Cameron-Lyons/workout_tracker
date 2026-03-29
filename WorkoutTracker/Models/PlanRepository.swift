@@ -214,6 +214,10 @@ final class PlanRepository: RepositoryBase {
         return records.compactMap(profile(from:))
     }
 
+    func loadProfileCount() -> Int {
+        (try? modelContext.fetchCount(FetchDescriptor<StoredExerciseProfile>())) ?? 0
+    }
+
     @discardableResult
     func saveProfiles(_ profiles: [ExerciseProfile]) -> Bool {
         persistProfiles(profiles, deleteMissing: true)
@@ -285,13 +289,17 @@ final class PlanRepository: RepositoryBase {
     }
 
     private func planSummary(from record: StoredPlan) -> PlanSummary {
-        PlanSummary(
+        let orderedTemplates = orderedRecordsIfNeeded(record.templates, by: \.orderIndex)
+        let includesBlockExerciseIDs = orderedTemplates.count == 2
+
+        return PlanSummary(
             id: record.id,
             name: record.name,
             createdAt: record.createdAt,
             pinnedTemplateID: record.pinnedTemplateID,
-            templates: orderedRecordsIfNeeded(record.templates, by: \.orderIndex)
-                .map(templateSummary(from:))
+            templates: orderedTemplates.map { template in
+                templateSummary(from: template, includeBlockExerciseIDs: includesBlockExerciseIDs)
+            }
         )
     }
 
@@ -311,7 +319,10 @@ final class PlanRepository: RepositoryBase {
         )
     }
 
-    private func templateSummary(from record: StoredTemplate) -> TemplateSummary {
+    private func templateSummary(
+        from record: StoredTemplate,
+        includeBlockExerciseIDs: Bool
+    ) -> TemplateSummary {
         TemplateSummary(
             id: record.id,
             name: record.name,
@@ -321,7 +332,9 @@ final class PlanRepository: RepositoryBase {
                 operation: "template weekdays for \(record.id.uuidString)"
             ) ?? [],
             lastStartedAt: record.lastStartedAt,
-            blockExerciseIDs: orderedRecordsIfNeeded(record.blocks, by: \.orderIndex).map(\.exerciseID)
+            blockExerciseIDs: includeBlockExerciseIDs
+                ? orderedRecordsIfNeeded(record.blocks, by: \.orderIndex).map(\.exerciseID)
+                : []
         )
     }
 

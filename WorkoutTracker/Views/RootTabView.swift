@@ -621,6 +621,8 @@ private struct OnboardingSetupView: View {
 }
 
 struct RootTabView: View {
+    @Environment(AppStore.self) private var appStore
+
     private enum Tab: String, Hashable {
         case today
         case plans
@@ -666,6 +668,9 @@ struct RootTabView: View {
                 }
         }
         .tint(AppColors.accent)
+        .task {
+            await appStore.preloadDeferredTabDataIfNeeded(priority: .utility)
+        }
         .onChange(of: selectedTab) { _, newValue in
             if newValue == .progress {
                 progressSelectionSignpost = PerformanceSignpost.begin("Progress Tab Selection")
