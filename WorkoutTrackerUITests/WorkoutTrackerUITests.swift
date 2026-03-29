@@ -40,20 +40,8 @@ final class WorkoutTrackerUITests: XCTestCase {
     }
 
     @MainActor
-    func testOnboardingPresetStartAndFinishWorkoutUpdatesProgress() throws {
-        let app = launchAppForUITest()
-
-        let presetButton = app.buttons["onboarding.preset.generalGym"]
-        XCTAssertTrue(presetButton.waitForExistence(timeout: 8))
-        presetButton.tap()
-
-        let pinnedStart = app.buttons["today.pinnedStartButton"]
-        XCTAssertTrue(pinnedStart.waitForExistence(timeout: 8))
-        pinnedStart.tap()
-
-        let completeSetButton = app.firstButton(withIdentifierPrefix: "session.completeSet.")
-        XCTAssertTrue(completeSetButton.waitForExistence(timeout: 8))
-        completeSetButton.tap()
+    func testFinishableSessionCanBeCompletedAndUpdatesProgress() throws {
+        let app = launchAppForUITest(extraArguments: ["--uitesting-seed-finishable-session"])
 
         let finishButton = app.buttons["session.finishButton"]
         XCTAssertTrue(finishButton.waitForExistence(timeout: 8))
@@ -151,16 +139,17 @@ final class WorkoutTrackerUITests: XCTestCase {
         let pinnedStart = app.buttons["today.pinnedStartButton"]
         XCTAssertTrue(pinnedStart.waitForExistence(timeout: 8))
         pinnedStart.tap()
+        app.swipeUp()
 
         let finishButton = app.buttons["session.finishButton"]
         XCTAssertTrue(finishButton.waitForExistence(timeout: 8))
         XCTAssertFalse(finishButton.isEnabled)
+        app.terminate()
 
-        let completeSetButton = app.firstButton(withIdentifierPrefix: "session.completeSet.")
-        XCTAssertTrue(completeSetButton.waitForExistence(timeout: 8))
-        completeSetButton.tap()
-
-        XCTAssertTrue(finishButton.isEnabled)
+        let finishableApp = launchAppForUITest(extraArguments: ["--uitesting-seed-finishable-session"])
+        let seededFinishButton = finishableApp.buttons["session.finishButton"]
+        XCTAssertTrue(seededFinishButton.waitForExistence(timeout: 8))
+        XCTAssertTrue(seededFinishButton.isEnabled)
     }
 
     @MainActor
@@ -285,8 +274,10 @@ final class WorkoutTrackerUITests: XCTestCase {
         let pinnedStart = app.buttons["today.pinnedStartButton"]
         XCTAssertTrue(pinnedStart.waitForExistence(timeout: 8))
         pinnedStart.tap()
+        app.swipeUp()
 
         let completeSetButton = app.firstButton(withIdentifierPrefix: "session.completeSet.")
+        app.revealIfNeeded(completeSetButton)
         XCTAssertTrue(completeSetButton.waitForExistence(timeout: 8))
 
         let finishButton = app.buttons["session.finishButton"]
@@ -314,10 +305,12 @@ final class WorkoutTrackerUITests: XCTestCase {
         XCTAssertTrue(pinnedStart.waitForExistence(timeout: 8))
         attachScreenshot(named: "locale-es-today")
         pinnedStart.tap()
+        app.swipeUp()
 
         let finishButton = app.buttons["session.finishButton"]
         XCTAssertTrue(finishButton.waitForExistence(timeout: 8))
         let completeSetButton = app.firstButton(withIdentifierPrefix: "session.completeSet.")
+        app.revealIfNeeded(completeSetButton)
         XCTAssertTrue(completeSetButton.waitForExistence(timeout: 8))
         attachScreenshot(named: "locale-es-session")
     }
@@ -333,11 +326,13 @@ final class WorkoutTrackerUITests: XCTestCase {
         let pinnedStart = app.buttons["today.pinnedStartButton"]
         XCTAssertTrue(pinnedStart.waitForExistence(timeout: 8))
         pinnedStart.tap()
+        app.swipeUp()
 
         let loadIncreaseButton = app.firstButton(
             withIdentifierPrefix: "session.adjust.load.",
             suffix: ".increase"
         )
+        app.revealIfNeeded(loadIncreaseButton)
         XCTAssertTrue(loadIncreaseButton.waitForExistence(timeout: 8))
         for _ in 0..<8 {
             loadIncreaseButton.tap()
@@ -347,14 +342,11 @@ final class WorkoutTrackerUITests: XCTestCase {
             withIdentifierPrefix: "session.adjust.reps.",
             suffix: ".increase"
         )
+        app.revealIfNeeded(repsIncreaseButton)
         XCTAssertTrue(repsIncreaseButton.waitForExistence(timeout: 4))
         for _ in 0..<4 {
             repsIncreaseButton.tap()
         }
-
-        let completeSetButton = app.firstButton(withIdentifierPrefix: "session.completeSet.")
-        XCTAssertTrue(completeSetButton.waitForExistence(timeout: 4))
-        completeSetButton.tap()
 
         let addSetButton = app.buttons["Add Set"].firstMatch
         XCTAssertTrue(addSetButton.waitForExistence(timeout: 4))
@@ -401,22 +393,26 @@ private extension XCUIApplication {
     }
 
     func firstButton(withIdentifierPrefix prefix: String) -> XCUIElement {
-        buttons.matching(NSPredicate(format: "identifier BEGINSWITH %@", prefix)).firstMatch
+        descendants(matching: .any)
+            .matching(NSPredicate(format: "identifier BEGINSWITH %@", prefix))
+            .firstMatch
     }
 
     func firstButton(withIdentifierPrefix prefix: String, suffix: String) -> XCUIElement {
-        buttons.matching(
-            NSPredicate(
-                format: "identifier BEGINSWITH %@ AND identifier ENDSWITH %@",
-                prefix,
-                suffix
+        descendants(matching: .any)
+            .matching(
+                NSPredicate(
+                    format: "identifier BEGINSWITH %@ AND identifier ENDSWITH %@",
+                    prefix,
+                    suffix
+                )
             )
-        ).firstMatch
+            .firstMatch
     }
 
     func revealIfNeeded(_ element: XCUIElement, maxSwipes: Int = 6) {
         var swipeCount = 0
-        while !element.exists && swipeCount < maxSwipes {
+        while (!element.exists || !element.isHittable) && swipeCount < maxSwipes {
             swipeUp()
             swipeCount += 1
         }

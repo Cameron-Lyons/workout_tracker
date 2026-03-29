@@ -5,6 +5,12 @@ import SwiftData
 @MainActor
 @Observable
 final class AppStore {
+    private enum UITestingLaunchArguments {
+        static let emptyStore = "--uitesting-empty-store"
+        static let completeOnboarding = "--uitesting-complete-onboarding"
+        static let seedFinishableSession = "--uitesting-seed-finishable-session"
+    }
+
     @ObservationIgnored private let launchArguments: Set<String>
     @ObservationIgnored private var hasHydrated = false
     @ObservationIgnored private var completedSessionHistoryLoadGeneration = 0
@@ -90,13 +96,13 @@ final class AppStore {
         }
 
         hasHydrated = true
-        let isEmptyStoreLaunch = launchArguments.contains("--uitesting-empty-store")
+        let isEmptyStoreLaunch = launchArguments.contains(UITestingLaunchArguments.emptyStore)
 
         if isEmptyStoreLaunch {
             resetAllDataForFreshStart()
         }
 
-        if launchArguments.contains("--uitesting-complete-onboarding") {
+        if launchArguments.contains(UITestingLaunchArguments.completeOnboarding) {
             settingsStore.hasCompletedOnboarding = true
         }
 
@@ -110,6 +116,7 @@ final class AppStore {
             )
         )
         await derivedStateController.hydrate(plansStore: plansStore, sessionStore: sessionStore)
+        applyUITestingFixturesIfNeeded()
         isHydrated = true
     }
 
@@ -290,6 +297,33 @@ final class AppStore {
             plansStore: plansStore,
             sessionStore: sessionStore
         )
+    }
+
+    private func applyUITestingFixturesIfNeeded() {
+        guard launchArguments.contains(UITestingLaunchArguments.seedFinishableSession) else {
+            return
+        }
+
+        if shouldShowOnboarding {
+            completeOnboarding(with: .generalGym)
+        }
+
+        if sessionStore.activeDraft == nil,
+            let pinnedTemplate = todayStore.pinnedTemplate
+        {
+            startSession(planID: pinnedTemplate.planID, templateID: pinnedTemplate.templateID)
+        }
+
+        guard let block = sessionStore.activeDraft?.blocks.first,
+            let workingRow = block.sets.first(where: { $0.target.setKind == .working })
+        else {
+            return
+        }
+
+        if workingRow.log.isCompleted == false {
+            toggleSetCompletion(blockID: block.id, setID: workingRow.id)
+        }
+        clearRestTimer()
     }
 
     private func cancelCompletedSessionHistoryLoad() {

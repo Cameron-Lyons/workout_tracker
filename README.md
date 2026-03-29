@@ -34,10 +34,10 @@ Native SwiftUI iPhone app for logging workouts with routines.
 
 ## Quality Checks
 - `swiftlint lint --config .swiftlint.yml`
-- `swift-format lint --recursive --configuration .swift-format WorkoutTracker WorkoutTrackerTests WorkoutTrackerUITests`
-- `swift-format format --in-place --recursive --configuration .swift-format WorkoutTracker WorkoutTrackerTests WorkoutTrackerUITests`
+- `swift-format lint --recursive --configuration .swift-format WorkoutTracker WorkoutTrackerTests WorkoutTrackerBenchmarks WorkoutTrackerUITests`
+- `swift-format format --in-place --recursive --configuration .swift-format WorkoutTracker WorkoutTrackerTests WorkoutTrackerBenchmarks WorkoutTrackerUITests`
 - `xcodebuild build -project "WorkoutTracker.xcodeproj" -scheme "WorkoutTracker" -destination "platform=iOS Simulator,name=iPhone 17"`
 - `xcodebuild test -project "WorkoutTracker.xcodeproj" -scheme "WorkoutTracker" -destination "platform=iOS Simulator,name=iPhone 17" -only-testing:WorkoutTrackerTests`
 - `xcodebuild test -project "WorkoutTracker.xcodeproj" -scheme "WorkoutTracker" -destination "platform=iOS Simulator,name=iPhone 17" -parallel-testing-enabled NO -only-testing:WorkoutTrackerUITests`
-- `xcodebuild test -project "WorkoutTracker.xcodeproj" -scheme "WorkoutTracker" -destination "platform=iOS Simulator,name=iPhone 17" -parallel-testing-enabled NO -only-testing:WorkoutTrackerTests/WorkoutBenchmarkTests`
-- GitHub Actions also runs dedicated benchmark coverage plus compact-phone and iPad layout smoke jobs, and uploads the benchmark/UI result bundles as artifacts for later inspection.
+- `./scripts/run-benchmarks.sh`
+- GitHub Actions also runs a dedicated benchmark scheme plus compact-phone and iPad layout smoke jobs, and uploads the benchmark/UI result bundles as artifacts for later inspection.

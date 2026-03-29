@@ -432,6 +432,32 @@ final class WorkoutStoreTests: XCTestCase {
     }
 
     @MainActor
+    func testHydrateIfNeededWithUITestingFinishableSessionSeedCreatesReadyToFinishDraft() async throws {
+        let store = makeStore(
+            launchArguments: [
+                "--uitesting-empty-store",
+                "--uitesting-seed-finishable-session",
+            ]
+        )
+
+        await store.hydrateIfNeeded()
+
+        let draft = try XCTUnwrap(store.sessionStore.activeDraft)
+        let firstBlock = try XCTUnwrap(draft.blocks.first)
+        let firstWorkingRow = try XCTUnwrap(firstBlock.sets.first(where: { $0.target.setKind == .working }))
+
+        XCTAssertFalse(store.shouldShowOnboarding)
+        XCTAssertTrue(store.sessionStore.isPresentingSession)
+        XCTAssertTrue(store.sessionStore.activeDraftProgress.canFinishWorkout)
+        XCTAssertEqual(store.sessionStore.activeDraftProgress.completedSetCount, 1)
+        XCTAssertTrue(firstWorkingRow.log.isCompleted)
+        XCTAssertNil(store.sessionStore.activeDraft?.restTimerEndsAt)
+        XCTAssertTrue(store.finishActiveSession())
+        XCTAssertEqual(store.sessionStore.completedSessions.count, 1)
+        XCTAssertEqual(store.progressStore.overview.totalSessions, 1)
+    }
+
+    @MainActor
     func testSessionMutationCommandsUndoAndPersistDraftChanges() async throws {
         let container = WorkoutModelContainerFactory.makeContainer(isStoredInMemoryOnly: true)
         let store = makeStore(container: container)
@@ -1271,6 +1297,105 @@ final class WorkoutStoreTests: XCTestCase {
     }
 
     @MainActor
+    func testDeferredDraftMutationsPersistAfterDebounceWithoutManualFlush() async throws {
+        let container = WorkoutModelContainerFactory.makeContainer(isStoredInMemoryOnly: true)
+        let context = ModelContext(container)
+        context.autosaveEnabled = false
+        let repository = SessionRepository(modelContext: context)
+        let persistenceController = SessionPersistenceControllerRegistry.controller(for: container)
+        let store = SessionStore(
+            repository: repository,
+            persistenceController: persistenceController
+        )
+        let draft = SessionDraft(
+            planID: nil,
+            templateID: UUID(),
+            templateNameSnapshot: "Bench Day",
+            blocks: []
+        )
+
+        store.beginSession(draft)
+        persistenceController.flush()
+
+        store.pushMutation(persistence: .deferred) { updatedDraft in
+            SessionEngine.updateSessionNotes("Debounced note", draft: &updatedDraft)
+        }
+
+        XCTAssertEqual(repository.loadActiveDraft()?.notes, "")
+
+        try await Task.sleep(nanoseconds: 700_000_000)
+        persistenceController.flush()
+
+        XCTAssertEqual(repository.loadActiveDraft()?.notes, "Debounced note")
+    }
+
+    @MainActor
+    func testCompletedSessionHistoryMergePrefersLocalCopiesAndResetsLoadingFlags() {
+        let container = WorkoutModelContainerFactory.makeContainer(isStoredInMemoryOnly: true)
+        let context = ModelContext(container)
+        context.autosaveEnabled = false
+        let store = SessionStore(
+            repository: SessionRepository(modelContext: context),
+            persistenceController: SessionPersistenceControllerRegistry.controller(for: container)
+        )
+        let duplicateSessionID = UUID()
+        let planID = UUID()
+        let templateID = UUID()
+        let earlierDate = Date(timeIntervalSince1970: 1_741_478_400)
+        let laterDate = earlierDate.addingTimeInterval(86_400)
+        let localSession = makeCompletedSession(
+            id: duplicateSessionID,
+            planID: planID,
+            templateID: templateID,
+            templateNameSnapshot: "Local Session",
+            date: laterDate
+        )
+        let remoteDuplicate = makeCompletedSession(
+            id: duplicateSessionID,
+            planID: planID,
+            templateID: templateID,
+            templateNameSnapshot: "Remote Session",
+            date: laterDate.addingTimeInterval(-60)
+        )
+        let earlierRemoteSession = makeCompletedSession(
+            planID: UUID(),
+            templateID: UUID(),
+            templateNameSnapshot: "Earlier Session",
+            date: earlierDate
+        )
+
+        store.hydrate(
+            with: SessionStore.HydrationSnapshot(
+                activeDraft: nil,
+                completedSessions: [localSession],
+                includesCompleteHistory: false
+            )
+        )
+
+        let initialRevision = store.completedSessionsRevision
+        XCTAssertFalse(store.hasLoadedCompletedSessionHistory)
+        XCTAssertTrue(store.isLoadingCompletedSessionHistory)
+
+        store.setCompletedSessionHistoryLoading(false)
+        XCTAssertFalse(store.isLoadingCompletedSessionHistory)
+
+        store.setCompletedSessionHistoryLoading(true)
+        XCTAssertTrue(store.isLoadingCompletedSessionHistory)
+
+        store.mergeCompletedSessionHistory([remoteDuplicate, earlierRemoteSession])
+
+        XCTAssertTrue(store.hasLoadedCompletedSessionHistory)
+        XCTAssertFalse(store.isLoadingCompletedSessionHistory)
+        XCTAssertEqual(store.completedSessionsRevision, initialRevision + 1)
+        XCTAssertEqual(store.completedSessions.map(\.templateNameSnapshot), ["Earlier Session", "Local Session"])
+        XCTAssertEqual(store.completedSessions.last?.id, duplicateSessionID)
+        XCTAssertEqual(store.completedSessions.last?.completedAt, laterDate)
+
+        store.setCompletedSessionHistoryLoading(true)
+        XCTAssertFalse(store.isLoadingCompletedSessionHistory)
+    }
+
+    @MainActor
     func testSessionStoreUndoRestoresBlockSessionAndFullDraftMutationsIncrementally() throws {
         let container = WorkoutModelContainerFactory.makeContainer(isStoredInMemoryOnly: true)
         let context = ModelContext(container)
@@ -1486,6 +1611,83 @@ final class WorkoutStoreTests: XCTestCase {
         XCTAssertLessThanOrEqual(chartSeries.markerPoints.count, 24)
         XCTAssertEqual(chartSeries.trendPoints.first?.sessionID, snapshot.exerciseSummaries.first?.points.first?.sessionID)
         XCTAssertEqual(chartSeries.trendPoints.last?.sessionID, snapshot.exerciseSummaries.first?.points.last?.sessionID)
+    }
+
+    @MainActor
+    func testProgressStoreRecordCompletedSessionRebuildsCachesAndKeepsSelectedExerciseSeriesSorted() throws {
+        let analytics = AnalyticsRepository()
+        let progressStore = ProgressStore()
+        let dayOne = Date(timeIntervalSince1970: 1_741_478_400)
+        let dayTwo = dayOne.addingTimeInterval(86_400)
+        let dayThree = dayTwo.addingTimeInterval(86_400)
+        let olderBenchSession = makeCompletedSession(
+            date: dayOne,
+            exerciseID: CatalogSeed.benchPress,
+            exerciseName: "Bench Press",
+            rows: [makeRow(kind: .working, weight: 185, reps: 5)]
+        )
+        let newerBenchSession = makeCompletedSession(
+            date: dayTwo,
+            exerciseID: CatalogSeed.benchPress,
+            exerciseName: "Bench Press",
+            rows: [makeRow(kind: .working, weight: 205, reps: 5)]
+        )
+        let laterSquatSession = makeCompletedSession(
+            date: dayThree,
+            exerciseID: CatalogSeed.backSquat,
+            exerciseName: "Back Squat",
+            rows: [makeRow(kind: .working, weight: 275, reps: 5)]
+        )
+        let catalogByID = [
+            CatalogSeed.backSquat: ExerciseCatalogItem(
+                id: CatalogSeed.backSquat,
+                name: "Back Squat",
+                category: .legs
+            ),
+            CatalogSeed.benchPress: ExerciseCatalogItem(
+                id: CatalogSeed.benchPress,
+                name: "Bench Press",
+                category: .chest
+            ),
+        ]
+        let sessionAnalytics = analytics.makeSessionAnalyticsSnapshot(
+            sessions: [newerBenchSession],
+            catalogByID: catalogByID,
+            now: dayThree
+        )
+
+        progressStore.apply(
+            analytics.makeProgressSnapshot(
+                sessionAnalytics: sessionAnalytics,
+                selectedExerciseID: nil
+            ),
+            completedSessions: [newerBenchSession]
+        )
+
+        progressStore.selectExercise(CatalogSeed.benchPress)
+        XCTAssertEqual(progressStore.selectedExerciseSummary?.points.map(\.date), [dayTwo])
+
+        progressStore.recordCompletedSession(
+            olderBenchSession,
+            completedSessions: [olderBenchSession, newerBenchSession, laterSquatSession],
+            analytics: analytics,
+            catalogByID: catalogByID,
+            finishSummary: nil,
+            payloads: analytics.sessionExercisePayloads(from: olderBenchSession)
+        )
+
+        let summary = try XCTUnwrap(progressStore.selectedExerciseSummary)
+        let chartSeries = try XCTUnwrap(progressStore.selectedExerciseChartSeries)
+
+        XCTAssertEqual(progressStore.selectedExerciseID, CatalogSeed.benchPress)
+        XCTAssertEqual(summary.displayName, "Bench Press")
+        XCTAssertEqual(summary.pointCount, 2)
+        XCTAssertEqual(summary.points.map(\.date), [dayOne, dayTwo])
+        XCTAssertEqual(chartSeries.trendPoints.map(\.date), [dayOne, dayTwo])
+        XCTAssertEqual(progressStore.workoutDays.count, 3)
+
+        progressStore.selectDay(dayOne)
+        XCTAssertEqual(progressStore.historySessions.map(\.completedAt), [dayOne])
     }
 
     func testExercisePickerSearchIndexMatchesAliasesAndDiacritics() {
@@ -1769,6 +1971,55 @@ final class WorkoutStoreTests: XCTestCase {
         XCTAssertEqual(store.todayStore.quickStartTemplates.first?.templateID, reference.templateID)
     }
 
+    func testTemplateReferenceSelectionQuickStartsPreferRecentUniqueTemplatesThenBackfill() throws {
+        let alternatingPlan = makeStartingStrengthPlan()
+        let dayA = try XCTUnwrap(alternatingPlan.templates.first)
+        let dayB = try XCTUnwrap(alternatingPlan.templates.last)
+        let accessoryTemplate = WorkoutTemplate(
+            name: "Accessory Day",
+            blocks: []
+        )
+        let accessoryPlan = Plan(
+            name: "Accessory",
+            pinnedTemplateID: accessoryTemplate.id,
+            templates: [accessoryTemplate]
+        )
+        let references = [
+            makeReference(plan: alternatingPlan, template: dayA),
+            makeReference(plan: alternatingPlan, template: dayB),
+            makeReference(plan: accessoryPlan, template: accessoryTemplate),
+        ]
+        let start = Date(timeIntervalSince1970: 1_741_478_400)
+        let sessions = [
+            makeCompletedSession(
+                planID: alternatingPlan.id,
+                templateID: dayA.id,
+                templateNameSnapshot: dayA.name,
+                date: start
+            ),
+            makeCompletedSession(
+                planID: alternatingPlan.id,
+                templateID: dayA.id,
+                templateNameSnapshot: dayA.name,
+                date: start.addingTimeInterval(86_400)
+            ),
+            makeCompletedSession(
+                planID: alternatingPlan.id,
+                templateID: dayB.id,
+                templateNameSnapshot: dayB.name,
+                date: start.addingTimeInterval(172_800)
+            ),
+        ]
+
+        let quickStarts = TemplateReferenceSelection.quickStarts(
+            references: references,
+            sessions: sessions,
+            limit: 3
+        )
+
+        XCTAssertEqual(quickStarts.map(\.templateID), [dayB.id, dayA.id, accessoryTemplate.id])
+    }
+
     @MainActor
     private func makeStore(
         container: ModelContainer = WorkoutModelContainerFactory.makeContainer(isStoredInMemoryOnly: true),
@@ -1915,6 +2166,25 @@ final class WorkoutStoreTests: XCTestCase {
                     sets: rows
                 )
             ]
+        )
+    }
+
+    private func makeCompletedSession(
+        id: UUID = UUID(),
+        planID: UUID? = UUID(),
+        templateID: UUID,
+        templateNameSnapshot: String,
+        date: Date,
+        blocks: [CompletedSessionBlock] = []
+    ) -> CompletedSession {
+        CompletedSession(
+            id: id,
+            planID: planID,
+            templateID: templateID,
+            templateNameSnapshot: templateNameSnapshot,
+            startedAt: date.addingTimeInterval(-3_600),
+            completedAt: date,
+            blocks: blocks
         )
     }
 

@@ -50,6 +50,21 @@ targets:
         TEST_HOST: "$(BUILT_PRODUCTS_DIR)/WorkoutTracker.app/WorkoutTracker"
         BUNDLE_LOADER: "$(TEST_HOST)"
 
+  WorkoutTrackerBenchmarks:
+    type: bundle.unit-test
+    platform: iOS
+    deploymentTarget: "26.2"
+    sources:
+      - path: WorkoutTrackerBenchmarks
+    dependencies:
+      - target: WorkoutTracker
+    settings:
+      base:
+        PRODUCT_NAME: WorkoutTrackerBenchmarks
+        GENERATE_INFOPLIST_FILE: YES
+        TEST_HOST: "$(BUILT_PRODUCTS_DIR)/WorkoutTracker.app/WorkoutTracker"
+        BUNDLE_LOADER: "$(TEST_HOST)"
+
   WorkoutTrackerUITests:
     type: bundle.ui-testing
     platform: iOS
@@ -79,3 +94,12 @@ schemes:
         - name: WorkoutTrackerUITests
     archive:
       config: Release
+  WorkoutTrackerBenchmarks:
+    build:
+      targets:
+        WorkoutTracker: all
+    test:
+      config: Debug
+      gatherCoverageData: false
+      targets:
+        - name: WorkoutTrackerBenchmarks
