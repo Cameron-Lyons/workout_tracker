@@ -137,42 +137,8 @@ enum AppAppearance {
 
 struct AppBackground: View {
     var body: some View {
-        ZStack {
-            AppColors.canvasBottom
-
-            VStack(spacing: 0) {
-                Rectangle()
-                    .fill(AppColors.canvasTop)
-                    .frame(height: 172)
-                Spacer(minLength: 0)
-            }
-
-            VStack(spacing: 0) {
-                Rectangle()
-                    .fill(AppColors.strokeStrong.opacity(0.7))
-                    .frame(height: 1)
-                Spacer(minLength: 0)
-            }
-
-            HStack(spacing: 0) {
-                Rectangle()
-                    .fill(AppColors.surfaceStrong.opacity(0.7))
-                    .frame(width: 8)
-                Spacer(minLength: 0)
-            }
-
-            Rectangle()
-                .stroke(AppColors.strokeStrong.opacity(0.22), lineWidth: 1)
-                .frame(width: 172, height: 172)
-                .rotationEffect(.degrees(12))
-                .offset(x: 120, y: 260)
-
-            Rectangle()
-                .stroke(AppColors.stroke.opacity(0.46), lineWidth: 1)
-                .frame(width: 96, height: 96)
-                .offset(x: -140, y: -248)
-        }
-        .ignoresSafeArea()
+        AppColors.canvasBottom
+            .ignoresSafeArea()
     }
 }
 
@@ -183,30 +149,22 @@ private struct AppSurfaceModifier: ViewModifier {
 
     func body(content: Content) -> some View {
         content
-            .background {
-                RoundedRectangle(cornerRadius: cornerRadius, style: .continuous)
-                    .fill(AppColors.surface)
-                    .overlay {
-                        RoundedRectangle(cornerRadius: cornerRadius, style: .continuous)
-                            .fill(AppColors.surfaceStrong.opacity(0.38))
-                            .padding(1)
-                    }
-            }
-            .overlay {
-                ZStack(alignment: .topLeading) {
-                    RoundedRectangle(cornerRadius: cornerRadius, style: .continuous)
-                        .stroke(AppColors.strokeStrong, lineWidth: 1)
+            .overlay(alignment: .top) {
+                ZStack(alignment: .leading) {
+                    Rectangle()
+                        .fill(AppColors.stroke.opacity(0.34))
+                        .frame(height: 1)
 
-                    if let tone {
-                        Rectangle()
-                            .fill(tone.accent)
-                            .frame(width: 88, height: 4)
-                            .padding(1)
-                            .clipShape(RoundedRectangle(cornerRadius: 2, style: .continuous))
-                    }
+                    Rectangle()
+                        .fill((tone?.accent ?? AppColors.strokeStrong).opacity(0.92))
+                        .frame(width: 72, height: 2)
                 }
             }
-            .shadow(color: .black.opacity(shadowOpacity), radius: 8, x: 0, y: 3)
+            .overlay(alignment: .bottom) {
+                Rectangle()
+                    .fill(AppColors.stroke.opacity(0.74))
+                    .frame(height: 1)
+            }
     }
 }
 
@@ -217,13 +175,12 @@ private struct AppInputFieldModifier: ViewModifier {
             .padding(.vertical, 10)
             .background {
                 RoundedRectangle(cornerRadius: 10, style: .continuous)
-                    .fill(AppColors.input)
+                    .fill(AppColors.input.opacity(0.28))
             }
             .overlay(
                 RoundedRectangle(cornerRadius: 10, style: .continuous)
-                    .stroke(AppColors.strokeStrong.opacity(0.88), lineWidth: 1)
+                    .stroke(AppColors.strokeStrong.opacity(0.62), lineWidth: 1)
             )
-            .glassEffect(.regular.tint(AppColors.glassTint).interactive(), in: .rect(cornerRadius: 10))
     }
 }
 
@@ -236,10 +193,6 @@ private struct AppInsetCardModifier: ViewModifier {
 
     func body(content: Content) -> some View {
         content
-            .background(
-                RoundedRectangle(cornerRadius: cornerRadius, style: .continuous)
-                    .fill(fill ?? AppColors.surfaceStrong.opacity(fillOpacity))
-            )
             .overlay(
                 RoundedRectangle(cornerRadius: cornerRadius, style: .continuous)
                     .stroke(border ?? AppColors.strokeStrong.opacity(borderOpacity), lineWidth: 1)
@@ -313,79 +266,45 @@ struct AppHeroCard: View {
     var tone: AppToneStyle = .base
 
     var body: some View {
-        VStack(alignment: .leading, spacing: 18) {
-            HStack(alignment: .top, spacing: 16) {
-                VStack(alignment: .leading, spacing: 8) {
-                    if let eyebrow, !eyebrow.isEmpty {
-                        Text(eyebrow.uppercased())
-                            .font(.caption.weight(.black))
-                            .tracking(1.1)
-                            .foregroundStyle(tone.accent)
-                    }
-
-                    Text(title)
-                        .font(.system(size: 29, weight: .black))
-                        .foregroundStyle(AppColors.textPrimary)
-                        .multilineTextAlignment(.leading)
-                        .fixedSize(horizontal: false, vertical: true)
-
-                    Text(subtitle)
-                        .font(.subheadline.weight(.medium))
-                        .foregroundStyle(AppColors.textSecondary)
-                        .multilineTextAlignment(.leading)
-                        .fixedSize(horizontal: false, vertical: true)
-                }
-                .layoutPriority(1)
-
-                Spacer(minLength: 12)
-
-                ZStack {
-                    Rectangle()
-                        .fill(tone.softFill.opacity(0.82))
-
-                    Rectangle()
-                        .stroke(tone.softBorder, lineWidth: 1)
-
-                    Image(systemName: systemImage)
-                        .font(.system(size: 23, weight: .black))
+        VStack(alignment: .leading, spacing: 16) {
+            HStack(alignment: .center, spacing: 10) {
+                if let eyebrow, !eyebrow.isEmpty {
+                    Text(eyebrow.uppercased())
+                        .font(.caption.weight(.black))
+                        .tracking(1.1)
                         .foregroundStyle(tone.accent)
                 }
-                .frame(width: AppCardMetrics.heroIconSize, height: AppCardMetrics.heroIconSize)
+
+                Spacer(minLength: 0)
+
+                Image(systemName: systemImage)
+                    .font(.headline.weight(.black))
+                    .foregroundStyle(tone.accent)
             }
 
-            if !metrics.isEmpty {
-                VStack(spacing: 0) {
-                    Rectangle()
-                        .fill(AppColors.strokeStrong.opacity(0.7))
-                        .frame(height: 1)
+            Text(title)
+                .font(.system(size: 29, weight: .black))
+                .foregroundStyle(AppColors.textPrimary)
+                .multilineTextAlignment(.leading)
+                .fixedSize(horizontal: false, vertical: true)
 
-                    LazyVGrid(
-                        columns: [
-                            GridItem(.flexible(minimum: 110), spacing: 0),
-                            GridItem(.flexible(minimum: 110), spacing: 0),
-                        ],
-                        alignment: .leading,
-                        spacing: 0
-                    ) {
-                        ForEach(Array(metrics.enumerated()), id: \.element.id) { index, metric in
-                            AppHeroMetricCell(metric: metric, tone: tone)
-                                .padding(.horizontal, 12)
-                                .padding(.vertical, 12)
-                                .overlay(alignment: .top) {
-                                    if index >= 2 {
-                                        Rectangle()
-                                            .fill(AppColors.stroke.opacity(0.82))
-                                            .frame(height: 1)
-                                    }
-                                }
-                                .overlay(alignment: .leading) {
-                                    if index.isMultiple(of: 2) == false {
-                                        Rectangle()
-                                            .fill(AppColors.stroke.opacity(0.82))
-                                            .frame(width: 1)
-                                    }
-                                }
-                        }
+            Text(subtitle)
+                .font(.subheadline.weight(.medium))
+                .foregroundStyle(AppColors.textSecondary)
+                .multilineTextAlignment(.leading)
+                .fixedSize(horizontal: false, vertical: true)
+
+            if !metrics.isEmpty {
+                LazyVGrid(
+                    columns: [
+                        GridItem(.flexible(minimum: 110), spacing: 12),
+                        GridItem(.flexible(minimum: 110), spacing: 12),
+                    ],
+                    alignment: .leading,
+                    spacing: 12
+                ) {
+                    ForEach(metrics) { metric in
+                        AppHeroMetricCell(metric: metric, tone: tone)
                     }
                 }
             }
@@ -429,37 +348,25 @@ struct AppEmptyStateCard: View {
 
     var body: some View {
         VStack(alignment: .leading, spacing: 16) {
-            HStack(alignment: .top, spacing: 16) {
-                ZStack {
-                    Rectangle()
-                        .fill(tone.softFill.opacity(0.82))
+            Image(systemName: systemImage)
+                .font(.title2.weight(.black))
+                .foregroundStyle(tone.accent)
 
-                    Rectangle()
-                        .stroke(tone.softBorder, lineWidth: 1)
+            VStack(alignment: .leading, spacing: 8) {
+                Text(title)
+                    .font(.system(size: 28, weight: .black))
+                    .foregroundStyle(AppColors.textPrimary)
+                    .multilineTextAlignment(.leading)
+                    .fixedSize(horizontal: false, vertical: true)
 
-                    Image(systemName: systemImage)
-                        .font(.system(size: 28, weight: .black))
-                        .foregroundStyle(tone.accent)
-                }
-                .frame(width: AppCardMetrics.emptyStateIconSize, height: AppCardMetrics.emptyStateIconSize)
-
-                VStack(alignment: .leading, spacing: 8) {
-                    Text(title)
-                        .font(.system(size: 28, weight: .black))
-                        .foregroundStyle(AppColors.textPrimary)
-                        .multilineTextAlignment(.leading)
-                        .fixedSize(horizontal: false, vertical: true)
-
-                    Text(message)
-                        .font(.subheadline.weight(.medium))
-                        .foregroundStyle(AppColors.textSecondary)
-                        .multilineTextAlignment(.leading)
-                        .fixedSize(horizontal: false, vertical: true)
-                }
-                .layoutPriority(1)
+                Text(message)
+                    .font(.subheadline.weight(.medium))
+                    .foregroundStyle(AppColors.textSecondary)
+                    .multilineTextAlignment(.leading)
+                    .fixedSize(horizontal: false, vertical: true)
             }
         }
-        .padding(24)
+        .padding(.vertical, 18)
         .frame(maxWidth: .infinity, alignment: .leading)
         .appFeatureSurface(tone: tone)
     }
@@ -592,7 +499,7 @@ struct MetricBadge: View {
                 .foregroundStyle(AppColors.textPrimary)
         }
         .padding(.horizontal, 10)
-        .padding(.vertical, 7)
+        .padding(.vertical, 8)
         .appInsetCard(cornerRadius: 8, borderOpacity: 0.8, fill: AppColors.surfaceStrong.opacity(0.9), border: tone.softBorder)
     }
 }

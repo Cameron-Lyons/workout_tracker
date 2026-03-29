@@ -812,12 +812,8 @@ private struct ActiveSessionFooterView: View {
                 }
             }
         }
-        .padding(14)
-        .background {
-            RoundedRectangle(cornerRadius: 18, style: .continuous)
-                .fill(AppColors.chrome.opacity(0.20))
-        }
-        .glassEffect(.regular.tint(AppColors.glassTint), in: .rect(cornerRadius: 18))
+        .padding(.vertical, 10)
+        .appSectionFrame(tone: restTimerPresentation.tone, topPadding: 12, bottomPadding: 0)
     }
 }
 

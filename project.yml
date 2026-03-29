@@ -1,7 +1,7 @@
 name: WorkoutTracker
 options:
   minimumXcodeGenVersion: 2.44.1
-  xcodeVersion: "26.3"
+  xcodeVersion: "26.4"
 settings:
   base:
     PRODUCT_BUNDLE_IDENTIFIER: com.cam.workouttracker
@@ -25,10 +25,11 @@ targets:
         excludes:
           - Info.plist
           - Resources
-    resources:
       - path: WorkoutTracker/Resources
+        buildPhase: resources
     settings:
       base:
+        DEVELOPMENT_TEAM: W9YS23J6FT
         PRODUCT_NAME: WorkoutTracker
         INFOPLIST_FILE: WorkoutTracker/Info.plist
         GENERATE_INFOPLIST_FILE: NO

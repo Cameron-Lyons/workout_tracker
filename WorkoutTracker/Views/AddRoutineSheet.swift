@@ -46,40 +46,6 @@ struct OnboardingView: View {
             AppBackground()
             ScrollView {
                 LazyVStack(spacing: 18) {
-                    AppHeroCard(
-                        eyebrow: "WorkoutTracker",
-                        title: "Choose your starting setup",
-                        subtitle: "Install a preset pack for a faster launch, or start blank and build your own system from Plans.",
-                        systemImage: "sparkles.rectangle.stack",
-                        metrics: [
-                            AppHeroMetric(
-                                id: "packs",
-                                label: "Preset Packs",
-                                value: "\(presetPacks.count)",
-                                systemImage: "shippingbox"
-                            ),
-                            AppHeroMetric(
-                                id: "blank",
-                                label: "Blank Setup",
-                                value: "Available",
-                                systemImage: "square.and.pencil"
-                            ),
-                            AppHeroMetric(
-                                id: "progress",
-                                label: "Progress",
-                                value: "PRs + trends",
-                                systemImage: "chart.line.uptrend.xyaxis"
-                            ),
-                            AppHeroMetric(
-                                id: "session",
-                                label: "Session",
-                                value: "Autosaved",
-                                systemImage: "square.and.arrow.down"
-                            ),
-                        ],
-                        tone: .plans
-                    )
-
                     VStack(alignment: .leading, spacing: 12) {
                         AppSectionHeader(
                             title: "Choose A Path",
