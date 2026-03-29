@@ -19,6 +19,7 @@ final class AppStore {
     @ObservationIgnored private let derivedStateController: AppDerivedStateController
     @ObservationIgnored private let planCoordinator: AppPlanCoordinator
     @ObservationIgnored private let sessionCoordinator: AppSessionCoordinator
+    @ObservationIgnored private let restTimerLiveActivityManager: RestTimerLiveActivityManager
 
     let settingsStore: SettingsStore
     let plansStore: PlansStore
@@ -59,6 +60,12 @@ final class AppStore {
             todayStore: todayStore,
             progressStore: progressStore
         )
+        let restTimerLiveActivityManager = RestTimerLiveActivityManager()
+        sessionStore.onActiveDraftLiveActivityStateChanged = { [restTimerLiveActivityManager] draft in
+            Task { @MainActor in
+                await restTimerLiveActivityManager.sync(with: draft)
+            }
+        }
 
         self.settingsStore = settingsStore
         self.plansStore = plansStore
@@ -68,6 +75,7 @@ final class AppStore {
         self.hydrationLoader = hydrationLoader
         persistenceStartupIssue = WorkoutModelContainerFactory.consumeStartupIssue()
         self.derivedStateController = derivedStateController
+        self.restTimerLiveActivityManager = restTimerLiveActivityManager
         self.planCoordinator = AppPlanCoordinator(
             settingsStore: settingsStore,
             plansStore: plansStore,
@@ -126,7 +134,7 @@ final class AppStore {
     }
 
     func hydrateCompletedSessionHistoryIfNeeded(priority: TaskPriority = .utility) async {
-        guard hasHydrated, sessionStore.hasLoadedCompletedSessionHistory == false else {
+        guard isHydrated, sessionStore.hasLoadedCompletedSessionHistory == false else {
             return
         }
 
@@ -182,6 +190,14 @@ final class AppStore {
 
     func adjustSetReps(blockID: UUID, setID: UUID, delta: Int) {
         sessionCoordinator.adjustSetReps(blockID: blockID, setID: setID, delta: delta)
+    }
+
+    func updateSetWeight(blockID: UUID, setID: UUID, weight: Double) {
+        sessionCoordinator.updateSetWeight(blockID: blockID, setID: setID, weight: weight)
+    }
+
+    func updateSetReps(blockID: UUID, setID: UUID, reps: Int) {
+        sessionCoordinator.updateSetReps(blockID: blockID, setID: setID, reps: reps)
     }
 
     func addSet(to blockID: UUID) {
@@ -269,10 +285,19 @@ final class AppStore {
 
     @discardableResult
     func refreshDerivedStores() async -> Bool {
-        await derivedStateController.refreshDerivedStores(
+        guard isHydrated else {
+            return false
+        }
+
+        return await derivedStateController.refreshDerivedStores(
             plansStore: plansStore,
             sessionStore: sessionStore
         )
+    }
+
+    @discardableResult
+    func loadPlanLibraryIfNeeded(priority: TaskPriority = .userInitiated) async -> Bool {
+        await plansStore.loadPlanLibraryIfNeeded(priority: priority)
     }
 
     func refreshTodayStore() {
@@ -285,6 +310,13 @@ final class AppStore {
 
     func flushPendingPlanPersistence() {
         plansStore.flushPendingPersistence()
+    }
+
+    func syncRestTimerLiveActivity() {
+        let draft = sessionStore.activeDraft
+        Task { @MainActor in
+            await restTimerLiveActivityManager.sync(with: draft)
+        }
     }
 
     private func applyCompletedSessionHistoryIfNeeded(_ sessions: [CompletedSession]) async {

@@ -39,8 +39,10 @@ actor PersistenceHydrationLoader {
         return AppHydrationSnapshot(
             plans: PlansStore.HydrationSnapshot(
                 catalog: catalog,
-                plans: planRepository.loadPlans(),
-                profiles: planRepository.loadProfiles()
+                plans: [],
+                profiles: planRepository.loadProfiles(),
+                planSummaries: planRepository.loadPlanSummaries(),
+                includesFullPlanLibrary: false
             ),
             sessions: SessionStore.HydrationSnapshot(
                 activeDraft: sessionRepository.loadActiveDraft(),

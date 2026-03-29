@@ -68,7 +68,7 @@ final class AppDerivedStateController {
         let interval = PerformanceSignpost.begin("Derived Store Refresh")
         defer { PerformanceSignpost.end(interval) }
 
-        let plans = plansStore.plans
+        let planSummaries = plansStore.planSummaries
         let references = plansStore.templateReferences()
         let sessions = sessionStore.completedSessions
         let selectedExerciseID = progressStore.selectedExerciseID
@@ -82,7 +82,7 @@ final class AppDerivedStateController {
 
         if shouldRefreshToday {
             let todaySnapshot = analytics.makeTodaySnapshot(
-                plans: plans,
+                planSummaries: planSummaries,
                 references: references,
                 sessions: sessions,
                 sessionAnalytics: sessionAnalytics,
@@ -132,7 +132,7 @@ final class AppDerivedStateController {
 
         todayStore.apply(
             analytics.makeTodaySnapshot(
-                plans: plansStore.plans,
+                planSummaries: plansStore.planSummaries,
                 references: plansStore.templateReferences(),
                 sessions: sessions,
                 sessionAnalytics: sessionAnalytics,
@@ -231,7 +231,7 @@ final class AppDerivedStateController {
         let references = plansStore.templateReferences()
         todayStore.recordCompletedSession(
             session,
-            plans: plansStore.plans,
+            planSummaries: plansStore.planSummaries,
             references: references,
             allSessions: sessionStore.completedSessions,
             finishSummary: finishSummary
@@ -583,6 +583,28 @@ final class AppSessionCoordinator {
             persistence: .deferred
         ) { draft, context in
             SessionEngine.adjustReps(by: delta, setID: setID, in: blockID, draft: &draft, context: context)
+        }
+    }
+
+    func updateSetWeight(blockID: UUID, setID: UUID, weight: Double) {
+        sessionStore.pushMutation(
+            blockID: blockID,
+            setID: setID,
+            undoStrategy: .block(blockID),
+            persistence: .deferred
+        ) { draft, context in
+            SessionEngine.updateWeight(to: weight, setID: setID, in: blockID, draft: &draft, context: context)
+        }
+    }
+
+    func updateSetReps(blockID: UUID, setID: UUID, reps: Int) {
+        sessionStore.pushMutation(
+            blockID: blockID,
+            setID: setID,
+            undoStrategy: .block(blockID),
+            persistence: .deferred
+        ) { draft, context in
+            SessionEngine.updateReps(to: reps, setID: setID, in: blockID, draft: &draft, context: context)
         }
     }
 

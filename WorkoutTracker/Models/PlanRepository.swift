@@ -124,6 +124,19 @@ final class PlanRepository: RepositoryBase {
         return records.compactMap(plan(from:))
     }
 
+    func loadPlanSummaries() -> [PlanSummary] {
+        let descriptor = FetchDescriptor<StoredPlan>(sortBy: [SortDescriptor(\.createdAt)])
+        let records = (try? modelContext.fetch(descriptor)) ?? []
+        return records.map(planSummary(from:))
+    }
+
+    func loadPlan(_ planID: UUID) -> Plan? {
+        let descriptor = FetchDescriptor<StoredPlan>(
+            predicate: #Predicate<StoredPlan> { $0.id == planID }
+        )
+        return (try? modelContext.fetch(descriptor))?.first.flatMap(plan(from:))
+    }
+
     @discardableResult
     func savePlans(_ plans: [Plan]) -> Bool {
         persistPlans(plans, deleteMissing: true)
@@ -268,6 +281,17 @@ final class PlanRepository: RepositoryBase {
             pinnedTemplateID: record.pinnedTemplateID,
             templates: orderedRecordsIfNeeded(record.templates, by: \.orderIndex)
                 .compactMap(template(from:))
+            )
+    }
+
+    private func planSummary(from record: StoredPlan) -> PlanSummary {
+        PlanSummary(
+            id: record.id,
+            name: record.name,
+            createdAt: record.createdAt,
+            pinnedTemplateID: record.pinnedTemplateID,
+            templates: orderedRecordsIfNeeded(record.templates, by: \.orderIndex)
+                .map(templateSummary(from:))
         )
     }
 
@@ -284,6 +308,20 @@ final class PlanRepository: RepositoryBase {
             blocks: orderedRecordsIfNeeded(record.blocks, by: \.orderIndex)
                 .compactMap(templateBlock(from:)),
             lastStartedAt: record.lastStartedAt
+        )
+    }
+
+    private func templateSummary(from record: StoredTemplate) -> TemplateSummary {
+        TemplateSummary(
+            id: record.id,
+            name: record.name,
+            scheduledWeekdays: decode(
+                [Weekday].self,
+                from: record.scheduledWeekdaysData,
+                operation: "template weekdays for \(record.id.uuidString)"
+            ) ?? [],
+            lastStartedAt: record.lastStartedAt,
+            blockExerciseIDs: orderedRecordsIfNeeded(record.blocks, by: \.orderIndex).map(\.exerciseID)
         )
     }
 

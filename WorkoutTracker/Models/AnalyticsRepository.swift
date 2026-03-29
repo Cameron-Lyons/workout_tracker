@@ -257,7 +257,7 @@ struct AnalyticsRepository: Sendable {
     }
 
     func makeDerivedStoreSnapshot(
-        plans: [Plan],
+        planSummaries: [PlanSummary],
         references: [TemplateReference],
         sessions: [CompletedSession],
         sessionAnalytics: SessionAnalyticsSnapshot,
@@ -266,7 +266,7 @@ struct AnalyticsRepository: Sendable {
     ) -> DerivedStoreSnapshot {
         return DerivedStoreSnapshot(
             today: makeTodaySnapshot(
-                plans: plans,
+                planSummaries: planSummaries,
                 references: references,
                 sessions: sessions,
                 sessionAnalytics: sessionAnalytics,
@@ -280,14 +280,14 @@ struct AnalyticsRepository: Sendable {
     }
 
     func makeTodaySnapshot(
-        plans: [Plan],
+        planSummaries: [PlanSummary],
         references: [TemplateReference],
         sessions: [CompletedSession],
         sessionAnalytics: SessionAnalyticsSnapshot,
         now: Date = .now
     ) -> TodaySnapshot {
         let selection = TemplateReferenceSelection.todaySelection(
-            plans: plans,
+            planSummaries: planSummaries,
             references: references,
             sessions: sessions,
             now: now

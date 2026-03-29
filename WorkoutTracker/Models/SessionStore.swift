@@ -139,6 +139,7 @@ final class SessionStore {
 
     var activeDraft: SessionDraft?
     private(set) var activeDraftProgress = ActiveSessionProgress(draft: nil)
+    @ObservationIgnored var onActiveDraftLiveActivityStateChanged: ((SessionDraft?) -> Void)?
     var completedSessions: [CompletedSession] = []
     private(set) var hasLoadedCompletedSessionHistory = true
     private(set) var isLoadingCompletedSessionHistory = false
@@ -418,15 +419,30 @@ final class SessionStore {
     }
 
     private func updateActiveDraft(_ draft: SessionDraft?, invalidateIndexCache: Bool = false) {
+        let previousDraft = activeDraft
         activeDraft = draft
         activeDraftProgress = ActiveSessionProgress(draft: draft)
         if invalidateIndexCache {
             rebuildActiveDraftIndexCache()
         }
+
+        guard liveActivityState(for: previousDraft) != liveActivityState(for: draft) else {
+            return
+        }
+
+        onActiveDraftLiveActivityStateChanged?(draft)
     }
 
     private func rebuildActiveDraftIndexCache() {
         activeDraftIndexCache = ActiveDraftIndexCache(draft: activeDraft)
+    }
+
+    private func liveActivityState(for draft: SessionDraft?) -> (UUID?, String?, Date?) {
+        (
+            draft?.id,
+            draft?.templateNameSnapshot,
+            draft?.restTimerEndsAt
+        )
     }
 
     private func resolvedBlockIndex(

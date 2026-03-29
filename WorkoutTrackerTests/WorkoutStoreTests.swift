@@ -85,6 +85,36 @@ final class WorkoutStoreTests: XCTestCase {
     }
 
     @MainActor
+    func testStartupHydrationDefersFullPlanLibraryButKeepsReferencesUsable() async throws {
+        let container = WorkoutModelContainerFactory.makeContainer(isStoredInMemoryOnly: true)
+        let seededStore = makeStore(container: container)
+        await seededStore.hydrateIfNeeded()
+        seededStore.completeOnboarding(with: nil)
+
+        let plan = makeSingleTemplatePlan(
+            name: "Deferred Plan",
+            templateName: "Upper 1",
+            store: seededStore,
+            weight: 185
+        )
+        seededStore.savePlan(plan)
+        seededStore.flushPendingPlanPersistence()
+
+        let rehydratedStore = makeStore(container: container)
+        await rehydratedStore.hydrateIfNeeded()
+
+        XCTAssertFalse(rehydratedStore.plansStore.hasLoadedPlanLibrary)
+        XCTAssertEqual(rehydratedStore.plansStore.planCount, 1)
+        XCTAssertEqual(rehydratedStore.plansStore.templateReferenceCount, 1)
+
+        let loadedPlan = try XCTUnwrap(rehydratedStore.plansStore.plan(for: plan.id))
+        let templateID = try XCTUnwrap(loadedPlan.templates.first?.id)
+        rehydratedStore.startSession(planID: loadedPlan.id, templateID: templateID)
+
+        XCTAssertEqual(rehydratedStore.sessionStore.activeDraft?.templateNameSnapshot, "Upper 1")
+    }
+
+    @MainActor
     func testEmptySessionDoesNotFinishOrPersist() async throws {
         let store = makeStore()
         await store.hydrateIfNeeded()
@@ -1007,7 +1037,7 @@ final class WorkoutStoreTests: XCTestCase {
             now: now
         )
         let combined = analytics.makeDerivedStoreSnapshot(
-            plans: [plan],
+            planSummaries: [PlanSummary(plan: plan)],
             references: references,
             sessions: sessions,
             sessionAnalytics: sessionAnalytics,
@@ -1015,7 +1045,7 @@ final class WorkoutStoreTests: XCTestCase {
             now: now
         )
         let today = analytics.makeTodaySnapshot(
-            plans: [plan],
+            planSummaries: [PlanSummary(plan: plan)],
             references: references,
             sessions: sessions,
             sessionAnalytics: sessionAnalytics,
@@ -1376,6 +1406,73 @@ final class WorkoutStoreTests: XCTestCase {
         persistenceController.flush()
 
         XCTAssertEqual(repository.loadActiveDraft()?.notes, "Debounced note")
+    }
+
+    @MainActor
+    func testSessionStoreOnlyNotifiesLiveActivityObserverForTimerRelevantChanges() throws {
+        let container = WorkoutModelContainerFactory.makeContainer(isStoredInMemoryOnly: true)
+        let context = ModelContext(container)
+        context.autosaveEnabled = false
+        let repository = SessionRepository(modelContext: context)
+        let store = SessionStore(
+            repository: repository,
+            persistenceController: SessionPersistenceControllerRegistry.controller(for: container)
+        )
+
+        let target = SetTarget(
+            setKind: .working,
+            targetWeight: 185,
+            repRange: RepRange(5, 5)
+        )
+        let row = SessionSetRow(target: target)
+        let block = SessionBlock(
+            exerciseID: CatalogSeed.benchPress,
+            exerciseNameSnapshot: "Bench Press",
+            restSeconds: 90,
+            progressionRule: .manual,
+            sets: [row]
+        )
+        let draft = SessionDraft(
+            planID: nil,
+            templateID: UUID(),
+            templateNameSnapshot: "Bench Day",
+            blocks: [block]
+        )
+
+        var observedDrafts: [SessionDraft?] = []
+        store.onActiveDraftLiveActivityStateChanged = { observedDrafts.append($0) }
+
+        store.beginSession(draft)
+        observedDrafts.removeAll()
+
+        store.pushMutation(persistence: .deferred) { updatedDraft in
+            SessionEngine.adjustWeight(by: 5, setID: row.id, in: block.id, draft: &updatedDraft)
+        }
+        XCTAssertTrue(observedDrafts.isEmpty)
+
+        let completedAt = Date(timeIntervalSince1970: 1_741_600_000)
+        store.pushMutation(
+            blockID: block.id,
+            setID: row.id,
+            undoStrategy: .block(block.id),
+            persistence: .deferred
+        ) { updatedDraft, context in
+            SessionEngine.toggleCompletion(
+                of: row.id,
+                in: block.id,
+                draft: &updatedDraft,
+                context: context,
+                completedAt: completedAt
+            )
+        }
+
+        XCTAssertEqual(observedDrafts.count, 1)
+        XCTAssertEqual(observedDrafts.last??.restTimerEndsAt, completedAt.addingTimeInterval(90))
+
+        store.clearRestTimer()
+
+        XCTAssertEqual(observedDrafts.count, 2)
+        XCTAssertNil(observedDrafts.last??.restTimerEndsAt)
     }
 
     @MainActor

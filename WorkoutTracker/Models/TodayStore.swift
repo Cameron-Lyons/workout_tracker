@@ -18,7 +18,7 @@ final class TodayStore {
 
     func recordCompletedSession(
         _ session: CompletedSession,
-        plans: [Plan],
+        planSummaries: [PlanSummary],
         references: [TemplateReference],
         allSessions: [CompletedSession],
         finishSummary: SessionFinishSummary?,
@@ -35,7 +35,7 @@ final class TodayStore {
         }
 
         let selection = TemplateReferenceSelection.todaySelection(
-            plans: plans,
+            planSummaries: planSummaries,
             references: references,
             sessions: allSessions,
             now: now

@@ -127,4 +127,28 @@ final class PlanPersistenceController: @unchecked Sendable {
     func flush() {
         queue.sync {}
     }
+
+    func loadPlanSummaries() -> [PlanSummary] {
+        flush()
+
+        let context = ModelContext(modelContainer)
+        context.autosaveEnabled = false
+        return PlanRepository(modelContext: context).loadPlanSummaries()
+    }
+
+    func loadPlans() -> [Plan] {
+        flush()
+
+        let context = ModelContext(modelContainer)
+        context.autosaveEnabled = false
+        return PlanRepository(modelContext: context).loadPlans()
+    }
+
+    func loadPlan(_ planID: UUID) -> Plan? {
+        flush()
+
+        let context = ModelContext(modelContainer)
+        context.autosaveEnabled = false
+        return PlanRepository(modelContext: context).loadPlan(planID)
+    }
 }

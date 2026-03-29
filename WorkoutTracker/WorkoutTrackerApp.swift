@@ -3,23 +3,27 @@ import SwiftUI
 
 private struct AppStartupShellView: View {
     var body: some View {
-        ZStack {
-            AppBackground()
-            VStack(spacing: 14) {
-                ProgressView()
-                    .progressViewStyle(.circular)
-                    .tint(AppColors.accent)
-                    .scaleEffect(1.2)
+        HStack(spacing: 14) {
+            ProgressView()
+                .progressViewStyle(.circular)
+                .tint(AppColors.accent)
+                .scaleEffect(1.05)
 
-                Text("Loading session-first workspace...")
-                    .font(.subheadline.weight(.semibold))
+            VStack(alignment: .leading, spacing: 4) {
+                Text("Loading your workspace...")
+                    .font(.headline.weight(.bold))
                     .foregroundStyle(AppColors.textPrimary)
+
+                Text("Plans, today state, and your active session are hydrating in the background.")
+                    .font(.subheadline)
+                    .foregroundStyle(AppColors.textSecondary)
             }
-            .padding(.vertical, 20)
-            .padding(.horizontal, 24)
-            .appSurface(cornerRadius: 16, shadow: false)
-            .padding(.horizontal, 24)
         }
+        .padding(.vertical, 16)
+        .padding(.horizontal, 18)
+        .frame(maxWidth: 460, alignment: .leading)
+        .appSurface(cornerRadius: 18, shadow: false)
+        .accessibilityIdentifier("app.startupOverlay")
     }
 }
 
@@ -36,44 +40,56 @@ struct WorkoutTrackerApp: App {
         let container = WorkoutModelContainerFactory.makeContainer(
             isStoredInMemoryOnly: useInMemoryStore
         )
+        let store = AppStore(
+            modelContainer: container,
+            launchArguments: launchArguments
+        )
 
         modelContainer = container
         _appStore = State(
-            initialValue: AppStore(
-                modelContainer: container,
-                launchArguments: launchArguments
-            )
+            initialValue: store
         )
+
+        Task {
+            await store.hydrateIfNeeded()
+        }
     }
 
     var body: some Scene {
         WindowGroup {
-            Group {
-                if appStore.isHydrated {
-                    RootAppView()
-                        .environment(appStore)
-                } else {
-                    AppStartupShellView()
-                }
-            }
-            .task {
-                await appStore.hydrateIfNeeded()
-            }
-            .onChange(of: scenePhase, initial: false) { _, phase in
-                switch phase {
-                case .active:
-                    Task {
-                        await appStore.refreshDerivedStores()
+            RootAppView()
+                .environment(appStore)
+                .allowsHitTesting(appStore.isHydrated)
+                .overlay(alignment: .top) {
+                    if appStore.isHydrated == false {
+                        AppStartupShellView()
+                            .padding(.top, 12)
+                            .padding(.horizontal, 12)
+                            .allowsHitTesting(false)
+                            .transition(.move(edge: .top).combined(with: .opacity))
                     }
-
-                case .inactive, .background:
-                    appStore.flushPendingSessionPersistence()
-                    appStore.flushPendingPlanPersistence()
-
-                @unknown default:
-                    break
                 }
-            }
+                .animation(.easeOut(duration: 0.2), value: appStore.isHydrated)
+                .onChange(of: scenePhase, initial: false) { _, phase in
+                    switch phase {
+                    case .active:
+                        guard appStore.isHydrated else {
+                            return
+                        }
+
+                        appStore.syncRestTimerLiveActivity()
+                        Task {
+                            await appStore.refreshDerivedStores()
+                        }
+
+                    case .inactive, .background:
+                        appStore.flushPendingSessionPersistence()
+                        appStore.flushPendingPlanPersistence()
+
+                    @unknown default:
+                        break
+                    }
+                }
         }
         .modelContainer(modelContainer)
     }

@@ -535,6 +535,55 @@ final class WorkoutProgramEngineTests: XCTestCase {
         XCTAssertNil(updatedRow.log.weight)
     }
 
+    func testUpdateWeightStoresExactLoggedWeight() throws {
+        let row = SessionSetRow(
+            target: SetTarget(
+                targetWeight: 185,
+                repRange: RepRange(5, 5)
+            )
+        )
+        let block = SessionBlock(
+            exerciseID: CatalogSeed.benchPress,
+            exerciseNameSnapshot: "Bench Press",
+            restSeconds: 90,
+            progressionRule: .manual,
+            sets: [row]
+        )
+        var draft = SessionDraft(
+            planID: UUID(),
+            templateID: UUID(),
+            templateNameSnapshot: "Bench Day",
+            blocks: [block]
+        )
+
+        SessionEngine.updateWeight(to: 192.5, setID: row.id, in: block.id, draft: &draft)
+
+        let updatedRow = try XCTUnwrap(draft.blocks.first?.sets.first)
+        XCTAssertEqual(updatedRow.log.weight, 192.5)
+    }
+
+    func testUpdateRepsStoresExactLoggedReps() throws {
+        let row = SessionSetRow(target: SetTarget(repRange: RepRange(8, 10)))
+        let block = SessionBlock(
+            exerciseID: CatalogSeed.benchPress,
+            exerciseNameSnapshot: "Bench Press",
+            restSeconds: 90,
+            progressionRule: .manual,
+            sets: [row]
+        )
+        var draft = SessionDraft(
+            planID: UUID(),
+            templateID: UUID(),
+            templateNameSnapshot: "Bench Day",
+            blocks: [block]
+        )
+
+        SessionEngine.updateReps(to: 12, setID: row.id, in: block.id, draft: &draft)
+
+        let updatedRow = try XCTUnwrap(draft.blocks.first?.sets.first)
+        XCTAssertEqual(updatedRow.log.reps, 12)
+    }
+
     func testAddSetAssignsNewTargetIdentityAndCopiesLastLogValues() throws {
         let target = SetTarget(targetWeight: 185, repRange: RepRange(5, 5))
         let row = SessionSetRow(

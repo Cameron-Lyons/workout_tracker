@@ -22,7 +22,7 @@ This repo keeps lightweight performance guardrails in the dedicated `WorkoutTrac
 | Persistence | `PersistenceBenchmarks.testSessionRepositoryLoadCompletedSessionsLargeHistory` | 240 completed sessions, 4 blocks/session, 6 sets/block | avg `<= 0.950s`, max `<= 1.050s` |
 | App Flow | `AppFlowBenchmarks.testSessionEngineStartSessionLargeTemplate` | 18-block mixed-progression template | avg `<= 0.001s`, max `<= 0.002s` |
 | App Flow | `AppFlowBenchmarks.testAppStoreFinishActiveSessionLargeProgressionSession` | finish + persist a 12-block progression session | avg `<= 0.080s`, max `<= 0.100s` |
-| App Flow | `AppFlowBenchmarks.testPersistenceHydrationLoaderLoadStartupSnapshotLargeLibrary` | startup snapshot with 121 plans, profiles, and active draft | avg `<= 2.150s`, max `<= 2.350s` |
+| App Flow | `AppFlowBenchmarks.testPersistenceHydrationLoaderLoadStartupSnapshotLargeLibrary` | startup summary snapshot with 121 plans, profiles, and active draft | avg `<= 0.450s`, max `<= 0.500s` |
 | App Flow | `AppFlowBenchmarks.testPersistenceHydrationLoaderLoadCompletedSessionHistoryLargeHistory` | lazy history load for 240 completed sessions | avg `<= 0.950s`, max `<= 1.050s` |
 | App Flow | `AppFlowBenchmarks.testAppDerivedStateControllerRefreshDerivedStoresLargeLibraryAndHistory` | refresh derived stores for 120 plans + 500 sessions | avg `<= 0.035s`, max `<= 0.045s` |
 

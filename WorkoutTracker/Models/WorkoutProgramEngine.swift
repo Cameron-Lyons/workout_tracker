@@ -311,6 +311,36 @@ enum SessionEngine {
     }
 
     @discardableResult
+    static func updateWeight(
+        to newWeight: Double,
+        setID: UUID,
+        in blockID: UUID,
+        draft: inout SessionDraft,
+        context: SessionMutationContext = .empty,
+        now: Date = .now
+    ) -> SessionMutationResult {
+        guard
+            let blockIndex = resolvedBlockIndex(in: draft, blockID: blockID, suggested: context.blockIndex),
+            let setIndex = resolvedSetIndex(
+                in: draft.blocks[blockIndex],
+                setID: setID,
+                suggested: context.setIndex
+            )
+        else {
+            return .unchanged
+        }
+
+        let updatedWeight = max(0, newWeight)
+        guard draft.blocks[blockIndex].sets[setIndex].log.weight != updatedWeight else {
+            return .unchanged
+        }
+
+        draft.blocks[blockIndex].sets[setIndex].log.weight = updatedWeight
+        draft.touch(now: now)
+        return .changed
+    }
+
+    @discardableResult
     static func adjustReps(
         by delta: Int,
         setID: UUID,
@@ -334,6 +364,36 @@ enum SessionEngine {
         let baseReps = previousReps ?? draft.blocks[blockIndex].sets[setIndex].target.repRange.upperBound
         let updatedReps = max(0, baseReps + delta)
         guard previousReps != updatedReps else {
+            return .unchanged
+        }
+
+        draft.blocks[blockIndex].sets[setIndex].log.reps = updatedReps
+        draft.touch(now: now)
+        return .changed
+    }
+
+    @discardableResult
+    static func updateReps(
+        to newReps: Int,
+        setID: UUID,
+        in blockID: UUID,
+        draft: inout SessionDraft,
+        context: SessionMutationContext = .empty,
+        now: Date = .now
+    ) -> SessionMutationResult {
+        guard
+            let blockIndex = resolvedBlockIndex(in: draft, blockID: blockID, suggested: context.blockIndex),
+            let setIndex = resolvedSetIndex(
+                in: draft.blocks[blockIndex],
+                setID: setID,
+                suggested: context.setIndex
+            )
+        else {
+            return .unchanged
+        }
+
+        let updatedReps = max(0, newReps)
+        guard draft.blocks[blockIndex].sets[setIndex].log.reps != updatedReps else {
             return .unchanged
         }
 

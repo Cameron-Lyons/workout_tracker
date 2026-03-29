@@ -8,19 +8,26 @@ final class PlansStore {
         var catalog: [ExerciseCatalogItem]
         var plans: [Plan]
         var profiles: [ExerciseProfile]
+        var planSummaries: [PlanSummary]? = nil
+        var includesFullPlanLibrary = true
     }
 
     @ObservationIgnored private let persistenceController: PlanPersistenceController
     @ObservationIgnored private(set) var catalogByID: [UUID: ExerciseCatalogItem] = [:]
     @ObservationIgnored private(set) var catalogRevision = 0
     @ObservationIgnored private(set) var planRevision = 0
-    @ObservationIgnored private var plansByID: [UUID: Plan] = [:]
+    @ObservationIgnored private var planSummariesByID: [UUID: PlanSummary] = [:]
+    @ObservationIgnored private var loadedPlansByID: [UUID: Plan] = [:]
     @ObservationIgnored private var profilesByExerciseID: [UUID: ExerciseProfile] = [:]
     @ObservationIgnored private var cachedTemplateReferences: [TemplateReference] = []
+    @ObservationIgnored private var fullPlanLibraryLoadTask: Task<[Plan], Never>?
 
     var catalog: [ExerciseCatalogItem] = []
+    var planSummaries: [PlanSummary] = []
     var plans: [Plan] = []
     var profiles: [ExerciseProfile] = []
+    var hasLoadedPlanLibrary = true
+    var isLoadingPlanLibrary = false
 
     init(persistenceController: PlanPersistenceController) {
         self.persistenceController = persistenceController
@@ -30,41 +37,77 @@ final class PlansStore {
         catalog = snapshot.catalog
         plans = snapshot.plans
         profiles = snapshot.profiles
+        planSummaries = snapshot.planSummaries ?? snapshot.plans.map(PlanSummary.init)
+        loadedPlansByID = Dictionary(uniqueKeysWithValues: snapshot.plans.map { ($0.id, $0) })
+        hasLoadedPlanLibrary = snapshot.includesFullPlanLibrary
+        isLoadingPlanLibrary = false
+        fullPlanLibraryLoadTask = nil
         rebuildCaches()
         bumpCatalogRevision()
     }
 
     func resetAllData() {
         persistenceController.scheduleDeleteEverything()
+        fullPlanLibraryLoadTask?.cancel()
+        fullPlanLibraryLoadTask = nil
         catalog = CatalogSeed.defaultCatalog()
+        planSummaries = []
         plans = []
         profiles = []
+        loadedPlansByID = [:]
+        hasLoadedPlanLibrary = true
+        isLoadingPlanLibrary = false
         rebuildCaches()
         bumpCatalogRevision()
         persistenceController.scheduleSaveCatalog(catalog)
     }
 
+    @discardableResult
+    func loadPlanLibraryIfNeeded(priority: TaskPriority = .userInitiated) async -> Bool {
+        guard hasLoadedPlanLibrary == false else {
+            return false
+        }
+
+        if let existingTask = fullPlanLibraryLoadTask {
+            let loadedPlans = await existingTask.value
+            applyLoadedPlanLibrary(loadedPlans)
+            return true
+        }
+
+        isLoadingPlanLibrary = true
+        let task = Task(priority: priority) { [persistenceController] in
+            persistenceController.loadPlans()
+        }
+        fullPlanLibraryLoadTask = task
+        let loadedPlans = await task.value
+        fullPlanLibraryLoadTask = nil
+        applyLoadedPlanLibrary(loadedPlans)
+        return true
+    }
+
     func savePlan(_ plan: Plan) {
-        upsertPlan(plan)
-        rebuildPlanCaches()
+        cacheLoadedPlan(plan)
         persistenceController.scheduleUpsertPlans([plan])
     }
 
     func deletePlan(_ planID: UUID) {
-        guard plansByID[planID] != nil else {
+        guard planSummariesByID[planID] != nil else {
             return
         }
 
+        loadedPlansByID.removeValue(forKey: planID)
         plans.removeAll(where: { $0.id == planID })
+        planSummaries.removeAll(where: { $0.id == planID })
         rebuildPlanCaches()
         persistenceController.scheduleDeletePlans([planID])
     }
 
     func addPresetPack(_ pack: PresetPack, settings: SettingsStore) {
         let existingPinnedPlanIDs = Set(
-            plans.compactMap { plan in
+            planSummaries.compactMap { plan in
                 plan.pinnedTemplateID == nil ? nil : plan.id
-            })
+            }
+        )
         let generatedPlans = PresetPackBuilder.makePlans(for: pack, settings: settings).map { generatedPlan in
             guard !existingPinnedPlanIDs.isEmpty,
                 existingPinnedPlanIDs.contains(generatedPlan.id) == false
@@ -81,10 +124,9 @@ final class PlansStore {
         }
 
         for plan in generatedPlans {
-            upsertPlan(plan)
+            cacheLoadedPlan(plan)
         }
 
-        rebuildPlanCaches()
         persistenceController.scheduleUpsertPlans(generatedPlans)
     }
 
@@ -97,7 +139,20 @@ final class PlansStore {
     }
 
     func plan(for planID: UUID) -> Plan? {
-        plansByID[planID]
+        if let loadedPlan = loadedPlansByID[planID] {
+            return loadedPlan
+        }
+
+        guard let loadedPlan = persistenceController.loadPlan(planID) else {
+            return nil
+        }
+
+        cacheLoadedPlan(loadedPlan)
+        return loadedPlan
+    }
+
+    func planSummary(for planID: UUID) -> PlanSummary? {
+        planSummariesByID[planID]
     }
 
     func templateReferences() -> [TemplateReference] {
@@ -108,19 +163,23 @@ final class PlansStore {
         cachedTemplateReferences.count
     }
 
+    var planCount: Int {
+        planSummaries.count
+    }
+
     func markTemplateStarted(planID: UUID, templateID: UUID, startedAt: Date) {
-        guard let planIndex = plans.firstIndex(where: { $0.id == planID }),
-            let templateIndex = plans[planIndex].templates.firstIndex(where: { $0.id == templateID })
+        guard var plan = plan(for: planID),
+            let templateIndex = plan.templates.firstIndex(where: { $0.id == templateID })
         else {
             return
         }
 
-        guard plans[planIndex].templates[templateIndex].lastStartedAt != startedAt else {
+        guard plan.templates[templateIndex].lastStartedAt != startedAt else {
             return
         }
 
-        plans[planIndex].templates[templateIndex].lastStartedAt = startedAt
-        rebuildPlanCaches()
+        plan.templates[templateIndex].lastStartedAt = startedAt
+        cacheLoadedPlan(plan)
         persistenceController.scheduleMarkTemplateStarted(planID: planID, templateID: templateID, startedAt: startedAt)
     }
 
@@ -148,38 +207,40 @@ final class PlansStore {
     }
 
     func pinTemplate(planID: UUID, templateID: UUID) {
-        guard
-            plans.contains(where: { plan in
-                plan.id == planID && plan.templates.contains(where: { $0.id == templateID })
-            })
+        guard var targetPlan = plan(for: planID),
+            targetPlan.templates.contains(where: { $0.id == templateID })
         else {
             return
         }
 
-        var didUpdate = false
         var changedPlans: [Plan] = []
 
-        for index in plans.indices {
-            if plans[index].id == planID {
-                guard plans[index].pinnedTemplateID != templateID else {
-                    continue
-                }
-
-                plans[index].pinnedTemplateID = templateID
-                didUpdate = true
-                changedPlans.append(plans[index])
-            } else if plans[index].pinnedTemplateID != nil {
-                plans[index].pinnedTemplateID = nil
-                didUpdate = true
-                changedPlans.append(plans[index])
-            }
+        if targetPlan.pinnedTemplateID != templateID {
+            targetPlan.pinnedTemplateID = templateID
+            cacheLoadedPlan(targetPlan)
+            changedPlans.append(targetPlan)
         }
 
-        guard didUpdate else {
+        let otherPinnedPlanIDs = planSummaries.compactMap { summary in
+            summary.id == planID || summary.pinnedTemplateID == nil ? nil : summary.id
+        }
+
+        for otherPlanID in otherPinnedPlanIDs {
+            guard var otherPlan = plan(for: otherPlanID),
+                otherPlan.pinnedTemplateID != nil
+            else {
+                continue
+            }
+
+            otherPlan.pinnedTemplateID = nil
+            cacheLoadedPlan(otherPlan)
+            changedPlans.append(otherPlan)
+        }
+
+        guard !changedPlans.isEmpty else {
             return
         }
 
-        rebuildPlanCaches()
         persistenceController.scheduleUpsertPlans(changedPlans)
     }
 
@@ -259,95 +320,6 @@ final class PlansStore {
         profilesByExerciseID
     }
 
-    private func rebuildCaches() {
-        rebuildCatalogCaches()
-        rebuildPlanCaches()
-        rebuildProfileCaches()
-    }
-
-    private func rebuildCatalogCaches() {
-        catalogByID = Dictionary(uniqueKeysWithValues: catalog.map { ($0.id, $0) })
-    }
-
-    private func upsertPlan(_ plan: Plan) {
-        if let existingIndex = plans.firstIndex(where: { $0.id == plan.id }) {
-            let createdAt = plans[existingIndex].createdAt
-            plans.remove(at: existingIndex)
-
-            if createdAt == plan.createdAt {
-                plans.insert(plan, at: min(existingIndex, plans.endIndex))
-                return
-            }
-        }
-
-        let insertionIndex = plans.firstIndex(where: { $0.createdAt > plan.createdAt }) ?? plans.endIndex
-        plans.insert(plan, at: insertionIndex)
-    }
-
-    private func rebuildPlanCaches() {
-        plansByID = Dictionary(uniqueKeysWithValues: plans.map { ($0.id, $0) })
-        cachedTemplateReferences = plans.flatMap { plan in
-            plan.templates.map {
-                TemplateReference(
-                    planID: plan.id,
-                    planName: plan.name,
-                    templateID: $0.id,
-                    templateName: $0.name,
-                    scheduledWeekdays: $0.scheduledWeekdays,
-                    lastStartedAt: $0.lastStartedAt
-                )
-            }
-        }
-        bumpPlanRevision()
-    }
-
-    private func rebuildProfileCaches() {
-        profilesByExerciseID = Dictionary(uniqueKeysWithValues: profiles.map { ($0.exerciseID, $0) })
-    }
-
-    private func bumpCatalogRevision() {
-        catalogRevision &+= 1
-    }
-
-    private func bumpPlanRevision() {
-        planRevision &+= 1
-    }
-
-    private func hasPinnedTemplate(excluding planID: UUID? = nil) -> Bool {
-        plans.contains { plan in
-            guard plan.id != planID else {
-                return false
-            }
-
-            return plan.pinnedTemplateID != nil
-        }
-    }
-
-    private func synchronizeExerciseNameSnapshots(exerciseID: UUID, name: String) -> [Plan] {
-        var changedPlanIDs: Set<UUID> = []
-
-        for planIndex in plans.indices {
-            for templateIndex in plans[planIndex].templates.indices {
-                for blockIndex in plans[planIndex].templates[templateIndex].blocks.indices
-                where plans[planIndex].templates[templateIndex].blocks[blockIndex].exerciseID == exerciseID {
-                    guard plans[planIndex].templates[templateIndex].blocks[blockIndex].exerciseNameSnapshot != name else {
-                        continue
-                    }
-
-                    plans[planIndex].templates[templateIndex].blocks[blockIndex].exerciseNameSnapshot = name
-                    changedPlanIDs.insert(plans[planIndex].id)
-                }
-            }
-        }
-
-        guard !changedPlanIDs.isEmpty else {
-            return []
-        }
-
-        rebuildPlanCaches()
-        return plans.filter { changedPlanIDs.contains($0.id) }
-    }
-
     func updatePlanProgression(
         planID: UUID,
         templateID: UUID,
@@ -396,9 +368,141 @@ final class PlansStore {
         }
 
         plan.templates[templateIndex] = template
-        upsertPlan(plan)
-        rebuildPlanCaches()
+        cacheLoadedPlan(plan)
         persistenceController.schedulePersistProgression(plan: plan, updatedProfiles: updatedProfiles)
+    }
+
+    func flushPendingPersistence() {
+        persistenceController.flush()
+    }
+
+    private func applyLoadedPlanLibrary(_ loadedPlans: [Plan]) {
+        guard hasLoadedPlanLibrary == false else {
+            isLoadingPlanLibrary = false
+            return
+        }
+
+        plans = loadedPlans
+        planSummaries = loadedPlans.map(PlanSummary.init)
+        loadedPlansByID = Dictionary(uniqueKeysWithValues: loadedPlans.map { ($0.id, $0) })
+        hasLoadedPlanLibrary = true
+        isLoadingPlanLibrary = false
+        rebuildPlanCaches()
+    }
+
+    private func rebuildCaches() {
+        rebuildCatalogCaches()
+        rebuildPlanCaches()
+        rebuildProfileCaches()
+    }
+
+    private func rebuildCatalogCaches() {
+        catalogByID = Dictionary(uniqueKeysWithValues: catalog.map { ($0.id, $0) })
+    }
+
+    private func cacheLoadedPlan(_ plan: Plan) {
+        loadedPlansByID[plan.id] = plan
+        upsertLoadedPlan(plan)
+        upsertPlanSummary(PlanSummary(plan: plan))
+        rebuildPlanCaches()
+    }
+
+    private func upsertLoadedPlan(_ plan: Plan) {
+        if let existingIndex = plans.firstIndex(where: { $0.id == plan.id }) {
+            let createdAt = plans[existingIndex].createdAt
+            plans.remove(at: existingIndex)
+
+            if createdAt == plan.createdAt {
+                plans.insert(plan, at: min(existingIndex, plans.endIndex))
+                return
+            }
+        }
+
+        let insertionIndex = plans.firstIndex(where: { $0.createdAt > plan.createdAt }) ?? plans.endIndex
+        plans.insert(plan, at: insertionIndex)
+    }
+
+    private func upsertPlanSummary(_ summary: PlanSummary) {
+        if let existingIndex = planSummaries.firstIndex(where: { $0.id == summary.id }) {
+            let createdAt = planSummaries[existingIndex].createdAt
+            planSummaries.remove(at: existingIndex)
+
+            if createdAt == summary.createdAt {
+                planSummaries.insert(summary, at: min(existingIndex, planSummaries.endIndex))
+                return
+            }
+        }
+
+        let insertionIndex = planSummaries.firstIndex(where: { $0.createdAt > summary.createdAt }) ?? planSummaries.endIndex
+        planSummaries.insert(summary, at: insertionIndex)
+    }
+
+    private func rebuildPlanCaches() {
+        planSummariesByID = Dictionary(uniqueKeysWithValues: planSummaries.map { ($0.id, $0) })
+        cachedTemplateReferences = planSummaries.flatMap { plan in
+            plan.templates.map {
+                TemplateReference(
+                    planID: plan.id,
+                    planName: plan.name,
+                    templateID: $0.id,
+                    templateName: $0.name,
+                    scheduledWeekdays: $0.scheduledWeekdays,
+                    lastStartedAt: $0.lastStartedAt
+                )
+            }
+        }
+        bumpPlanRevision()
+    }
+
+    private func rebuildProfileCaches() {
+        profilesByExerciseID = Dictionary(uniqueKeysWithValues: profiles.map { ($0.exerciseID, $0) })
+    }
+
+    private func bumpCatalogRevision() {
+        catalogRevision &+= 1
+    }
+
+    private func bumpPlanRevision() {
+        planRevision &+= 1
+    }
+
+    private func hasPinnedTemplate(excluding planID: UUID? = nil) -> Bool {
+        planSummaries.contains { plan in
+            guard plan.id != planID else {
+                return false
+            }
+
+            return plan.pinnedTemplateID != nil
+        }
+    }
+
+    private func synchronizeExerciseNameSnapshots(exerciseID: UUID, name: String) -> [Plan] {
+        var changedPlanIDs: Set<UUID> = []
+
+        for planIndex in plans.indices {
+            for templateIndex in plans[planIndex].templates.indices {
+                for blockIndex in plans[planIndex].templates[templateIndex].blocks.indices
+                where plans[planIndex].templates[templateIndex].blocks[blockIndex].exerciseID == exerciseID {
+                    guard plans[planIndex].templates[templateIndex].blocks[blockIndex].exerciseNameSnapshot != name else {
+                        continue
+                    }
+
+                    plans[planIndex].templates[templateIndex].blocks[blockIndex].exerciseNameSnapshot = name
+                    changedPlanIDs.insert(plans[planIndex].id)
+                }
+            }
+        }
+
+        guard !changedPlanIDs.isEmpty else {
+            return []
+        }
+
+        for plan in plans where changedPlanIDs.contains(plan.id) {
+            loadedPlansByID[plan.id] = plan
+            upsertPlanSummary(PlanSummary(plan: plan))
+        }
+        rebuildPlanCaches()
+        return plans.filter { changedPlanIDs.contains($0.id) }
     }
 
     private func templateBlockIndex(in template: WorkoutTemplate, matching finishedBlock: SessionBlock) -> Int? {
@@ -432,13 +536,5 @@ final class PlansStore {
         }
 
         rebuildProfileCaches()
-    }
-
-    func flushPendingPersistence() {
-        flushPendingPlanPersistence()
-    }
-
-    private func flushPendingPlanPersistence() {
-        persistenceController.flush()
     }
 }

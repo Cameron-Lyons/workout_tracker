@@ -181,9 +181,6 @@ struct TodayView: View {
                 .scrollIndicators(.hidden)
             }
             .navigationTitle("Today")
-            .task {
-                await appStore.hydrateCompletedSessionHistoryIfNeeded(priority: .utility)
-            }
             .sessionStartConfirmationDialog(
                 pendingStartRequest: $pendingStartRequest,
                 activeDraft: activeDraft,
@@ -297,7 +294,7 @@ struct TodayView: View {
 
     private func pinnedTemplateCard(_ reference: TemplateReference) -> some View {
         let usesAlternatingRotation = TemplateReferenceSelection.isAlternatingPlan(
-            plansStore.plan(for: reference.planID)
+            plansStore.planSummary(for: reference.planID)
         )
 
         return TodaySpotlightCard(tone: .plans) {
@@ -688,6 +685,30 @@ private struct TemplateEditorContext: Identifiable {
     var template: WorkoutTemplate?
 }
 
+private struct PlansLibraryLoadingCard: View {
+    var body: some View {
+        VStack(spacing: 14) {
+            ProgressView()
+                .progressViewStyle(.circular)
+                .tint(AppColors.accentPlans)
+                .scaleEffect(1.08)
+
+            Text("Loading plans...")
+                .font(.headline.weight(.bold))
+                .foregroundStyle(AppColors.textPrimary)
+
+            Text("The full plan library is hydrating in the background so launch stays fast.")
+                .font(.subheadline)
+                .multilineTextAlignment(.center)
+                .foregroundStyle(AppColors.textSecondary)
+        }
+        .padding(.vertical, 22)
+        .padding(.horizontal, 24)
+        .appSurface(cornerRadius: AppCardMetrics.featureCornerRadius, shadow: false, tone: .plans)
+        .padding(.horizontal, 24)
+    }
+}
+
 struct PlansView: View {
     @Environment(AppStore.self) private var appStore
     @Environment(PlansStore.self) private var plansStore
@@ -706,32 +727,39 @@ struct PlansView: View {
         NavigationStack {
             ZStack {
                 AppBackground()
-                ScrollView {
-                    LazyVStack(spacing: 16) {
-                        plansHero
-                            .appReveal(delay: 0.01)
+                if plansStore.hasLoadedPlanLibrary == false {
+                    PlansLibraryLoadingCard()
+                } else {
+                    ScrollView {
+                        LazyVStack(spacing: 16) {
+                            plansHero
+                                .appReveal(delay: 0.01)
 
-                        if plansStore.plans.isEmpty {
-                            AppEmptyStateCard(
-                                systemImage: "list.bullet.rectangle",
-                                title: "No plans yet",
-                                message: "Create a custom plan or install one of the preset packs.",
-                                tone: .plans
-                            )
-                            .appReveal(delay: 0.03)
-                        } else {
-                            ForEach(plansStore.plans) { plan in
-                                planCard(plan)
-                                    .appReveal(delay: 0.03)
+                            if plansStore.plans.isEmpty {
+                                AppEmptyStateCard(
+                                    systemImage: "list.bullet.rectangle",
+                                    title: "No plans yet",
+                                    message: "Create a custom plan or install one of the preset packs.",
+                                    tone: .plans
+                                )
+                                .appReveal(delay: 0.03)
+                            } else {
+                                ForEach(plansStore.plans) { plan in
+                                    planCard(plan)
+                                        .appReveal(delay: 0.03)
+                                }
                             }
                         }
+                        .padding(.horizontal, 14)
+                        .padding(.vertical, 14)
                     }
-                    .padding(.horizontal, 14)
-                    .padding(.vertical, 14)
+                    .scrollIndicators(.hidden)
                 }
-                .scrollIndicators(.hidden)
             }
             .navigationTitle("Plans")
+            .task {
+                await appStore.loadPlanLibraryIfNeeded(priority: .userInitiated)
+            }
             .toolbar {
                 ToolbarItem(placement: .topBarLeading) {
                     Menu {
@@ -811,7 +839,7 @@ struct PlansView: View {
     private var plansHero: some View {
         AppHeroCard(
             eyebrow: "Plan Builder",
-            title: "\(plansStore.plans.count) plans",
+            title: "\(plansStore.planCount) plans",
             subtitle:
                 "Templates define your future sessions. Schedule them loosely, pin your Today favorite, and start whenever you want.",
             systemImage: "list.bullet.rectangle",
@@ -819,7 +847,7 @@ struct PlansView: View {
                 AppHeroMetric(
                     id: "plans",
                     label: "Plans",
-                    value: "\(plansStore.plans.count)",
+                    value: "\(plansStore.planCount)",
                     systemImage: "list.bullet"
                 ),
                 AppHeroMetric(

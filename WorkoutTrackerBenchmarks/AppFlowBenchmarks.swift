@@ -18,8 +18,8 @@ final class AppFlowBenchmarks: BenchmarkTestCase {
         )
         static let persistenceHydrationLoaderLoadStartupSnapshotLargeLibrary = BenchmarkThreshold(
             measuredIterationCount: 3,
-            averageSecondsUpperBound: 2.150,
-            maxSecondsUpperBound: 2.350
+            averageSecondsUpperBound: 0.450,
+            maxSecondsUpperBound: 0.500
         )
         static let persistenceHydrationLoaderLoadCompletedSessionHistoryLargeHistory = BenchmarkThreshold(
             measuredIterationCount: 3,
@@ -141,7 +141,9 @@ final class AppFlowBenchmarks: BenchmarkTestCase {
             },
             operation: { loader in
                 let snapshot = await loader.loadStartupSnapshot()
-                XCTAssertEqual(snapshot.plans.plans.count, seededPlans.count)
+                XCTAssertEqual(snapshot.plans.planSummaries?.count, seededPlans.count)
+                XCTAssertFalse(snapshot.plans.includesFullPlanLibrary)
+                XCTAssertTrue(snapshot.plans.plans.isEmpty)
                 XCTAssertEqual(snapshot.sessions.activeDraft?.blocks.count, draft.blocks.count)
             }
         )
