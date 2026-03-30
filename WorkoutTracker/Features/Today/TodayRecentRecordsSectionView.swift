@@ -10,7 +10,6 @@ struct TodayRecentRecordsSectionView: View {
                 title: "Recent PRs",
                 systemImage: "rosette",
                 subtitle: "Your latest high points stay visible after every session.",
-                trailing: todayStore.recentPersonalRecords.isEmpty ? nil : "\(todayStore.recentPersonalRecords.count)",
                 tone: .success
             )
 

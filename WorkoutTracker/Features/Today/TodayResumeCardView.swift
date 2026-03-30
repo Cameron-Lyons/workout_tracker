@@ -2,47 +2,17 @@ import SwiftUI
 
 struct TodayResumeCardView: View {
     @Environment(AppStore.self) private var appStore
-    @Environment(SessionStore.self) private var sessionStore
 
     let draft: SessionDraft
 
     var body: some View {
-        let progress = sessionStore.activeDraftProgress
-
         return TodaySpotlightCard(tone: .today) {
-            VStack(alignment: .leading, spacing: 16) {
-                HStack(alignment: .top, spacing: 12) {
-                    VStack(alignment: .leading, spacing: 8) {
-                        AppStatePill(title: "Autosaved", systemImage: "bolt.fill", tone: .warning)
+            VStack(alignment: .leading, spacing: 12) {
+                Text(draft.templateNameSnapshot)
+                    .font(.system(size: 28, weight: .black))
+                    .foregroundStyle(AppColors.textPrimary)
 
-                        Text(draft.templateNameSnapshot)
-                            .font(.system(size: 28, weight: .black))
-                            .foregroundStyle(AppColors.textPrimary)
-
-                        Text("Last updated \(draft.lastUpdatedAt.formatted(date: .abbreviated, time: .shortened))")
-                            .font(.caption)
-                            .foregroundStyle(AppColors.textSecondary)
-                    }
-
-                    Spacer(minLength: 12)
-
-                    VStack(alignment: .trailing, spacing: 8) {
-                        MetricBadge(
-                            label: "Blocks",
-                            value: "\(progress.blockCount)",
-                            systemImage: "square.grid.2x2",
-                            tone: .today
-                        )
-                        MetricBadge(
-                            label: "Logged",
-                            value: "\(progress.completedSetCount)",
-                            systemImage: "checklist",
-                            tone: .success
-                        )
-                    }
-                }
-
-                Text("Jump back into the logger with every set, note, and timer exactly where you left it.")
+                Text("Resume where you left off. Updated \(draft.lastUpdatedAt.formatted(date: .abbreviated, time: .shortened)).")
                     .font(.subheadline)
                     .foregroundStyle(AppColors.textSecondary)
 

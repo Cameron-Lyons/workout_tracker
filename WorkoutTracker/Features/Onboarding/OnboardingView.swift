@@ -170,7 +170,7 @@ private struct OnboardingBlankRow: View {
                     .font(.system(size: 21, weight: .black))
                     .foregroundStyle(AppColors.textPrimary)
 
-                Text("Begin with an empty setup and add plans, templates, and exercises as you go.")
+                Text("Begin with an empty setup and add programs, templates, and exercises as you go.")
                     .font(.subheadline)
                     .foregroundStyle(AppColors.textSecondary)
                     .multilineTextAlignment(.leading)

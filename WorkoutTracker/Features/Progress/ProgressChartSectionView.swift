@@ -6,6 +6,10 @@ struct ProgressChartSectionView: View {
     let state: ProgressChartSectionState
     let onSelectExercise: @MainActor (UUID?) -> Void
 
+    private var selectedExerciseLabel: String {
+        state.selectedExerciseSummary?.displayName ?? "Choose Exercise"
+    }
+
     var body: some View {
         VStack(alignment: .leading, spacing: 12) {
             AppSectionHeader(
@@ -15,7 +19,8 @@ struct ProgressChartSectionView: View {
                     ? "Weighted logs unlock exercise-level trend lines and PR callouts."
                     : "Follow top-set load and estimated strength over time for a single exercise.",
                 trailing: state.selectedExerciseSummary.map { "\($0.pointCount) points" },
-                tone: .progress
+                tone: .progress,
+                trailingStyle: .plain
             )
 
             if state.exerciseSummaries.isEmpty {
@@ -23,7 +28,8 @@ struct ProgressChartSectionView: View {
                     systemImage: "chart.line.uptrend.xyaxis",
                     title: "No trend data yet",
                     message: "Weighted logs will unlock exercise trend charts and strength callouts.",
-                    tone: .progress
+                    tone: .progress,
+                    style: .plain
                 )
             } else {
                 VStack(alignment: .leading, spacing: 10) {
@@ -31,29 +37,30 @@ struct ProgressChartSectionView: View {
                         title: "Tracked Exercise",
                         systemImage: "dumbbell",
                         subtitle: "Switch the active movement to compare long-term load and strength trends.",
-                        tone: .today
+                        tone: .today,
+                        trailingStyle: .plain
                     )
 
-                    Picker(
-                        "Exercise",
-                        selection: Binding(
-                            get: { state.selectedExerciseID },
-                            set: { selection in
-                                onSelectExercise(selection)
-                            }
-                        )
-                    ) {
+                    Menu {
                         ForEach(state.exerciseSummaries) { summary in
-                            Text(summary.displayName).tag(Optional(summary.exerciseID))
+                            Button(summary.displayName) {
+                                onSelectExercise(summary.exerciseID)
+                            }
+                        }
+                    } label: {
+                        HStack(spacing: 6) {
+                            Text(selectedExerciseLabel)
+                                .font(.subheadline.weight(.semibold))
+                                .foregroundStyle(AppColors.textPrimary)
+
+                            Image(systemName: "chevron.down")
+                                .font(.caption.weight(.black))
+                                .foregroundStyle(AppColors.textSecondary)
                         }
                     }
-                    .pickerStyle(.menu)
-                    .tint(AppColors.textPrimary)
+                    .buttonStyle(.plain)
                 }
-                .appInsetContentCard(
-                    fill: AppToneStyle.today.softFill.opacity(0.45),
-                    border: AppToneStyle.today.softBorder
-                )
+                .progressSectionSpacing()
 
                 if let summary = state.selectedExerciseSummary,
                     let chartSeries = state.selectedExerciseChartSeries
@@ -72,7 +79,8 @@ struct ProgressChartSectionView: View {
                                 )
                                 return "e1RM PR \(oneRepMax) \(state.weightUnit.symbol)"
                             },
-                            tone: .progress
+                            tone: .progress,
+                            trailingStyle: .plain
                         )
 
                         Chart {
@@ -108,24 +116,10 @@ struct ProgressChartSectionView: View {
                                         Text("Current e1RM PR")
                                             .font(.caption2.weight(.semibold))
                                             .foregroundStyle(AppColors.success)
-                                            .padding(.horizontal, 8)
-                                            .padding(.vertical, 5)
-                                            .appInsetCard(
-                                                cornerRadius: 999,
-                                                fill: AppToneStyle.success.softFill.opacity(0.84),
-                                                border: AppToneStyle.success.softBorder
-                                            )
                                     }
                             }
                         }
                         .frame(height: ProgressDashboardMetrics.trendChartHeight)
-                        .chartPlotStyle { plotArea in
-                            plotArea
-                                .background(
-                                    RoundedRectangle(cornerRadius: 16, style: .continuous)
-                                        .fill(AppColors.input.opacity(0.60))
-                                )
-                        }
                         .chartXAxis {
                             AxisMarks(values: .automatic(desiredCount: ProgressDashboardMetrics.trendAxisMarkCount)) { value in
                                 AxisGridLine()
@@ -176,13 +170,15 @@ struct ProgressChartSectionView: View {
                                 label: "Points",
                                 value: "\(summary.pointCount)",
                                 systemImage: "chart.bar",
-                                tone: .progress
+                                tone: .progress,
+                                style: .plain
                             )
                             MetricBadge(
                                 label: "Volume",
                                 value: WeightFormatter.displayString(summary.totalVolume, unit: state.weightUnit),
                                 systemImage: "scalemass",
-                                tone: .warning
+                                tone: .warning,
+                                style: .plain
                             )
 
                             if let currentPR = summary.currentPR {
@@ -190,19 +186,17 @@ struct ProgressChartSectionView: View {
                                     label: "e1RM PR",
                                     value: WeightFormatter.displayString(currentPR.estimatedOneRepMax, unit: state.weightUnit),
                                     systemImage: "rosette",
-                                    tone: .success
+                                    tone: .success,
+                                    style: .plain
                                 )
                             }
                         }
                     }
-                    .appInsetContentCard(
-                        fill: AppToneStyle.progress.softFill.opacity(0.34),
-                        border: AppToneStyle.progress.softBorder
-                    )
+                    .progressSectionSpacing()
                 }
             }
         }
-        .appSectionFrame(tone: .progress, topPadding: 16, bottomPadding: 8)
+        .progressSectionSpacing(topPadding: 6, bottomPadding: 2)
     }
 }
 
@@ -224,7 +218,8 @@ private struct ProgressExerciseSummaryCardView: View {
                         ? "Trend data is waiting for more weighted logs."
                         : "Follow top-set load alongside estimated strength changes over time.",
                     trailing: summary.currentPR == nil ? "Building" : "PR tracked",
-                    tone: summary.currentPR == nil ? .progress : .success
+                    tone: summary.currentPR == nil ? .progress : .success,
+                    trailingStyle: .plain
                 )
 
                 LazyVGrid(
@@ -235,13 +230,15 @@ private struct ProgressExerciseSummaryCardView: View {
                         label: "Sessions",
                         value: "\(summary.pointCount)",
                         systemImage: "chart.bar",
-                        tone: .progress
+                        tone: .progress,
+                        style: .plain
                     )
                     MetricBadge(
                         label: "Volume",
                         value: WeightFormatter.displayString(summary.totalVolume, unit: weightUnit),
                         systemImage: "scalemass",
-                        tone: .warning
+                        tone: .warning,
+                        style: .plain
                     )
 
                     if let latestPoint {
@@ -249,14 +246,16 @@ private struct ProgressExerciseSummaryCardView: View {
                             label: "Latest Top",
                             value: "\(WeightFormatter.displayString(latestPoint.topWeight, unit: weightUnit)) \(weightUnit.symbol)",
                             systemImage: "arrow.up.right",
-                            tone: .today
+                            tone: .today,
+                            style: .plain
                         )
                         MetricBadge(
                             label: "Latest 1RM",
                             value:
                                 "\(WeightFormatter.displayString(latestPoint.estimatedOneRepMax, unit: weightUnit)) \(weightUnit.symbol)",
                             systemImage: "waveform.path.ecg",
-                            tone: .success
+                            tone: .success,
+                            style: .plain
                         )
                     }
                 }

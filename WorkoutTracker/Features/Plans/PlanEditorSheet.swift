@@ -9,7 +9,7 @@ struct PlanEditorSheet: View {
     @State private var name = ""
 
     private var planTitle: String {
-        name.nonEmptyTrimmed ?? existingPlan?.name ?? "Name your plan"
+        name.nonEmptyTrimmed ?? existingPlan?.name ?? "Name your program"
     }
 
     var body: some View {
@@ -19,9 +19,9 @@ struct PlanEditorSheet: View {
                 ScrollView {
                     LazyVStack(spacing: 18) {
                         AppHeroCard(
-                            eyebrow: existingPlan == nil ? "New Plan" : "Edit Plan",
+                            eyebrow: existingPlan == nil ? "New Program" : "Edit Program",
                             title: planTitle,
-                            subtitle: "Plans keep related templates together so Today stays fast and organized.",
+                            subtitle: "Programs keep related templates together so Today stays fast and organized.",
                             systemImage: "list.bullet.rectangle",
                             metrics: [
                                 AppHeroMetric(
@@ -42,13 +42,13 @@ struct PlanEditorSheet: View {
 
                         VStack(alignment: .leading, spacing: 12) {
                             AppSectionHeader(
-                                title: "Plan Identity",
+                                title: "Program Identity",
                                 systemImage: "textformat",
-                                subtitle: "Choose a short name you will recognize from Today and Plans.",
+                                subtitle: "Choose a short name you will recognize from Today and Programs.",
                                 tone: .plans
                             )
 
-                            TextField("Plan name", text: $name)
+                            TextField("Program name", text: $name)
                                 .textInputAutocapitalization(.words)
                                 .foregroundStyle(AppColors.textPrimary)
                                 .appInputField()
@@ -64,7 +64,7 @@ struct PlanEditorSheet: View {
                 }
                 .scrollIndicators(.hidden)
             }
-            .navigationTitle(existingPlan == nil ? "New Plan" : "Edit Plan")
+            .navigationTitle(existingPlan == nil ? "New Program" : "Edit Program")
             .toolbar {
                 ToolbarItem(placement: .topBarLeading) {
                     Button("Cancel") {

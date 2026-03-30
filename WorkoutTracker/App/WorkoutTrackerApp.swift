@@ -14,7 +14,7 @@ private struct AppStartupShellView: View {
                     .font(.headline.weight(.bold))
                     .foregroundStyle(AppColors.textPrimary)
 
-                Text("Plans, today state, and your active session are hydrating in the background.")
+                Text("Programs, today state, and your active session are hydrating in the background.")
                     .font(.subheadline)
                     .foregroundStyle(AppColors.textSecondary)
             }

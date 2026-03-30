@@ -215,7 +215,12 @@ struct PersonalRecordSummaryCardView: View, Equatable {
             Spacer()
 
             VStack(alignment: .trailing, spacing: 8) {
-                AppStatePill(title: "Record", systemImage: "rosette.fill", tone: tone)
+                AppStatePill(
+                    title: "Record",
+                    systemImage: "rosette.fill",
+                    tone: tone,
+                    style: style == .plain ? .plain : .boxed
+                )
 
                 Text(record.achievedAt.formatted(date: .abbreviated, time: .omitted))
                     .font(.caption.weight(.black))
@@ -287,7 +292,12 @@ struct CompletedSessionSummaryCardView: View, Equatable {
 
                 Spacer()
 
-                AppStatePill(title: "Logged", systemImage: "checkmark.circle.fill", tone: tone)
+                AppStatePill(
+                    title: "Logged",
+                    systemImage: "checkmark.circle.fill",
+                    tone: tone,
+                    style: style == .plain ? .plain : .boxed
+                )
             }
 
             Text(detailText)

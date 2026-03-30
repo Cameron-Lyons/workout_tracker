@@ -78,7 +78,8 @@ private struct ProgressDashboardBodyView: View {
                 systemImage: "chart.xyaxis.line",
                 title: "No progress yet",
                 message: "Finish a session and PRs, trends, and calendar history will populate here.",
-                tone: .progress
+                tone: .progress,
+                style: .plain
             )
         } else {
             ProgressDashboardLoadedView(displayedMonth: $displayedMonth)
@@ -146,7 +147,6 @@ private struct ProgressHistoryLoadingCardView: View {
         }
         .padding(.vertical, 22)
         .padding(.horizontal, 24)
-        .appSurface(cornerRadius: AppCardMetrics.featureCornerRadius, shadow: false, tone: .progress)
         .padding(.horizontal, 24)
     }
 }

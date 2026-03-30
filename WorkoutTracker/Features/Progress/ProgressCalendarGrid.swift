@@ -105,15 +105,18 @@ private struct AppCalendarDayCellView: View, Equatable {
                     VStack(spacing: 4) {
                         Text("\(dayNumber)")
                             .font(.subheadline.weight(entry.hasWorkout ? .semibold : .regular))
-                            .foregroundStyle(
-                                isSelected || entry.hasWorkout
-                                    ? AppColors.textPrimary
-                                    : AppColors.textSecondary
-                            )
+                            .foregroundStyle(textColor(for: date))
 
-                        if entry.hasWorkout {
+                        if isSelected {
                             Capsule()
-                                .fill(isSelected ? AppColors.textPrimary : AppColors.success)
+                                .fill(AppColors.accentProgress)
+                                .frame(
+                                    width: ProgressDashboardMetrics.calendarWorkoutIndicatorWidth,
+                                    height: ProgressDashboardMetrics.calendarWorkoutIndicatorSize
+                                )
+                        } else if entry.hasWorkout {
+                            Capsule()
+                                .fill(AppColors.success)
                                 .frame(
                                     width: ProgressDashboardMetrics.calendarWorkoutIndicatorWidth,
                                     height: ProgressDashboardMetrics.calendarWorkoutIndicatorSize
@@ -134,14 +137,6 @@ private struct AppCalendarDayCellView: View, Equatable {
                         }
                     }
                     .frame(maxWidth: .infinity, minHeight: ProgressDashboardMetrics.calendarCellHeight)
-                    .background {
-                        RoundedRectangle(cornerRadius: ProgressDashboardMetrics.calendarCellCornerRadius, style: .continuous)
-                            .fill(backgroundFill(for: date))
-                    }
-                    .overlay {
-                        RoundedRectangle(cornerRadius: ProgressDashboardMetrics.calendarCellCornerRadius, style: .continuous)
-                            .stroke(borderColor(for: date), lineWidth: 1)
-                    }
                 }
                 .buttonStyle(.plain)
                 .disabled(!entry.hasWorkout)
@@ -153,30 +148,17 @@ private struct AppCalendarDayCellView: View, Equatable {
         }
     }
 
-    private func backgroundFill(for date: Date) -> Color {
+    private func textColor(for date: Date) -> Color {
         if isSelected {
-            return AppToneStyle.progress.softFill.opacity(0.92)
+            return AppColors.accentProgress
         }
         if entry.hasWorkout {
-            return AppToneStyle.success.softFill.opacity(0.52)
+            return AppColors.textPrimary
         }
         if calendar.isDateInToday(date) {
-            return AppToneStyle.warning.softFill.opacity(0.22)
+            return AppColors.warning
         }
-        return AppColors.surface.opacity(0.30)
-    }
-
-    private func borderColor(for date: Date) -> Color {
-        if isSelected {
-            return AppToneStyle.progress.softBorder
-        }
-        if entry.hasWorkout {
-            return AppToneStyle.success.softBorder
-        }
-        if calendar.isDateInToday(date) {
-            return AppToneStyle.warning.softBorder
-        }
-        return AppColors.stroke.opacity(0.22)
+        return AppColors.textSecondary
     }
 }
 
@@ -213,11 +195,6 @@ struct AppCalendarGrid: View {
                         .font(.caption.weight(.bold))
                         .foregroundStyle(AppColors.textPrimary)
                         .frame(width: 34, height: 34)
-                        .appInsetCard(
-                            cornerRadius: 12,
-                            fill: AppToneStyle.progress.softFill.opacity(0.72),
-                            border: AppToneStyle.progress.softBorder
-                        )
                 }
                 .buttonStyle(.plain)
 
@@ -242,11 +219,6 @@ struct AppCalendarGrid: View {
                         .font(.caption.weight(.bold))
                         .foregroundStyle(AppColors.textPrimary)
                         .frame(width: 34, height: 34)
-                        .appInsetCard(
-                            cornerRadius: 12,
-                            fill: AppToneStyle.progress.softFill.opacity(0.72),
-                            border: AppToneStyle.progress.softBorder
-                        )
                 }
                 .buttonStyle(.plain)
             }
@@ -272,11 +244,6 @@ struct AppCalendarGrid: View {
                 }
             }
             .padding(12)
-            .appInsetCard(
-                cornerRadius: 18,
-                fill: AppToneStyle.progress.softFill.opacity(0.24),
-                border: AppToneStyle.progress.softBorder
-            )
         }
         .onChange(of: displayedMonth, initial: false) { _, newValue in
             monthLayout = AppCalendarMonthLayout.make(for: newValue, workoutDays: workoutDays)

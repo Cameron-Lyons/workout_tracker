@@ -1,5 +1,22 @@
 import SwiftUI
 
+private struct ProgressSectionSpacingModifier: ViewModifier {
+    let topPadding: CGFloat
+    let bottomPadding: CGFloat
+
+    func body(content: Content) -> some View {
+        content
+            .padding(.top, topPadding)
+            .padding(.bottom, bottomPadding)
+    }
+}
+
+extension View {
+    func progressSectionSpacing(topPadding: CGFloat = 4, bottomPadding: CGFloat = 2) -> some View {
+        modifier(ProgressSectionSpacingModifier(topPadding: topPadding, bottomPadding: bottomPadding))
+    }
+}
+
 struct ProgressSpotlightCard<Content: View>: View {
     let tone: AppToneStyle
     let content: Content
@@ -12,7 +29,7 @@ struct ProgressSpotlightCard<Content: View>: View {
     var body: some View {
         content
             .padding(18)
-            .appSectionFrame(tone: tone, topPadding: 14, bottomPadding: 6)
+            .progressSectionSpacing(topPadding: 4, bottomPadding: 2)
     }
 }
 
@@ -30,8 +47,5 @@ struct ProgressLegendPill: View {
                 .tracking(0.8)
         }
         .foregroundStyle(tone.accent)
-        .padding(.horizontal, 10)
-        .padding(.vertical, 7)
-        .appInsetCard(cornerRadius: 6, fill: tone.softFill.opacity(0.76), border: tone.softBorder)
     }
 }

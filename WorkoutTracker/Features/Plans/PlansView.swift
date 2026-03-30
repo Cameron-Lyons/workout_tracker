@@ -17,11 +17,11 @@ private struct PlansLibraryLoadingCard: View {
                 .tint(AppColors.accentPlans)
                 .scaleEffect(1.08)
 
-            Text("Loading plans...")
+            Text("Loading programs...")
                 .font(.headline.weight(.bold))
                 .foregroundStyle(AppColors.textPrimary)
 
-            Text("The full plan library is hydrating in the background so launch stays fast.")
+            Text("The full program library is hydrating in the background so launch stays fast.")
                 .font(.subheadline)
                 .multilineTextAlignment(.center)
                 .foregroundStyle(AppColors.textSecondary)
@@ -30,6 +30,81 @@ private struct PlansLibraryLoadingCard: View {
         .padding(.horizontal, 24)
         .appSurface(cornerRadius: AppCardMetrics.featureCornerRadius, shadow: false, tone: .plans)
         .padding(.horizontal, 24)
+    }
+}
+
+private struct AvailableProgramsSectionView: View {
+    let presetPacks: [PresetPack]
+    let onSelectPack: (PresetPack) -> Void
+
+    var body: some View {
+        VStack(alignment: .leading, spacing: 14) {
+            AppSectionHeader(
+                title: "Available Programs",
+                systemImage: "square.grid.2x2",
+                subtitle: "Install one of the starter programs directly from here.",
+                trailing: "\(presetPacks.count)",
+                tone: .plans
+            )
+
+            VStack(spacing: 0) {
+                ForEach(Array(presetPacks.enumerated()), id: \.element.id) { index, pack in
+                    AvailableProgramRow(pack: pack) {
+                        onSelectPack(pack)
+                    }
+
+                    if index < presetPacks.count - 1 {
+                        SectionSurfaceDivider()
+                    }
+                }
+            }
+            .appSectionFrame(tone: .plans, topPadding: 8, bottomPadding: 8)
+        }
+    }
+}
+
+private struct AvailableProgramRow: View {
+    let pack: PresetPack
+    let onAdd: () -> Void
+
+    var body: some View {
+        HStack(alignment: .top, spacing: 14) {
+            Image(systemName: pack.systemImage)
+                .font(.system(size: 18, weight: .black))
+                .foregroundStyle(AppToneStyle.plans.accent)
+                .frame(width: 42, height: 42)
+                .appInsetCard(
+                    cornerRadius: 10,
+                    fill: AppToneStyle.plans.softFill.opacity(0.72),
+                    border: AppToneStyle.plans.softBorder
+                )
+
+            VStack(alignment: .leading, spacing: 6) {
+                Text(pack.displayName)
+                    .font(.headline.weight(.black))
+                    .foregroundStyle(AppColors.textPrimary)
+
+                Text(pack.description)
+                    .font(.subheadline)
+                    .foregroundStyle(AppColors.textSecondary)
+                    .multilineTextAlignment(.leading)
+                    .fixedSize(horizontal: false, vertical: true)
+            }
+            .layoutPriority(1)
+
+            Spacer(minLength: 12)
+
+            Button {
+                onAdd()
+            } label: {
+                Label("Add", systemImage: "plus")
+            }
+            .appSecondaryActionButton(tone: .plans, controlSize: .small)
+            .padding(.top, 2)
+        }
+        .frame(maxWidth: .infinity, alignment: .leading)
+        .padding(.vertical, 14)
+        .accessibilityIdentifier("programs.preset.\(pack.rawValue)")
     }
 }
 
@@ -42,6 +117,8 @@ struct PlansView: View {
     @State private var editingTemplateContext: TemplateEditorContext?
     @State private var selectedPresetPack: PresetPack?
     @State private var pendingStartRequest: SessionStartRequest?
+
+    private let availablePrograms = PresetPack.allCases
 
     private var activeDraft: SessionDraft? {
         sessionStore.activeDraft
@@ -60,13 +137,32 @@ struct PlansView: View {
                                 .appReveal(delay: 0.01)
 
                             if plansStore.plans.isEmpty {
-                                AppEmptyStateCard(
-                                    systemImage: "list.bullet.rectangle",
-                                    title: "No plans yet",
-                                    message: "Create a custom plan or install one of the preset packs.",
-                                    tone: .plans
+                                AvailableProgramsSectionView(
+                                    presetPacks: availablePrograms,
+                                    onSelectPack: { pack in
+                                        selectedPresetPack = pack
+                                    }
                                 )
                                 .appReveal(delay: 0.03)
+                            }
+
+                            AppSectionHeader(
+                                title: "Your Programs",
+                                systemImage: "list.bullet.rectangle",
+                                subtitle: "Build custom programs and manage the ones you add.",
+                                trailing: "\(plansStore.planCount)",
+                                tone: .plans
+                            )
+                            .appReveal(delay: plansStore.plans.isEmpty ? 0.05 : 0.03)
+
+                            if plansStore.plans.isEmpty {
+                                AppEmptyStateCard(
+                                    systemImage: "list.bullet.rectangle",
+                                    title: "No programs yet",
+                                    message: "Create a custom program or add one of the available programs above.",
+                                    tone: .plans
+                                )
+                                .appReveal(delay: 0.07)
                             } else {
                                 ForEach(plansStore.plans) { plan in
                                     PlanCardView(
@@ -76,8 +172,16 @@ struct PlansView: View {
                                         editingTemplateContext: $editingTemplateContext,
                                         pendingStartRequest: $pendingStartRequest
                                     )
-                                    .appReveal(delay: 0.03)
+                                    .appReveal(delay: 0.07)
                                 }
+
+                                AvailableProgramsSectionView(
+                                    presetPacks: availablePrograms,
+                                    onSelectPack: { pack in
+                                        selectedPresetPack = pack
+                                    }
+                                )
+                                .appReveal(delay: 0.09)
                             }
                         }
                         .padding(.horizontal, 14)
@@ -86,28 +190,17 @@ struct PlansView: View {
                     .scrollIndicators(.hidden)
                 }
             }
-            .navigationTitle("Plans")
+            .navigationTitle("Programs")
+            .navigationBarTitleDisplayMode(.inline)
             .task {
                 await appStore.loadPlanLibraryIfNeeded(priority: .userInitiated)
             }
             .toolbar {
-                ToolbarItem(placement: .topBarLeading) {
-                    Menu {
-                        ForEach(PresetPack.allCases) { pack in
-                            Button(pack.displayName, systemImage: pack.systemImage) {
-                                selectedPresetPack = pack
-                            }
-                        }
-                    } label: {
-                        Label("Preset", systemImage: "sparkles")
-                    }
-                }
-
                 ToolbarItem(placement: .topBarTrailing) {
                     Button {
                         editingPlan = appStore.makePlan(name: "")
                     } label: {
-                        Label("Plan", systemImage: "plus")
+                        Label("Program", systemImage: "plus")
                     }
                     .accessibilityIdentifier("plans.addPlanButton")
                 }
@@ -126,7 +219,7 @@ struct PlansView: View {
                 }
             }
             .confirmationDialog(
-                "Install preset pack",
+                "Add program",
                 isPresented: Binding(
                     get: { selectedPresetPack != nil },
                     set: { isPresented in

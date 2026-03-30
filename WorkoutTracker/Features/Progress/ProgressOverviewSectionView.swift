@@ -107,7 +107,8 @@ struct ProgressOverviewSectionView: View {
                         systemImage: "waveform.path.ecg"
                     ),
                 ],
-                tone: .progress
+                tone: .progress,
+                style: .plain
             )
 
             ProgressSpotlightCard(tone: momentumTone) {
@@ -117,7 +118,8 @@ struct ProgressOverviewSectionView: View {
                         systemImage: "flame.fill",
                         subtitle: momentumMessage,
                         trailing: momentumTitle,
-                        tone: momentumTone
+                        tone: momentumTone,
+                        trailingStyle: .plain
                     )
 
                     HStack(spacing: 8) {
@@ -125,19 +127,22 @@ struct ProgressOverviewSectionView: View {
                             label: "30 Days",
                             value: "\(progressStore.overview.sessionsLast30Days)",
                             systemImage: "calendar",
-                            tone: .progress
+                            tone: .progress,
+                            style: .plain
                         )
                         MetricBadge(
                             label: "Avg/Week",
                             value: String(format: "%.1f", progressStore.overview.averageSessionsPerWeek),
                             systemImage: "waveform.path.ecg",
-                            tone: .warning
+                            tone: .warning,
+                            style: .plain
                         )
                         MetricBadge(
                             label: "Volume",
                             value: WeightFormatter.displayString(progressStore.overview.totalVolume, unit: settingsStore.weightUnit),
                             systemImage: "scalemass",
-                            tone: .success
+                            tone: .success,
+                            style: .plain
                         )
                     }
                 }

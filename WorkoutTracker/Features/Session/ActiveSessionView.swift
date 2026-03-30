@@ -166,7 +166,7 @@ struct ActiveSessionView: View {
                     AppEmptyStateCard(
                         systemImage: "figure.cooldown",
                         title: "No active session",
-                        message: "Start a workout from Today or Plans.",
+                        message: "Start a workout from Today or Programs.",
                         tone: .today
                     )
                 }

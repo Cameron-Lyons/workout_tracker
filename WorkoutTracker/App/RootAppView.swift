@@ -100,11 +100,11 @@ private struct OnboardingSetupView: View {
                     .tint(AppToneStyle.today.accent)
 
                 VStack(spacing: 8) {
-                    Text("Setting Up Your Plans")
+                    Text("Setting Up Your Programs")
                         .font(.system(size: 28, weight: .black))
                         .foregroundStyle(AppColors.textPrimary)
 
-                    Text("Bringing your preset pack into the app so Today is ready when it appears.")
+                    Text("Bringing your selected program into the app so Today is ready when it appears.")
                         .font(.subheadline)
                         .multilineTextAlignment(.center)
                         .foregroundStyle(AppColors.textSecondary)

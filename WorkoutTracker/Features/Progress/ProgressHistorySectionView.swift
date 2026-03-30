@@ -16,24 +16,24 @@ struct ProgressHistorySectionView: View {
                     ? "Browse the latest completed sessions or narrow the list from the calendar above."
                     : "Showing only the workouts logged on \(selectedDayLabel!).",
                 trailing: "\(progressStore.historySessions.count)",
-                tone: progressStore.selectedDay == nil ? .progress : .success
+                tone: progressStore.selectedDay == nil ? .progress : .success,
+                trailingStyle: .plain
             )
 
             if let selectedDayLabel {
                 HStack(spacing: 8) {
-                    AppStatePill(title: selectedDayLabel, systemImage: "calendar.badge.clock", tone: .success)
+                    AppStatePill(
+                        title: selectedDayLabel,
+                        systemImage: "calendar.badge.clock",
+                        tone: .success,
+                        style: .plain
+                    )
 
                     Button("Show All") {
                         progressStore.selectDay(nil)
                     }
                     .font(.caption.weight(.semibold))
-                    .padding(.horizontal, 10)
-                    .padding(.vertical, 7)
-                    .appInsetCard(
-                        cornerRadius: 999,
-                        fill: AppToneStyle.progress.softFill.opacity(0.84),
-                        border: AppToneStyle.progress.softBorder
-                    )
+                    .foregroundStyle(AppColors.accentProgress)
                     .buttonStyle(.plain)
                 }
             }
@@ -43,9 +43,10 @@ struct ProgressHistorySectionView: View {
                     systemImage: "calendar.badge.exclamationmark",
                     title: "No sessions for this filter",
                     message: "Choose another logged day or clear the calendar filter to see every completed workout.",
-                    tone: .warning
+                    tone: .warning,
+                    style: .plain
                 )
-                .appSectionFrame(tone: .warning)
+                .progressSectionSpacing()
             } else {
                 let listTone: AppToneStyle = progressStore.selectedDay == nil ? .progress : .success
 
@@ -62,10 +63,10 @@ struct ProgressHistorySectionView: View {
                             Rectangle()
                                 .fill(AppColors.stroke.opacity(0.78))
                                 .frame(height: 1)
+                            }
                         }
                     }
-                }
-                .appSectionFrame(tone: listTone)
+                .progressSectionSpacing()
             }
         }
     }

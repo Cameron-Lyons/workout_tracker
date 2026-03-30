@@ -14,7 +14,8 @@ struct ProgressCalendarSectionView: View {
                     ? "Tap any logged day to focus the session history below."
                     : "A selected day narrows the history list so you can inspect that training date quickly.",
                 trailing: "\(progressStore.workoutDays.count) active",
-                tone: .progress
+                tone: .progress,
+                trailingStyle: .plain
             )
 
             if let selectedDay = progressStore.selectedDay {
@@ -36,7 +37,7 @@ struct ProgressCalendarSectionView: View {
                 ProgressLegendPill(title: "Today", systemImage: "sun.max.fill", tone: .warning)
             }
         }
-        .appSectionFrame(tone: .progress, topPadding: 16, bottomPadding: 8)
+        .progressSectionSpacing(topPadding: 6, bottomPadding: 2)
     }
 }
 
@@ -52,12 +53,23 @@ private struct ProgressSelectedDayCardView: View {
                     systemImage: "calendar.badge.clock",
                     subtitle: "The history list below is filtered to this training date.",
                     trailing: "\(sessionCount) session\(sessionCount == 1 ? "" : "s")",
-                    tone: .success
+                    tone: .success,
+                    trailingStyle: .plain
                 )
 
                 HStack(spacing: 8) {
-                    AppStatePill(title: "Day Filter Active", systemImage: "line.3.horizontal.decrease.circle.fill", tone: .success)
-                    AppStatePill(title: "Tap again to clear", systemImage: "hand.tap.fill", tone: .progress)
+                    AppStatePill(
+                        title: "Day Filter Active",
+                        systemImage: "line.3.horizontal.decrease.circle.fill",
+                        tone: .success,
+                        style: .plain
+                    )
+                    AppStatePill(
+                        title: "Tap again to clear",
+                        systemImage: "hand.tap.fill",
+                        tone: .progress,
+                        style: .plain
+                    )
                 }
             }
         }

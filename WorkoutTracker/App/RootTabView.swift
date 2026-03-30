@@ -38,7 +38,7 @@ struct RootTabView: View {
             PlansView()
                 .tag(Tab.plans)
                 .tabItem {
-                    Label("Plans", systemImage: "list.bullet.rectangle")
+                    Label("Programs", systemImage: "list.bullet.rectangle")
                 }
 
             ProgressDashboardView(onDisplayed: endProgressSelectionSignpost)

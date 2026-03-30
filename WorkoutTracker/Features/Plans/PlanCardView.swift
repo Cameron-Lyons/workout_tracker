@@ -33,10 +33,10 @@ struct PlanCardView: View {
                 .accessibilityIdentifier("plans.addTemplateButton.\(plan.id.uuidString)")
 
                 Menu {
-                    Button("Edit Plan", systemImage: "square.and.pencil") {
+                    Button("Edit Program", systemImage: "square.and.pencil") {
                         editingPlan = plan
                     }
-                    Button("Delete Plan", systemImage: "trash", role: .destructive) {
+                    Button("Delete Program", systemImage: "trash", role: .destructive) {
                         appStore.deletePlan(plan.id)
                     }
                 } label: {
@@ -46,7 +46,7 @@ struct PlanCardView: View {
             }
 
             if plan.templates.isEmpty {
-                Text("This plan has no templates yet.")
+                Text("This program has no templates yet.")
                     .font(.subheadline)
                     .foregroundStyle(AppColors.textSecondary)
                     .frame(maxWidth: .infinity, alignment: .leading)

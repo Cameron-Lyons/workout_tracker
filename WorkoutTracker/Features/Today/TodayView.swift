@@ -15,12 +15,8 @@ struct TodayView: View {
         TodayHeroCardState(
             title: activeDraft?.templateNameSnapshot ?? "Ready to train",
             subtitle: activeDraft == nil
-                ? "Start from a pinned template, relaunch a recent session, or jump into Plans to build something custom."
-                : "Your active session is autosaved after every change. Resume exactly where you left it.",
-            status: activeDraft == nil ? "Ready" : "In Progress",
-            templateReferenceCount: todayStore.templateReferenceCount,
-            sessionsLast30Days: todayStore.sessionsLast30Days,
-            recentPersonalRecordCount: todayStore.recentPersonalRecords.count
+                ? "Start from a pinned template, relaunch a recent session, or jump into Programs to build something custom."
+                : "Pick up your active session or switch programs when you are ready."
         )
     }
 
@@ -46,8 +42,8 @@ struct TodayView: View {
                         } else {
                             AppEmptyStateCard(
                                 systemImage: "sparkles.rectangle.stack",
-                                title: "Start from a plan",
-                                message: "Finish onboarding or create a template in Plans to get a pinned next workout.",
+                                title: "Start from a program",
+                                message: "Finish onboarding or create a template in Programs to get a pinned next workout.",
                                 tone: .today
                             )
                             .appReveal(delay: 0.03)

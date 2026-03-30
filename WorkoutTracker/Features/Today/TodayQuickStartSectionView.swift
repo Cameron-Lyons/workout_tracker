@@ -13,7 +13,6 @@ struct TodayQuickStartSectionView: View {
                 title: "Quick Start",
                 systemImage: "bolt",
                 subtitle: "Templates you launched recently stay close.",
-                trailing: todayStore.quickStartTemplates.isEmpty ? nil : "\(todayStore.quickStartTemplates.count)",
                 tone: .today
             )
 

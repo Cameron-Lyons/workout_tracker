@@ -5,15 +5,15 @@ struct PlansHeroCardView: View {
 
     var body: some View {
         AppHeroCard(
-            eyebrow: "Plan Builder",
-            title: "\(plansStore.planCount) plans",
+            eyebrow: "Program Library",
+            title: "\(plansStore.planCount) program\(plansStore.planCount == 1 ? "" : "s")",
             subtitle:
-                "Templates define your future sessions. Schedule them loosely, pin your Today favorite, and start whenever you want.",
+                "Programs keep related templates together. Install a starter program, pin a favorite for Today, and launch whenever you want.",
             systemImage: "list.bullet.rectangle",
             metrics: [
                 AppHeroMetric(
                     id: "plans",
-                    label: "Plans",
+                    label: "Programs",
                     value: "\(plansStore.planCount)",
                     systemImage: "list.bullet"
                 ),

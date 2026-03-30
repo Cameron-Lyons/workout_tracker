@@ -9,7 +9,6 @@ struct TodayRecentSessionsSectionView: View {
                 title: "Recent Sessions",
                 systemImage: "clock.arrow.circlepath",
                 subtitle: "Keep momentum by reliving the last few workouts at a glance.",
-                trailing: todayStore.recentSessions.isEmpty ? nil : "\(todayStore.recentSessions.count)",
                 tone: .progress
             )
 

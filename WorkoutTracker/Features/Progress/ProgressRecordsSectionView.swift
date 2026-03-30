@@ -17,7 +17,8 @@ struct ProgressRecordsSectionView: View {
                     ? "Heavy work and rep PRs will surface here after you log more sessions."
                     : "Your latest highlights stay pinned at the top so progress feels visible.",
                 trailing: recentRecords.isEmpty ? nil : "\(recentRecords.count)",
-                tone: .success
+                tone: .success,
+                trailingStyle: .plain
             )
 
             if let featuredRecord = recentRecords.first {
@@ -42,16 +43,17 @@ struct ProgressRecordsSectionView: View {
                             }
                         }
                     }
-                    .appSectionFrame(tone: .success)
+                    .progressSectionSpacing()
                 }
             } else {
                 AppInlineMessage(
                     systemImage: "rosette",
                     title: "No PRs yet",
                     message: "Your first standout sets will show up here once a logged session beats an earlier benchmark.",
-                    tone: .success
+                    tone: .success,
+                    style: .plain
                 )
-                .appSectionFrame(tone: .success)
+                .progressSectionSpacing()
             }
         }
     }
@@ -69,7 +71,8 @@ private struct ProgressRecordSpotlightCardView: View {
                     systemImage: "rosette",
                     subtitle: "Your freshest milestone stays front and center until the next one lands.",
                     trailing: record.achievedAt.formatted(date: .abbreviated, time: .omitted),
-                    tone: .success
+                    tone: .success,
+                    trailingStyle: .plain
                 )
 
                 Text(record.displayName)
@@ -92,13 +95,15 @@ private struct ProgressRecordSpotlightCardView: View {
                         label: "Load",
                         value: "\(WeightFormatter.displayString(record.weight, unit: weightUnit)) \(weightUnit.symbol)",
                         systemImage: "scalemass",
-                        tone: .warning
+                        tone: .warning,
+                        style: .plain
                     )
                     MetricBadge(
                         label: "Estimated 1RM",
                         value: "\(WeightFormatter.displayString(record.estimatedOneRepMax, unit: weightUnit)) \(weightUnit.symbol)",
                         systemImage: "bolt.fill",
-                        tone: .success
+                        tone: .success,
+                        style: .plain
                     )
                 }
             }

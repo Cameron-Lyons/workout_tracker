@@ -14,57 +14,30 @@ struct TodayPinnedTemplateCardView: View {
         )
     }
 
+    private var contextLine: String {
+        if usesAlternatingRotation {
+            return "A/B rotation keeps this aligned with the last alternating workout you finished."
+        }
+
+        if reference.scheduledWeekdays.isEmpty {
+            return "Ready any day."
+        }
+
+        return "Scheduled \(weekdaySummary(reference.scheduledWeekdays, emptyLabel: "READY ANY DAY"))."
+    }
+
     var body: some View {
         TodaySpotlightCard(tone: .plans) {
-            VStack(alignment: .leading, spacing: 16) {
-                HStack(alignment: .top, spacing: 12) {
-                    VStack(alignment: .leading, spacing: 8) {
-                        AppStatePill(title: "Pinned Next", systemImage: "pin.fill", tone: .plans)
+            VStack(alignment: .leading, spacing: 12) {
+                Text(reference.templateName)
+                    .font(.system(size: 28, weight: .black))
+                    .foregroundStyle(AppColors.textPrimary)
 
-                        Text(reference.templateName)
-                            .font(.system(size: 28, weight: .black))
-                            .foregroundStyle(AppColors.textPrimary)
+                Text(reference.planName)
+                    .font(.subheadline)
+                    .foregroundStyle(AppColors.textSecondary)
 
-                        Text(reference.planName)
-                            .font(.subheadline)
-                            .foregroundStyle(AppColors.textSecondary)
-                    }
-
-                    Spacer(minLength: 12)
-
-                    Image(systemName: "figure.run")
-                        .font(.system(size: 30, weight: .semibold))
-                        .foregroundStyle(AppToneStyle.plans.accent)
-                        .padding(12)
-                        .appInsetCard(cornerRadius: 16, fill: AppToneStyle.plans.softFill, border: AppToneStyle.plans.softBorder)
-                }
-
-                if usesAlternatingRotation {
-                    Text("A/B rotation keeps this aligned with the last alternating workout you finished.")
-                        .font(.subheadline)
-                        .foregroundStyle(AppColors.textSecondary)
-                } else if reference.scheduledWeekdays.isEmpty {
-                    Text("No weekday pin yet. Keep this as your default whenever you want a fast start.")
-                        .font(.subheadline)
-                        .foregroundStyle(AppColors.textSecondary)
-                } else {
-                    HStack(spacing: 8) {
-                        ForEach(reference.scheduledWeekdays) { weekday in
-                            Text(weekday.shortLabel)
-                                .font(.caption.weight(.semibold))
-                                .foregroundStyle(AppToneStyle.plans.accent)
-                                .padding(.horizontal, 10)
-                                .padding(.vertical, 6)
-                                .appInsetCard(
-                                    cornerRadius: 999,
-                                    fill: AppToneStyle.plans.softFill.opacity(0.8),
-                                    border: AppToneStyle.plans.softBorder
-                                )
-                        }
-                    }
-                }
-
-                Text("Start straight from Today and drop into the workout logger immediately.")
+                Text(contextLine)
                     .font(.subheadline)
                     .foregroundStyle(AppColors.textSecondary)
 

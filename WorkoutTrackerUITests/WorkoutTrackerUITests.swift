@@ -80,7 +80,7 @@ final class WorkoutTrackerUITests: XCTestCase {
     func testCreateCustomTemplateAndLaunchIt() throws {
         let app = launchAppForUITest(extraArguments: ["--uitesting-complete-onboarding"])
 
-        let plansTab = app.tabButton(named: "Plans")
+        let plansTab = app.tabButton(named: "Programs")
         XCTAssertTrue(plansTab.waitForExistence(timeout: 8))
         plansTab.tap()
 
@@ -88,13 +88,14 @@ final class WorkoutTrackerUITests: XCTestCase {
         XCTAssertTrue(addPlanButton.waitForExistence(timeout: 4))
         addPlanButton.tap()
 
-        let planNameField = app.textFields["Plan name"]
+        let planNameField = app.textFields["Program name"]
         XCTAssertTrue(planNameField.waitForExistence(timeout: 4))
         planNameField.tap()
         planNameField.typeText("Custom Plan")
         app.buttons["Save"].tap()
 
         let addTemplateButton = app.firstButton(withIdentifierPrefix: "plans.addTemplateButton.")
+        app.revealIfNeeded(addTemplateButton)
         XCTAssertTrue(addTemplateButton.waitForExistence(timeout: 4))
         addTemplateButton.tap()
 
@@ -156,7 +157,7 @@ final class WorkoutTrackerUITests: XCTestCase {
     func testCreateCustomExerciseTemplateAndSaveIt() throws {
         let app = launchAppForUITest(extraArguments: ["--uitesting-complete-onboarding"])
 
-        let plansTab = app.tabButton(named: "Plans")
+        let plansTab = app.tabButton(named: "Programs")
         XCTAssertTrue(plansTab.waitForExistence(timeout: 8))
         plansTab.tap()
 
@@ -164,13 +165,14 @@ final class WorkoutTrackerUITests: XCTestCase {
         XCTAssertTrue(addPlanButton.waitForExistence(timeout: 4))
         addPlanButton.tap()
 
-        let planNameField = app.textFields["Plan name"]
+        let planNameField = app.textFields["Program name"]
         XCTAssertTrue(planNameField.waitForExistence(timeout: 4))
         planNameField.tap()
         planNameField.typeText("Custom Exercise Plan")
         app.buttons["Save"].tap()
 
         let addTemplateButton = app.firstButton(withIdentifierPrefix: "plans.addTemplateButton.")
+        app.revealIfNeeded(addTemplateButton)
         XCTAssertTrue(addTemplateButton.waitForExistence(timeout: 4))
         addTemplateButton.tap()
 
@@ -215,7 +217,7 @@ final class WorkoutTrackerUITests: XCTestCase {
         XCTAssertTrue(presetButton.waitForExistence(timeout: 8))
         presetButton.tap()
 
-        let plansTab = app.tabButton(named: "Plans")
+        let plansTab = app.tabButton(named: "Programs")
         XCTAssertTrue(plansTab.waitForExistence(timeout: 8))
         plansTab.tap()
 
@@ -242,13 +244,13 @@ final class WorkoutTrackerUITests: XCTestCase {
         let todayTab = app.tabButton(named: "Today")
         XCTAssertTrue(todayTab.waitForExistence(timeout: 8))
         todayTab.tap()
-        XCTAssertTrue(app.staticTexts["Start from a plan"].waitForExistence(timeout: 8))
+        XCTAssertTrue(app.staticTexts["Start from a program"].waitForExistence(timeout: 8))
         attachScreenshot(named: "layout-empty-today")
 
-        let plansTab = app.tabButton(named: "Plans")
+        let plansTab = app.tabButton(named: "Programs")
         XCTAssertTrue(plansTab.waitForExistence(timeout: 4))
         plansTab.tap()
-        XCTAssertTrue(app.staticTexts["No plans yet"].waitForExistence(timeout: 8))
+        XCTAssertTrue(app.staticTexts["General Gym"].waitForExistence(timeout: 8))
         XCTAssertTrue(app.buttons["plans.addPlanButton"].waitForExistence(timeout: 4))
         attachScreenshot(named: "layout-empty-plans")
 

@@ -12,6 +12,11 @@ enum AppRowStyle: Equatable {
     case plain
 }
 
+enum AppChromeStyle: Equatable {
+    case boxed
+    case plain
+}
+
 struct AppHeroCard: View {
     let eyebrow: String?
     let title: String
@@ -19,8 +24,21 @@ struct AppHeroCard: View {
     let systemImage: String
     let metrics: [AppHeroMetric]
     var tone: AppToneStyle = .base
+    var style: AppChromeStyle = .boxed
 
     var body: some View {
+        Group {
+            if style == .boxed {
+                content
+                    .appFeatureSurface(tone: tone)
+            } else {
+                content
+                    .padding(.vertical, 4)
+            }
+        }
+    }
+
+    private var content: some View {
         VStack(alignment: .leading, spacing: 16) {
             HStack(alignment: .center, spacing: 10) {
                 if let eyebrow, !eyebrow.isEmpty {
@@ -64,7 +82,6 @@ struct AppHeroCard: View {
                 }
             }
         }
-        .appFeatureSurface(tone: tone)
     }
 }
 
@@ -100,8 +117,24 @@ struct AppEmptyStateCard: View {
     let title: String
     let message: String
     var tone: AppToneStyle = .base
+    var style: AppChromeStyle = .boxed
 
     var body: some View {
+        Group {
+            if style == .boxed {
+                content
+                    .padding(.vertical, 18)
+                    .frame(maxWidth: .infinity, alignment: .leading)
+                    .appFeatureSurface(tone: tone)
+            } else {
+                content
+                    .padding(.vertical, 8)
+                    .frame(maxWidth: .infinity, alignment: .leading)
+            }
+        }
+    }
+
+    private var content: some View {
         VStack(alignment: .leading, spacing: 16) {
             Image(systemName: systemImage)
                 .font(.title2.weight(.black))
@@ -121,9 +154,6 @@ struct AppEmptyStateCard: View {
                     .fixedSize(horizontal: false, vertical: true)
             }
         }
-        .padding(.vertical, 18)
-        .frame(maxWidth: .infinity, alignment: .leading)
-        .appFeatureSurface(tone: tone)
     }
 }
 
@@ -132,18 +162,11 @@ struct AppInlineMessage: View {
     let title: String
     let message: String
     var tone: AppToneStyle = .base
+    var style: AppChromeStyle = .boxed
 
     var body: some View {
         HStack(alignment: .top, spacing: 14) {
-            Image(systemName: systemImage)
-                .font(.system(size: 16, weight: .black))
-                .foregroundStyle(tone.accent)
-                .frame(width: 36, height: 36)
-                .appInsetCard(
-                    cornerRadius: 8,
-                    fill: tone.softFill.opacity(0.72),
-                    border: tone.softBorder
-                )
+            icon
 
             VStack(alignment: .leading, spacing: 6) {
                 Text(title)
@@ -163,14 +186,47 @@ struct AppInlineMessage: View {
         .frame(maxWidth: .infinity, alignment: .leading)
         .padding(.vertical, 12)
     }
+
+    @ViewBuilder
+    private var icon: some View {
+        let content = Image(systemName: systemImage)
+                .font(.system(size: 16, weight: .black))
+                .foregroundStyle(tone.accent)
+                .frame(width: 36, height: 36)
+
+        if style == .boxed {
+            content
+                .appInsetCard(
+                    cornerRadius: 8,
+                    fill: tone.softFill.opacity(0.72),
+                    border: tone.softBorder
+                )
+        } else {
+            content
+        }
+    }
 }
 
 struct AppStatePill: View {
     let title: String
     let systemImage: String
     var tone: AppToneStyle = .base
+    var style: AppChromeStyle = .boxed
 
     var body: some View {
+        Group {
+            if style == .boxed {
+                content
+                    .padding(.horizontal, 10)
+                    .padding(.vertical, 7)
+                    .appInsetCard(cornerRadius: 6, fill: tone.softFill.opacity(0.65), border: tone.softBorder)
+            } else {
+                content
+            }
+        }
+    }
+
+    private var content: some View {
         HStack(spacing: 6) {
             Image(systemName: systemImage)
                 .font(.caption2.weight(.black))
@@ -179,9 +235,6 @@ struct AppStatePill: View {
                 .tracking(0.8)
         }
         .foregroundStyle(tone.accent)
-            .padding(.horizontal, 10)
-            .padding(.vertical, 7)
-            .appInsetCard(cornerRadius: 6, fill: tone.softFill.opacity(0.65), border: tone.softBorder)
     }
 }
 
@@ -191,6 +244,7 @@ struct AppSectionHeader: View {
     var subtitle: String?
     var trailing: String?
     var tone: AppToneStyle = .base
+    var trailingStyle: AppChromeStyle = .boxed
 
     var body: some View {
         HStack(alignment: .top, spacing: 12) {
@@ -217,13 +271,20 @@ struct AppSectionHeader: View {
             Spacer(minLength: 12)
 
             if let trailing, !trailing.isEmpty {
-                Text(trailing)
-                    .font(.caption.weight(.black))
-                    .monospacedDigit()
-                    .foregroundStyle(AppColors.textPrimary)
-                    .padding(.horizontal, 10)
-                    .padding(.vertical, 7)
-                    .appInsetCard(cornerRadius: 6, fill: tone.softFill.opacity(0.65), border: tone.softBorder)
+                if trailingStyle == .boxed {
+                    Text(trailing)
+                        .font(.caption.weight(.black))
+                        .monospacedDigit()
+                        .foregroundStyle(AppColors.textPrimary)
+                        .padding(.horizontal, 10)
+                        .padding(.vertical, 7)
+                        .appInsetCard(cornerRadius: 6, fill: tone.softFill.opacity(0.65), border: tone.softBorder)
+                } else {
+                    Text(trailing)
+                        .font(.caption.weight(.black))
+                        .monospacedDigit()
+                        .foregroundStyle(tone.accent)
+                }
             }
         }
     }
@@ -234,8 +295,28 @@ struct MetricBadge: View {
     let value: String
     let systemImage: String
     var tone: AppToneStyle = .base
+    var style: AppChromeStyle = .boxed
 
     var body: some View {
+        Group {
+            if style == .boxed {
+                content
+                    .padding(.horizontal, 10)
+                    .padding(.vertical, 8)
+                    .appInsetCard(
+                        cornerRadius: 8,
+                        borderOpacity: 0.8,
+                        fill: AppColors.surfaceStrong.opacity(0.9),
+                        border: tone.softBorder
+                    )
+            } else {
+                content
+                    .padding(.vertical, 2)
+            }
+        }
+    }
+
+    private var content: some View {
         VStack(alignment: .leading, spacing: 4) {
             HStack(spacing: 6) {
                 Image(systemName: systemImage)
@@ -253,8 +334,5 @@ struct MetricBadge: View {
                 .monospacedDigit()
                 .foregroundStyle(AppColors.textPrimary)
         }
-        .padding(.horizontal, 10)
-        .padding(.vertical, 8)
-        .appInsetCard(cornerRadius: 8, borderOpacity: 0.8, fill: AppColors.surfaceStrong.opacity(0.9), border: tone.softBorder)
     }
 }
