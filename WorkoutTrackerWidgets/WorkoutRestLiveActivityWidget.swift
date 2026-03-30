@@ -2,43 +2,64 @@ import ActivityKit
 import SwiftUI
 import WidgetKit
 
+private extension Color {
+    init(hex: UInt32, opacity: Double = 1) {
+        self.init(
+            .sRGB,
+            red: Double((hex >> 16) & 0xFF) / 255,
+            green: Double((hex >> 8) & 0xFF) / 255,
+            blue: Double(hex & 0xFF) / 255,
+            opacity: opacity
+        )
+    }
+}
+
+private enum RestActivityColors {
+    static let background = Color(hex: 0x16161D)
+    static let textPrimary = Color(hex: 0xDCD7BA)
+    static let textSecondary = Color(hex: 0xC8C093)
+    static let warning = Color(hex: 0xFFA066)
+}
+
 struct WorkoutRestLiveActivityWidget: Widget {
     var body: some WidgetConfiguration {
         ActivityConfiguration(for: WorkoutRestLiveActivityAttributes.self) { context in
             WorkoutRestLiveActivityLockScreenView(context: context)
-                .activityBackgroundTint(Color.black.opacity(0.16))
-                .activitySystemActionForegroundColor(Color.white)
+                .activityBackgroundTint(RestActivityColors.background.opacity(0.84))
+                .activitySystemActionForegroundColor(RestActivityColors.textPrimary)
         } dynamicIsland: { context in
             DynamicIsland {
                 DynamicIslandExpandedRegion(.leading) {
                     Label("Rest", systemImage: "timer")
                         .font(.caption.weight(.semibold))
-                        .foregroundStyle(.orange)
+                        .foregroundStyle(RestActivityColors.warning)
                 }
 
                 DynamicIslandExpandedRegion(.trailing) {
                     Text(context.state.endDate, style: .timer)
                         .font(.title3.weight(.bold))
                         .monospacedDigit()
+                        .foregroundStyle(RestActivityColors.textPrimary)
                 }
 
                 DynamicIslandExpandedRegion(.bottom) {
                     Text(context.attributes.workoutName)
                         .font(.caption)
-                        .foregroundStyle(.secondary)
+                        .foregroundStyle(RestActivityColors.textSecondary)
                         .lineLimit(1)
                         .frame(maxWidth: .infinity, alignment: .leading)
                 }
             } compactLeading: {
                 Image(systemName: "timer")
-                    .foregroundStyle(.orange)
+                    .foregroundStyle(RestActivityColors.warning)
             } compactTrailing: {
                 Text(context.state.endDate, style: .timer)
                     .font(.caption2.weight(.bold))
                     .monospacedDigit()
+                    .foregroundStyle(RestActivityColors.textPrimary)
             } minimal: {
                 Image(systemName: "timer")
-                    .foregroundStyle(.orange)
+                    .foregroundStyle(RestActivityColors.warning)
             }
         }
     }
@@ -57,20 +78,20 @@ private struct WorkoutRestLiveActivityLockScreenView: View {
                     .font(.caption.weight(.black))
                     .tracking(1.1)
             }
-            .foregroundStyle(.orange)
+            .foregroundStyle(RestActivityColors.warning)
             .padding(.horizontal, 10)
             .padding(.vertical, 4)
-            .background(.orange.opacity(0.16), in: Capsule())
+            .background(RestActivityColors.warning.opacity(0.16), in: Capsule())
 
             Text(context.state.endDate, style: .timer)
                 .font(.system(size: 34, weight: .black, design: .rounded))
                 .monospacedDigit()
-                .foregroundStyle(.primary)
+                .foregroundStyle(RestActivityColors.textPrimary)
                 .frame(maxWidth: .infinity, alignment: .center)
 
             Text(context.attributes.workoutName)
                 .font(.caption2.weight(.medium))
-                .foregroundStyle(.secondary)
+                .foregroundStyle(RestActivityColors.textSecondary)
                 .lineLimit(1)
                 .minimumScaleFactor(0.8)
                 .frame(maxWidth: .infinity, alignment: .center)

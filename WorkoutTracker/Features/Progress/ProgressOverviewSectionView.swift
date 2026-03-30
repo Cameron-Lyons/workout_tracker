@@ -16,25 +16,14 @@ private enum WeeklyMomentumState {
         }
     }
 
-    var heroSubtitle: String {
+    var summary: String {
         switch self {
         case .waitingForFirstSession:
-            return "Your history is ready. Log the next session to restart the weekly rhythm and keep PRs moving."
+            return "Log the next session to get the week moving again."
         case .building:
-            return "Momentum is building this week. Use the trends and calendar to keep your next session on pace."
+            return "Momentum is building this week."
         case .strong:
-            return "A strong week is already in motion. Keep the streak alive and watch your trend lines compound."
-        }
-    }
-
-    var message: String {
-        switch self {
-        case .waitingForFirstSession:
-            return "No sessions logged this week yet. One workout is enough to put the dashboard back in motion."
-        case .building:
-            return "You already have traction this week. Keep the cadence steady and the averages will follow."
-        case .strong:
-            return "You are ahead of your usual pace and stacking meaningful volume early in the week."
+            return "A strong week is already in motion."
         }
     }
 }
@@ -59,92 +48,60 @@ struct ProgressOverviewSectionView: View {
         momentumState.tone
     }
 
-    private var heroSubtitle: String {
-        momentumState.heroSubtitle
-    }
-
-    private var momentumTitle: String {
-        "\(progressStore.overview.sessionsThisWeek) this week"
-    }
-
-    private var momentumMessage: String {
-        momentumState.message
+    private var summaryText: String {
+        momentumState.summary
     }
 
     var body: some View {
-        VStack(spacing: 12) {
-            AppHeroCard(
-                eyebrow: "Analytics",
-                title: "\(progressStore.overview.totalSessions) sessions logged",
-                subtitle: heroSubtitle,
-                systemImage: "chart.line.uptrend.xyaxis",
-                metrics: [
-                    AppHeroMetric(
-                        id: "week",
-                        label: "This Week",
-                        value: "\(progressStore.overview.sessionsThisWeek)",
-                        systemImage: "calendar.badge.clock"
-                    ),
-                    AppHeroMetric(
-                        id: "last30",
+        ProgressSpotlightCard(tone: momentumTone) {
+            VStack(alignment: .leading, spacing: 14) {
+                HStack(alignment: .top, spacing: 12) {
+                    VStack(alignment: .leading, spacing: 6) {
+                        Text("\(progressStore.overview.totalSessions) sessions logged")
+                            .font(.system(size: 30, weight: .black))
+                            .foregroundStyle(AppColors.textPrimary)
+
+                        Text(summaryText)
+                            .font(.subheadline)
+                            .foregroundStyle(AppColors.textSecondary)
+                    }
+
+                    Spacer(minLength: 12)
+
+                    Text("\(progressStore.overview.sessionsThisWeek) this week")
+                        .font(.caption.weight(.semibold))
+                        .foregroundStyle(momentumTone.accent)
+                }
+
+                LazyVGrid(
+                    columns: [GridItem(.flexible(minimum: 120), spacing: 8), GridItem(.flexible(minimum: 120), spacing: 8)],
+                    alignment: .leading,
+                    spacing: 8
+                ) {
+                    MetricBadge(
                         label: "Last 30d",
                         value: "\(progressStore.overview.sessionsLast30Days)",
-                        systemImage: "calendar"
-                    ),
-                    AppHeroMetric(
-                        id: "volume",
+                        systemImage: "calendar",
+                        tone: .progress,
+                        style: .plain
+                    )
+                    MetricBadge(
+                        label: "Avg / Week",
+                        value: String(format: "%.1f", progressStore.overview.averageSessionsPerWeek),
+                        systemImage: "waveform.path.ecg",
+                        tone: .warning,
+                        style: .plain
+                    )
+                    MetricBadge(
                         label: "Volume",
                         value: WeightFormatter.displayString(
                             progressStore.overview.totalVolume,
                             unit: settingsStore.weightUnit
                         ),
-                        systemImage: "scalemass"
-                    ),
-                    AppHeroMetric(
-                        id: "avg",
-                        label: "Avg / Week",
-                        value: String(format: "%.1f", progressStore.overview.averageSessionsPerWeek),
-                        systemImage: "waveform.path.ecg"
-                    ),
-                ],
-                tone: .progress,
-                style: .plain
-            )
-
-            ProgressSpotlightCard(tone: momentumTone) {
-                VStack(alignment: .leading, spacing: 12) {
-                    AppSectionHeader(
-                        title: "Momentum",
-                        systemImage: "flame.fill",
-                        subtitle: momentumMessage,
-                        trailing: momentumTitle,
-                        tone: momentumTone,
-                        trailingStyle: .plain
+                        systemImage: "scalemass",
+                        tone: .success,
+                        style: .plain
                     )
-
-                    HStack(spacing: 8) {
-                        MetricBadge(
-                            label: "30 Days",
-                            value: "\(progressStore.overview.sessionsLast30Days)",
-                            systemImage: "calendar",
-                            tone: .progress,
-                            style: .plain
-                        )
-                        MetricBadge(
-                            label: "Avg/Week",
-                            value: String(format: "%.1f", progressStore.overview.averageSessionsPerWeek),
-                            systemImage: "waveform.path.ecg",
-                            tone: .warning,
-                            style: .plain
-                        )
-                        MetricBadge(
-                            label: "Volume",
-                            value: WeightFormatter.displayString(progressStore.overview.totalVolume, unit: settingsStore.weightUnit),
-                            systemImage: "scalemass",
-                            tone: .success,
-                            style: .plain
-                        )
-                    }
                 }
             }
         }

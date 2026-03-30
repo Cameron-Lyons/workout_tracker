@@ -27,9 +27,13 @@ struct PlanCardView: View {
                 Button {
                     editingTemplateContext = TemplateEditorContext(planID: plan.id, template: nil)
                 } label: {
-                    Label("Add Template", systemImage: "plus")
+                    Image(systemName: "plus")
+                        .font(.title3.weight(.black))
+                        .frame(width: 28, height: 28)
                 }
-                .appSecondaryActionButton(tone: .plans)
+                .buttonStyle(.plain)
+                .foregroundStyle(AppToneStyle.plans.accent)
+                .accessibilityLabel("Add Template")
                 .accessibilityIdentifier("plans.addTemplateButton.\(plan.id.uuidString)")
 
                 Menu {
@@ -82,59 +86,49 @@ private struct TemplateCardView: View {
     @Binding var editingTemplateContext: TemplateEditorContext?
     @Binding var pendingStartRequest: SessionStartRequest?
 
+    private var isPinned: Bool {
+        plan.pinnedTemplateID == template.id
+    }
+
+    private var detailLine: String {
+        var parts: [String] = []
+
+        if !template.note.isEmpty {
+            parts.append(template.note)
+        }
+
+        let scheduleSummary = weekdaySummary(template.scheduledWeekdays, emptyLabel: "")
+        if !scheduleSummary.isEmpty {
+            parts.append(scheduleSummary)
+        }
+
+        parts.append("\(template.blocks.count) exercise\(template.blocks.count == 1 ? "" : "s")")
+        return parts.joined(separator: " • ")
+    }
+
     var body: some View {
-        VStack(alignment: .leading, spacing: 10) {
-            HStack(alignment: .top) {
-                VStack(alignment: .leading, spacing: 5) {
-                    HStack(spacing: 8) {
-                        Text(template.name)
-                            .font(.headline.weight(.semibold))
-                            .foregroundStyle(AppColors.textPrimary)
+        HStack(alignment: .top, spacing: 12) {
+            VStack(alignment: .leading, spacing: 6) {
+                HStack(spacing: 8) {
+                    Text(template.name)
+                        .font(.headline.weight(.semibold))
+                        .foregroundStyle(AppColors.textPrimary)
 
-                        if plan.pinnedTemplateID == template.id {
-                            Text("PINNED")
-                                .font(.caption2.weight(.black))
-                                .tracking(0.8)
-                                .foregroundStyle(AppToneStyle.plans.accent)
-                        }
+                    if isPinned {
+                        AppStatePill(title: "Pinned", systemImage: "pin.fill", tone: .plans, style: .plain)
                     }
-
-                    if !template.note.isEmpty {
-                        Text(template.note)
-                            .font(.caption)
-                            .foregroundStyle(AppColors.textSecondary)
-                    }
-
-                    Text(weekdaySummary(template.scheduledWeekdays, emptyLabel: "ANY DAY"))
-                        .font(.caption.weight(.black))
-                        .tracking(0.7)
-                        .foregroundStyle(AppColors.textPrimary.opacity(0.88))
                 }
 
-                Spacer()
-
-                Button {
-                    appStore.pinTemplate(planID: plan.id, templateID: template.id)
-                } label: {
-                    Image(systemName: plan.pinnedTemplateID == template.id ? "pin.fill" : "pin")
-                        .font(.subheadline.weight(.semibold))
-                }
-                .appSecondaryActionButton(tone: .plans, controlSize: .small)
-                .accessibilityLabel(plan.pinnedTemplateID == template.id ? "Pinned to Today" : "Pin to Today")
-                .accessibilityIdentifier("plans.pinTemplate.\(template.id.uuidString)")
+                Text(detailLine)
+                    .font(.subheadline)
+                    .foregroundStyle(AppColors.textSecondary)
+                    .multilineTextAlignment(.leading)
+                    .fixedSize(horizontal: false, vertical: true)
             }
 
-            VStack(spacing: 0) {
-                ForEach(Array(template.blocks.enumerated()), id: \.element.id) { index, block in
-                    TemplateBlockSummaryRow(block: block)
+            Spacer(minLength: 12)
 
-                    if index < template.blocks.count - 1 {
-                        SectionSurfaceDivider()
-                    }
-                }
-            }
-
-            HStack(spacing: 10) {
+            HStack(spacing: 8) {
                 Button {
                     handleSessionStart(
                         activeDraft: activeDraft,
@@ -151,62 +145,32 @@ private struct TemplateCardView: View {
                     )
                 } label: {
                     Label("Start", systemImage: "play.fill")
-                        .frame(maxWidth: .infinity)
                 }
-                .appPrimaryActionButton(tone: .today, controlSize: .regular)
+                .appPrimaryActionButton(tone: .today, controlSize: .small)
                 .accessibilityIdentifier("plans.startTemplate.\(template.id.uuidString)")
 
-                Button {
-                    editingTemplateContext = TemplateEditorContext(planID: plan.id, template: template)
-                } label: {
-                    Label("Edit", systemImage: "square.and.pencil")
-                        .frame(maxWidth: .infinity)
-                }
-                .appSecondaryActionButton(tone: .plans, controlSize: .regular)
+                Menu {
+                    Button(
+                        isPinned ? "Pinned to Today" : "Pin to Today",
+                        systemImage: isPinned ? "pin.fill" : "pin"
+                    ) {
+                        appStore.pinTemplate(planID: plan.id, templateID: template.id)
+                    }
 
-                Button(role: .destructive) {
-                    appStore.deleteTemplate(planID: plan.id, templateID: template.id)
+                    Button("Edit Template", systemImage: "square.and.pencil") {
+                        editingTemplateContext = TemplateEditorContext(planID: plan.id, template: template)
+                    }
+
+                    Button("Delete Template", systemImage: "trash", role: .destructive) {
+                        appStore.deleteTemplate(planID: plan.id, templateID: template.id)
+                    }
                 } label: {
-                    Image(systemName: "trash")
+                    Image(systemName: "ellipsis.circle")
+                        .foregroundStyle(AppColors.textSecondary)
                 }
-                .appSecondaryActionButton(tone: .danger, controlSize: .regular)
+                .accessibilityIdentifier("plans.pinTemplate.\(template.id.uuidString)")
             }
         }
         .padding(.vertical, 14)
-    }
-}
-
-private struct TemplateBlockSummaryRow: View {
-    let block: ExerciseBlock
-
-    var body: some View {
-        HStack(alignment: .top, spacing: 12) {
-            VStack(alignment: .leading, spacing: 4) {
-                Text(block.exerciseNameSnapshot)
-                    .font(.subheadline.weight(.semibold))
-                    .foregroundStyle(AppColors.textPrimary)
-                    .multilineTextAlignment(.leading)
-                    .fixedSize(horizontal: false, vertical: true)
-
-                Text("\(block.targets.count) sets • \(setTargetRepSummary(for: block.targets)) reps")
-                    .font(.caption)
-                    .foregroundStyle(AppColors.textSecondary)
-
-                if let supersetGroup = block.supersetGroup, !supersetGroup.isEmpty {
-                    Text("SUPERSET \(supersetGroup)")
-                        .font(.caption2.weight(.black))
-                        .tracking(0.7)
-                        .foregroundStyle(AppToneStyle.plans.accent)
-                }
-            }
-
-            Spacer(minLength: 12)
-
-            Text(block.progressionRule.kind.displayLabel.uppercased())
-                .font(.caption2.weight(.black))
-                .tracking(0.7)
-                .foregroundStyle(AppToneStyle.progress.accent)
-        }
-        .padding(.vertical, 10)
     }
 }

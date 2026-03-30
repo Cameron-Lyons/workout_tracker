@@ -11,34 +11,20 @@ struct TodayView: View {
         sessionStore.activeDraft
     }
 
-    private var heroState: TodayHeroCardState {
-        TodayHeroCardState(
-            title: activeDraft?.templateNameSnapshot ?? "Ready to train",
-            subtitle: activeDraft == nil
-                ? "Start from a pinned template, relaunch a recent session, or jump into Programs to build something custom."
-                : "Pick up your active session or switch programs when you are ready."
-        )
-    }
-
     var body: some View {
         NavigationStack {
             ZStack {
                 AppBackground()
                 ScrollView {
-                    LazyVStack(spacing: 18) {
-                        TodayHeroCardView(state: heroState)
-                            .appReveal(delay: 0.01)
-
+                    LazyVStack(spacing: 20) {
                         if let activeDraft {
                             TodayResumeCardView(draft: activeDraft)
-                                .appReveal(delay: 0.03)
                         } else if let pinnedTemplate = todayStore.pinnedTemplate {
                             TodayPinnedTemplateCardView(
                                 reference: pinnedTemplate,
                                 activeDraft: activeDraft,
                                 pendingStartRequest: $pendingStartRequest
                             )
-                            .appReveal(delay: 0.03)
                         } else {
                             AppEmptyStateCard(
                                 systemImage: "sparkles.rectangle.stack",
@@ -46,20 +32,22 @@ struct TodayView: View {
                                 message: "Finish onboarding or create a template in Programs to get a pinned next workout.",
                                 tone: .today
                             )
-                            .appReveal(delay: 0.03)
                         }
 
-                        TodayQuickStartSectionView(
-                            activeDraft: activeDraft,
-                            pendingStartRequest: $pendingStartRequest
-                        )
-                        .appReveal(delay: 0.05)
+                        if !todayStore.quickStartTemplates.isEmpty {
+                            TodayQuickStartSectionView(
+                                activeDraft: activeDraft,
+                                pendingStartRequest: $pendingStartRequest
+                            )
+                        }
 
-                        TodayRecentRecordsSectionView()
-                            .appReveal(delay: 0.07)
+                        if !todayStore.recentSessions.isEmpty {
+                            TodayRecentSessionsSectionView()
+                        }
 
-                        TodayRecentSessionsSectionView()
-                            .appReveal(delay: 0.09)
+                        if !todayStore.recentPersonalRecords.isEmpty {
+                            TodayRecentRecordsSectionView()
+                        }
                     }
                     .padding(.horizontal, 14)
                     .padding(.vertical, 14)

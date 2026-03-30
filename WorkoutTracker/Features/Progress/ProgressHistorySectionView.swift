@@ -12,9 +12,6 @@ struct ProgressHistorySectionView: View {
             AppSectionHeader(
                 title: "Logged Sessions",
                 systemImage: "clock.arrow.circlepath",
-                subtitle: selectedDayLabel == nil
-                    ? "Browse the latest completed sessions or narrow the list from the calendar above."
-                    : "Showing only the workouts logged on \(selectedDayLabel!).",
                 trailing: "\(progressStore.historySessions.count)",
                 tone: progressStore.selectedDay == nil ? .progress : .success,
                 trailingStyle: .plain
@@ -22,12 +19,9 @@ struct ProgressHistorySectionView: View {
 
             if let selectedDayLabel {
                 HStack(spacing: 8) {
-                    AppStatePill(
-                        title: selectedDayLabel,
-                        systemImage: "calendar.badge.clock",
-                        tone: .success,
-                        style: .plain
-                    )
+                    Text("Filtered to \(selectedDayLabel)")
+                        .font(.caption.weight(.semibold))
+                        .foregroundStyle(AppColors.textSecondary)
 
                     Button("Show All") {
                         progressStore.selectDay(nil)
@@ -42,7 +36,7 @@ struct ProgressHistorySectionView: View {
                 AppInlineMessage(
                     systemImage: "calendar.badge.exclamationmark",
                     title: "No sessions for this filter",
-                    message: "Choose another logged day or clear the calendar filter to see every completed workout.",
+                    message: "Choose another day or clear the filter.",
                     tone: .warning,
                     style: .plain
                 )
@@ -52,12 +46,18 @@ struct ProgressHistorySectionView: View {
 
                 VStack(spacing: 0) {
                     ForEach(Array(progressStore.historySessions.enumerated()), id: \.element.id) { index, session in
-                        CompletedSessionSummaryCardView(
-                            session: session,
-                            detailSuffix: " logged",
-                            tone: listTone,
-                            style: .plain
-                        )
+                        NavigationLink {
+                            CompletedSessionDetailView(session: session)
+                        } label: {
+                            CompletedSessionSummaryCardView(
+                                session: session,
+                                detailSuffix: " logged",
+                                tone: listTone,
+                                style: .plain,
+                                showsDisclosureIndicator: true
+                            )
+                        }
+                        .buttonStyle(.plain)
 
                         if index < progressStore.historySessions.count - 1 {
                             Rectangle()

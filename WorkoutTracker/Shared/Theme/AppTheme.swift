@@ -1,27 +1,60 @@
 import SwiftUI
 import UIKit
 
+private extension Color {
+    init(hex: UInt32, opacity: Double = 1) {
+        self.init(
+            .sRGB,
+            red: Double((hex >> 16) & 0xFF) / 255,
+            green: Double((hex >> 8) & 0xFF) / 255,
+            blue: Double(hex & 0xFF) / 255,
+            opacity: opacity
+        )
+    }
+}
+
+enum KanagawaPalette {
+    static let sumiInk0 = Color(hex: 0x16161D)
+    static let sumiInk1 = Color(hex: 0x181820)
+    static let sumiInk2 = Color(hex: 0x1A1A22)
+    static let sumiInk3 = Color(hex: 0x1F1F28)
+    static let sumiInk4 = Color(hex: 0x2A2A37)
+    static let sumiInk5 = Color(hex: 0x363646)
+    static let sumiInk6 = Color(hex: 0x54546D)
+    static let waveBlue1 = Color(hex: 0x223249)
+    static let oldWhite = Color(hex: 0xC8C093)
+    static let fujiWhite = Color(hex: 0xDCD7BA)
+    static let fujiGray = Color(hex: 0x727169)
+    static let crystalBlue = Color(hex: 0x7E9CD8)
+    static let lightBlue = Color(hex: 0xA3D4D5)
+    static let waveAqua2 = Color(hex: 0x7AA89F)
+    static let springGreen = Color(hex: 0x98BB6C)
+    static let carpYellow = Color(hex: 0xE6C384)
+    static let surimiOrange = Color(hex: 0xFFA066)
+    static let waveRed = Color(hex: 0xE46876)
+}
+
 enum AppColors {
-    static let canvasTop = Color(red: 0.12, green: 0.12, blue: 0.14)
-    static let canvasMid = Color(red: 0.06, green: 0.06, blue: 0.07)
-    static let canvasBottom = Color(red: 0.03, green: 0.03, blue: 0.04)
-    static let chrome = Color(red: 0.08, green: 0.08, blue: 0.10)
-    static let surfaceStrong = Color(red: 0.15, green: 0.15, blue: 0.18)
-    static let surface = Color(red: 0.09, green: 0.09, blue: 0.11)
-    static let surfaceSoft = Color(red: 0.06, green: 0.06, blue: 0.08)
-    static let stroke = Color.white.opacity(0.12)
-    static let strokeStrong = Color.white.opacity(0.34)
-    static let textPrimary = Color(red: 0.97, green: 0.97, blue: 0.95)
-    static let textSecondary = Color(red: 0.74, green: 0.74, blue: 0.70)
-    static let accent = Color(red: 0.70, green: 0.82, blue: 0.98)
-    static let accentAlt = Color(red: 0.86, green: 0.92, blue: 1.00)
-    static let accentPlans = Color(red: 0.58, green: 0.90, blue: 0.78)
-    static let accentProgress = Color(red: 0.98, green: 0.82, blue: 0.47)
-    static let success = Color(red: 0.72, green: 0.95, blue: 0.64)
-    static let warning = Color(red: 1.00, green: 0.73, blue: 0.40)
-    static let danger = Color(red: 0.98, green: 0.52, blue: 0.54)
-    static let input = Color.black.opacity(0.34)
-    static let glassTint = Color.white.opacity(0.06)
+    static let canvasTop = KanagawaPalette.sumiInk3
+    static let canvasMid = KanagawaPalette.sumiInk1
+    static let canvasBottom = KanagawaPalette.sumiInk0
+    static let chrome = KanagawaPalette.sumiInk2
+    static let surfaceStrong = KanagawaPalette.sumiInk5
+    static let surface = KanagawaPalette.sumiInk4
+    static let surfaceSoft = KanagawaPalette.sumiInk2
+    static let stroke = KanagawaPalette.sumiInk6
+    static let strokeStrong = KanagawaPalette.fujiGray
+    static let textPrimary = KanagawaPalette.fujiWhite
+    static let textSecondary = KanagawaPalette.oldWhite
+    static let accent = KanagawaPalette.crystalBlue
+    static let accentAlt = KanagawaPalette.lightBlue
+    static let accentPlans = KanagawaPalette.waveAqua2
+    static let accentProgress = KanagawaPalette.carpYellow
+    static let success = KanagawaPalette.springGreen
+    static let warning = KanagawaPalette.surimiOrange
+    static let danger = KanagawaPalette.waveRed
+    static let input = KanagawaPalette.sumiInk0
+    static let glassTint = KanagawaPalette.waveBlue1
 }
 
 enum AppCardMetrics {

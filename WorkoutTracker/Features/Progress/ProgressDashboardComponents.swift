@@ -32,20 +32,3 @@ struct ProgressSpotlightCard<Content: View>: View {
             .progressSectionSpacing(topPadding: 4, bottomPadding: 2)
     }
 }
-
-struct ProgressLegendPill: View {
-    let title: String
-    let systemImage: String
-    let tone: AppToneStyle
-
-    var body: some View {
-        HStack(spacing: 6) {
-            Image(systemName: systemImage)
-                .font(.caption2.weight(.black))
-            Text(title.uppercased())
-                .font(.caption2.weight(.black))
-                .tracking(0.8)
-        }
-        .foregroundStyle(tone.accent)
-    }
-}

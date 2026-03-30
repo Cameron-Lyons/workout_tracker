@@ -33,11 +33,7 @@ struct TodayPinnedTemplateCardView: View {
                     .font(.system(size: 28, weight: .black))
                     .foregroundStyle(AppColors.textPrimary)
 
-                Text(reference.planName)
-                    .font(.subheadline)
-                    .foregroundStyle(AppColors.textSecondary)
-
-                Text(contextLine)
+                Text("\(reference.planName) • \(contextLine)")
                     .font(.subheadline)
                     .foregroundStyle(AppColors.textSecondary)
 

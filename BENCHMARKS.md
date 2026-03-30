@@ -21,15 +21,20 @@ This repo keeps lightweight performance guardrails in the dedicated `WorkoutTrac
 | Persistence | `PersistenceBenchmarks.testSessionRepositoryPersistCompletedSessionLargeSession` | completed 18-block progression session | avg `<= 0.035s`, max `<= 0.045s` |
 | Persistence | `PersistenceBenchmarks.testSessionRepositoryLoadCompletedSessionsLargeHistory` | 240 completed sessions, 4 blocks/session, 6 sets/block | avg `<= 0.950s`, max `<= 1.050s` |
 | App Flow | `AppFlowBenchmarks.testSessionEngineStartSessionLargeTemplate` | 18-block mixed-progression template | avg `<= 0.001s`, max `<= 0.002s` |
+| App Flow | `AppFlowBenchmarks.testAppStoreStartSessionAfterStartupHydrationLargeLibrary` | startup-hydrated store with 121 plan summaries and deferred profiles, starting one 18-block template | avg `<= 0.080s`, max `<= 0.100s` |
 | App Flow | `AppFlowBenchmarks.testAppStoreFinishActiveSessionLargeProgressionSession` | finish + persist a 12-block progression session | avg `<= 0.080s`, max `<= 0.100s` |
+| App Flow | `AppFlowBenchmarks.testAppStorePreloadDeferredTabDataLargeLibraryAndHistory` | startup-hydrated store preloading 120 plans + 500 plan-linked completed sessions | avg `<= 4.100s`, max `<= 4.300s` |
 | App Flow | `AppFlowBenchmarks.testPersistenceHydrationLoaderLoadStartupSnapshotLargeLibrary` | startup summary snapshot with 121 plans, profile count, and active draft | avg `<= 0.120s`, max `<= 0.150s` |
 | App Flow | `AppFlowBenchmarks.testPersistenceHydrationLoaderLoadCompletedSessionHistoryLargeHistory` | lazy history load for 240 completed sessions | avg `<= 0.950s`, max `<= 1.050s` |
-| App Flow | `AppFlowBenchmarks.testAppDerivedStateControllerRefreshDerivedStoresLargeLibraryAndHistory` | refresh derived stores for 120 plans + 500 sessions | avg `<= 0.035s`, max `<= 0.045s` |
+| App Flow | `AppFlowBenchmarks.testAppDerivedStateControllerRefreshDerivedStoresLargeLibraryAndHistory` | refresh derived stores for 120 plans + 500 plan-linked sessions | avg `<= 0.035s`, max `<= 0.045s` |
+| App Flow | `AppFlowBenchmarks.testSessionStoreMutateAndFlushActiveDraftLargeSession` | 18-block active draft with deferred mutation batch + flush | avg `<= 0.120s`, max `<= 0.150s` |
+| App Flow | `AppFlowBenchmarks.testSessionStoreUndoLastMutationsLargeSession` | same large draft after mutation batch, undoing all changes + flush | avg `<= 0.380s`, max `<= 0.420s` |
+| App Flow | `AppFlowBenchmarks.testAppDerivedStateControllerRecordCompletedSessionLargeLibraryAndHistory` | incremental Today/Progress update after finishing one session on top of 120 plans + 500 plan-linked sessions | avg `<= 0.015s`, max `<= 0.020s` |
 
 The thresholds are code-level guardrails, not Xcode `.xcbaseline` files. The suite is split into:
 
 - `WorkoutTrackerBenchmarks/BenchmarkHarness.swift` for warmup, timing, threshold assertions, and benchmark reports
-- `WorkoutTrackerBenchmarks/BenchmarkFixtures.swift` for shared synthetic plans, sessions, and catalog data
+- `WorkoutTrackerBenchmarks/BenchmarkFixtures.swift` for shared synthetic plans, sessions, plan-linked histories, and catalog data
 - `WorkoutTrackerBenchmarks/AnalyticsBenchmarks.swift` for derived-state and analytics hot paths
 - `WorkoutTrackerBenchmarks/PersistenceBenchmarks.swift` for SwiftData persistence loading hot paths
 - `WorkoutTrackerBenchmarks/AppFlowBenchmarks.swift` for startup, derived refresh, and session lifecycle flows
@@ -60,5 +65,5 @@ Recommended process:
 ## Notes
 
 - Simulator timing is noisy; the thresholds are intentionally a bit looser than the latest local averages.
-- These benchmarks are meant to catch meaningful regressions in analytics, derived-state preparation, startup hydration, session lifecycle flows, and persistence read/write paths.
+- These benchmarks are meant to catch meaningful regressions in analytics, derived-state preparation, startup hydration, deferred tab warmup, session lifecycle flows, logger mutation/undo paths, incremental finish updates, and persistence read/write paths.
 - GitHub Actions uploads both `benchmark-results.log` and `BenchmarkResults.xcresult`, so timing history survives outside the raw console log.

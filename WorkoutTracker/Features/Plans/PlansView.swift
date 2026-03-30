@@ -44,7 +44,8 @@ private struct AvailableProgramsSectionView: View {
                 systemImage: "square.grid.2x2",
                 subtitle: "Install one of the starter programs directly from here.",
                 trailing: "\(presetPacks.count)",
-                tone: .plans
+                tone: .plans,
+                trailingStyle: .plain
             )
 
             VStack(spacing: 0) {
@@ -68,42 +69,45 @@ private struct AvailableProgramRow: View {
     let onAdd: () -> Void
 
     var body: some View {
-        HStack(alignment: .top, spacing: 14) {
-            Image(systemName: pack.systemImage)
-                .font(.system(size: 18, weight: .black))
-                .foregroundStyle(AppToneStyle.plans.accent)
-                .frame(width: 42, height: 42)
-                .appInsetCard(
-                    cornerRadius: 10,
-                    fill: AppToneStyle.plans.softFill.opacity(0.72),
-                    border: AppToneStyle.plans.softBorder
-                )
+        Button(action: onAdd) {
+            HStack(alignment: .top, spacing: 14) {
+                Image(systemName: pack.systemImage)
+                    .font(.system(size: 18, weight: .black))
+                    .foregroundStyle(AppToneStyle.plans.accent)
+                    .frame(width: 42, height: 42)
+                    .appInsetCard(
+                        cornerRadius: 10,
+                        fill: AppToneStyle.plans.softFill.opacity(0.72),
+                        border: AppToneStyle.plans.softBorder
+                    )
 
-            VStack(alignment: .leading, spacing: 6) {
-                Text(pack.displayName)
-                    .font(.headline.weight(.black))
-                    .foregroundStyle(AppColors.textPrimary)
+                VStack(alignment: .leading, spacing: 6) {
+                    Text(pack.displayName)
+                        .font(.headline.weight(.black))
+                        .foregroundStyle(AppColors.textPrimary)
 
-                Text(pack.description)
-                    .font(.subheadline)
-                    .foregroundStyle(AppColors.textSecondary)
-                    .multilineTextAlignment(.leading)
-                    .fixedSize(horizontal: false, vertical: true)
+                    Text(pack.description)
+                        .font(.subheadline)
+                        .foregroundStyle(AppColors.textSecondary)
+                        .multilineTextAlignment(.leading)
+                        .fixedSize(horizontal: false, vertical: true)
+                }
+                .layoutPriority(1)
+
+                Spacer(minLength: 12)
+
+                Image(systemName: "plus")
+                    .font(.title3.weight(.black))
+                    .frame(width: 28, height: 28)
+                    .foregroundStyle(AppToneStyle.plans.accent)
+                    .padding(.top, 2)
             }
-            .layoutPriority(1)
-
-            Spacer(minLength: 12)
-
-            Button {
-                onAdd()
-            } label: {
-                Label("Add", systemImage: "plus")
-            }
-            .appSecondaryActionButton(tone: .plans, controlSize: .small)
-            .padding(.top, 2)
+            .frame(maxWidth: .infinity, alignment: .leading)
+            .padding(.vertical, 14)
+            .contentShape(Rectangle())
         }
-        .frame(maxWidth: .infinity, alignment: .leading)
-        .padding(.vertical, 14)
+        .buttonStyle(.plain)
+        .accessibilityLabel("Add \(pack.displayName)")
         .accessibilityIdentifier("programs.preset.\(pack.rawValue)")
     }
 }
@@ -133,9 +137,6 @@ struct PlansView: View {
                 } else {
                     ScrollView {
                         LazyVStack(spacing: 16) {
-                            PlansHeroCardView()
-                                .appReveal(delay: 0.01)
-
                             if plansStore.plans.isEmpty {
                                 AvailableProgramsSectionView(
                                     presetPacks: availablePrograms,
@@ -143,17 +144,15 @@ struct PlansView: View {
                                         selectedPresetPack = pack
                                     }
                                 )
-                                .appReveal(delay: 0.03)
                             }
 
                             AppSectionHeader(
                                 title: "Your Programs",
                                 systemImage: "list.bullet.rectangle",
-                                subtitle: "Build custom programs and manage the ones you add.",
                                 trailing: "\(plansStore.planCount)",
-                                tone: .plans
+                                tone: .plans,
+                                trailingStyle: .plain
                             )
-                            .appReveal(delay: plansStore.plans.isEmpty ? 0.05 : 0.03)
 
                             if plansStore.plans.isEmpty {
                                 AppEmptyStateCard(
@@ -162,7 +161,6 @@ struct PlansView: View {
                                     message: "Create a custom program or add one of the available programs above.",
                                     tone: .plans
                                 )
-                                .appReveal(delay: 0.07)
                             } else {
                                 ForEach(plansStore.plans) { plan in
                                     PlanCardView(
@@ -172,16 +170,7 @@ struct PlansView: View {
                                         editingTemplateContext: $editingTemplateContext,
                                         pendingStartRequest: $pendingStartRequest
                                     )
-                                    .appReveal(delay: 0.07)
                                 }
-
-                                AvailableProgramsSectionView(
-                                    presetPacks: availablePrograms,
-                                    onSelectPack: { pack in
-                                        selectedPresetPack = pack
-                                    }
-                                )
-                                .appReveal(delay: 0.09)
                             }
                         }
                         .padding(.horizontal, 14)
@@ -197,10 +186,24 @@ struct PlansView: View {
             }
             .toolbar {
                 ToolbarItem(placement: .topBarTrailing) {
-                    Button {
-                        editingPlan = appStore.makePlan(name: "")
+                    Menu {
+                        Button {
+                            editingPlan = appStore.makePlan(name: "")
+                        } label: {
+                            Label("New Program", systemImage: "square.and.pencil")
+                        }
+
+                        Divider()
+
+                        ForEach(availablePrograms, id: \.rawValue) { pack in
+                            Button {
+                                selectedPresetPack = pack
+                            } label: {
+                                Label("Add \(pack.displayName)", systemImage: pack.systemImage)
+                            }
+                        }
                     } label: {
-                        Label("Program", systemImage: "plus")
+                        Image(systemName: "plus")
                     }
                     .accessibilityIdentifier("plans.addPlanButton")
                 }

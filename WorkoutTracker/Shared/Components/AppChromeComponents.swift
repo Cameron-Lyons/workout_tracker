@@ -96,9 +96,8 @@ private struct AppHeroMetricCell: View {
                     .font(.caption.weight(.black))
                     .foregroundStyle(tone.accent)
 
-                Text(metric.label.uppercased())
-                    .font(.caption2.weight(.black))
-                    .tracking(0.8)
+                Text(metric.label)
+                    .font(.caption2.weight(.semibold))
                     .foregroundStyle(AppColors.textSecondary)
             }
 
@@ -142,7 +141,7 @@ struct AppEmptyStateCard: View {
 
             VStack(alignment: .leading, spacing: 8) {
                 Text(title)
-                    .font(.system(size: 28, weight: .black))
+                    .font(.system(size: 24, weight: .black))
                     .foregroundStyle(AppColors.textPrimary)
                     .multilineTextAlignment(.leading)
                     .fixedSize(horizontal: false, vertical: true)
@@ -229,12 +228,22 @@ struct AppStatePill: View {
     private var content: some View {
         HStack(spacing: 6) {
             Image(systemName: systemImage)
-                .font(.caption2.weight(.black))
-            Text(title.uppercased())
-                .font(.caption2.weight(.black))
-                .tracking(0.8)
+                .font(.caption2.weight(.semibold))
+            Text(title)
+                .font(.caption2.weight(.semibold))
         }
         .foregroundStyle(tone.accent)
+    }
+}
+
+struct AppDisclosureIndicator: View {
+    var tone: AppToneStyle? = nil
+
+    var body: some View {
+        Image(systemName: "chevron.right")
+            .font(.caption.weight(.bold))
+            .foregroundStyle((tone?.accent ?? AppColors.textSecondary).opacity(0.9))
+            .padding(.top, 2)
     }
 }
 
@@ -250,18 +259,17 @@ struct AppSectionHeader: View {
         HStack(alignment: .top, spacing: 12) {
             VStack(alignment: .leading, spacing: 6) {
                 Label {
-                    Text(title.uppercased())
+                    Text(title)
                 } icon: {
                     Image(systemName: systemImage)
                         .foregroundStyle(tone.accent)
                 }
-                .font(.caption.weight(.black))
-                .tracking(1)
+                .font(.headline.weight(.semibold))
                 .foregroundStyle(AppColors.textPrimary)
 
                 if let subtitle, !subtitle.isEmpty {
                     Text(subtitle)
-                        .font(.footnote.weight(.medium))
+                        .font(.footnote)
                         .foregroundStyle(AppColors.textSecondary)
                         .multilineTextAlignment(.leading)
                         .fixedSize(horizontal: false, vertical: true)
@@ -273,7 +281,7 @@ struct AppSectionHeader: View {
             if let trailing, !trailing.isEmpty {
                 if trailingStyle == .boxed {
                     Text(trailing)
-                        .font(.caption.weight(.black))
+                        .font(.caption.weight(.semibold))
                         .monospacedDigit()
                         .foregroundStyle(AppColors.textPrimary)
                         .padding(.horizontal, 10)
@@ -281,7 +289,7 @@ struct AppSectionHeader: View {
                         .appInsetCard(cornerRadius: 6, fill: tone.softFill.opacity(0.65), border: tone.softBorder)
                 } else {
                     Text(trailing)
-                        .font(.caption.weight(.black))
+                        .font(.caption.weight(.semibold))
                         .monospacedDigit()
                         .foregroundStyle(tone.accent)
                 }
@@ -320,12 +328,11 @@ struct MetricBadge: View {
         VStack(alignment: .leading, spacing: 4) {
             HStack(spacing: 6) {
                 Image(systemName: systemImage)
-                    .font(.caption2.weight(.black))
+                    .font(.caption2.weight(.semibold))
                     .foregroundStyle(tone.accent)
 
-                Text(label.uppercased())
-                    .font(.caption2.weight(.black))
-                    .tracking(0.7)
+                Text(label)
+                    .font(.caption2.weight(.semibold))
                     .foregroundStyle(AppColors.textSecondary)
             }
 

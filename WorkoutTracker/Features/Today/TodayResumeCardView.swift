@@ -6,13 +6,13 @@ struct TodayResumeCardView: View {
     let draft: SessionDraft
 
     var body: some View {
-        return TodaySpotlightCard(tone: .today) {
+        TodaySpotlightCard(tone: .today) {
             VStack(alignment: .leading, spacing: 12) {
                 Text(draft.templateNameSnapshot)
                     .font(.system(size: 28, weight: .black))
                     .foregroundStyle(AppColors.textPrimary)
 
-                Text("Resume where you left off. Updated \(draft.lastUpdatedAt.formatted(date: .abbreviated, time: .shortened)).")
+                Text("Updated \(draft.lastUpdatedAt.formatted(date: .abbreviated, time: .shortened))")
                     .font(.subheadline)
                     .foregroundStyle(AppColors.textSecondary)
 

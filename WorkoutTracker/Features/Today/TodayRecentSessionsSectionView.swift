@@ -8,27 +8,27 @@ struct TodayRecentSessionsSectionView: View {
             AppSectionHeader(
                 title: "Recent Sessions",
                 systemImage: "clock.arrow.circlepath",
-                subtitle: "Keep momentum by reliving the last few workouts at a glance.",
-                tone: .progress
+                trailing: "\(todayStore.recentSessions.count)",
+                tone: .progress,
+                trailingStyle: .plain
             )
 
-            if todayStore.recentSessions.isEmpty {
-                AppInlineMessage(
-                    systemImage: "clock.arrow.circlepath",
-                    title: "No sessions logged yet",
-                    message: "Your finished workouts will show up here.",
-                    tone: .progress
-                )
-                .appSectionFrame(tone: .progress)
-            } else {
-                TodayGroupedPanel(tone: .progress) {
-                    VStack(spacing: 0) {
-                        ForEach(Array(todayStore.recentSessions.enumerated()), id: \.element.id) { index, session in
-                            TodayCompletedSessionRow(session: session, tone: .progress)
+            TodayGroupedPanel(tone: .progress) {
+                VStack(spacing: 0) {
+                    ForEach(Array(todayStore.recentSessions.enumerated()), id: \.element.id) { index, session in
+                        NavigationLink {
+                            CompletedSessionDetailView(session: session)
+                        } label: {
+                            TodayCompletedSessionRow(
+                                session: session,
+                                tone: .progress,
+                                showsDisclosureIndicator: true
+                            )
+                        }
+                        .buttonStyle(.plain)
 
-                            if index < todayStore.recentSessions.count - 1 {
-                                SectionSurfaceDivider()
-                            }
+                        if index < todayStore.recentSessions.count - 1 {
+                            SectionSurfaceDivider()
                         }
                     }
                 }

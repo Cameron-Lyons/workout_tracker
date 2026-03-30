@@ -10,17 +10,17 @@ private struct AppSurfaceModifier: ViewModifier {
             .overlay(alignment: .top) {
                 ZStack(alignment: .leading) {
                     Rectangle()
-                        .fill(AppColors.stroke.opacity(0.34))
+                        .fill(AppColors.stroke.opacity(0.18))
                         .frame(height: 1)
 
                     Rectangle()
-                        .fill((tone?.accent ?? AppColors.strokeStrong).opacity(0.92))
-                        .frame(width: 72, height: 2)
+                        .fill((tone?.accent ?? AppColors.strokeStrong).opacity(0.55))
+                        .frame(width: 40, height: 2)
                 }
             }
             .overlay(alignment: .bottom) {
                 Rectangle()
-                    .fill(AppColors.stroke.opacity(0.74))
+                    .fill(AppColors.stroke.opacity(0.4))
                     .frame(height: 1)
             }
     }
@@ -70,17 +70,17 @@ private struct AppSectionFrameModifier: ViewModifier {
             .overlay(alignment: .top) {
                 ZStack(alignment: .leading) {
                     Rectangle()
-                        .fill(AppColors.stroke.opacity(0.34))
+                        .fill(AppColors.stroke.opacity(0.18))
                         .frame(height: 1)
 
                     Rectangle()
-                        .fill((tone?.accent ?? AppColors.strokeStrong).opacity(0.92))
-                        .frame(width: 72, height: 2)
+                        .fill((tone?.accent ?? AppColors.strokeStrong).opacity(0.55))
+                        .frame(width: 40, height: 2)
                 }
             }
             .overlay(alignment: .bottom) {
                 Rectangle()
-                    .fill(AppColors.stroke.opacity(0.74))
+                    .fill(AppColors.stroke.opacity(0.4))
                     .frame(height: 1)
             }
     }

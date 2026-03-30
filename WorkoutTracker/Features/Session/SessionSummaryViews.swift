@@ -165,17 +165,20 @@ struct PersonalRecordSummaryCardView: View, Equatable {
     let weightUnit: WeightUnit
     let tone: AppToneStyle
     let style: AppRowStyle
+    let showsDisclosureIndicator: Bool
 
     init(
         record: PersonalRecord,
         weightUnit: WeightUnit,
         tone: AppToneStyle = .success,
-        style: AppRowStyle = .surface
+        style: AppRowStyle = .surface,
+        showsDisclosureIndicator: Bool = false
     ) {
         self.record = record
         self.weightUnit = weightUnit
         self.tone = tone
         self.style = style
+        self.showsDisclosureIndicator = showsDisclosureIndicator
     }
 
     nonisolated static func == (lhs: PersonalRecordSummaryCardView, rhs: PersonalRecordSummaryCardView) -> Bool {
@@ -183,6 +186,7 @@ struct PersonalRecordSummaryCardView: View, Equatable {
             && lhs.weightUnit == rhs.weightUnit
             && lhs.tone == rhs.tone
             && lhs.style == rhs.style
+            && lhs.showsDisclosureIndicator == rhs.showsDisclosureIndicator
     }
 
     var body: some View {
@@ -214,18 +218,24 @@ struct PersonalRecordSummaryCardView: View, Equatable {
 
             Spacer()
 
-            VStack(alignment: .trailing, spacing: 8) {
-                AppStatePill(
-                    title: "Record",
-                    systemImage: "rosette.fill",
-                    tone: tone,
-                    style: style == .plain ? .plain : .boxed
-                )
+            HStack(alignment: .top, spacing: 8) {
+                VStack(alignment: .trailing, spacing: 8) {
+                    AppStatePill(
+                        title: "Record",
+                        systemImage: "rosette.fill",
+                        tone: tone,
+                        style: style == .plain ? .plain : .boxed
+                    )
 
-                Text(record.achievedAt.formatted(date: .abbreviated, time: .omitted))
-                    .font(.caption.weight(.black))
-                    .monospacedDigit()
-                    .foregroundStyle(tone.accent)
+                    Text(record.achievedAt.formatted(date: .abbreviated, time: .omitted))
+                        .font(.caption.weight(.black))
+                        .monospacedDigit()
+                        .foregroundStyle(tone.accent)
+                }
+
+                if showsDisclosureIndicator {
+                    AppDisclosureIndicator()
+                }
             }
         }
         .frame(maxWidth: .infinity, alignment: .leading)
@@ -237,17 +247,20 @@ struct CompletedSessionSummaryCardView: View, Equatable {
     let detailSuffix: String
     let tone: AppToneStyle
     let style: AppRowStyle
+    let showsDisclosureIndicator: Bool
 
     init(
         session: CompletedSession,
         detailSuffix: String = "",
         tone: AppToneStyle = .base,
-        style: AppRowStyle = .surface
+        style: AppRowStyle = .surface,
+        showsDisclosureIndicator: Bool = false
     ) {
         self.session = session
         self.detailSuffix = detailSuffix
         self.tone = tone
         self.style = style
+        self.showsDisclosureIndicator = showsDisclosureIndicator
     }
 
     nonisolated static func == (lhs: CompletedSessionSummaryCardView, rhs: CompletedSessionSummaryCardView) -> Bool {
@@ -255,6 +268,7 @@ struct CompletedSessionSummaryCardView: View, Equatable {
             && lhs.detailSuffix == rhs.detailSuffix
             && lhs.tone == rhs.tone
             && lhs.style == rhs.style
+            && lhs.showsDisclosureIndicator == rhs.showsDisclosureIndicator
     }
 
     private var detailText: String {
@@ -292,17 +306,330 @@ struct CompletedSessionSummaryCardView: View, Equatable {
 
                 Spacer()
 
-                AppStatePill(
-                    title: "Logged",
-                    systemImage: "checkmark.circle.fill",
-                    tone: tone,
-                    style: style == .plain ? .plain : .boxed
-                )
+                HStack(alignment: .top, spacing: 8) {
+                    AppStatePill(
+                        title: "Logged",
+                        systemImage: "checkmark.circle.fill",
+                        tone: tone,
+                        style: style == .plain ? .plain : .boxed
+                    )
+
+                    if showsDisclosureIndicator {
+                        AppDisclosureIndicator()
+                    }
+                }
             }
 
             Text(detailText)
                 .font(.caption.weight(.black))
                 .foregroundStyle(tone.accent)
         }
+    }
+}
+
+struct CompletedSessionDetailView: View {
+    @Environment(SettingsStore.self) private var settingsStore
+
+    let session: CompletedSession
+    var highlightedExerciseID: UUID? = nil
+
+    private var totalCompletedSetCount: Int {
+        session.blocks.reduce(0) { count, block in
+            count + block.sets.filter(\.isCompleted).count
+        }
+    }
+
+    private var totalVolume: Double {
+        session.blocks.reduce(0) { total, block in
+            total + block.sets.reduce(0) { subtotal, set in
+                guard let weight = set.weight, let reps = set.reps, set.isCompleted else {
+                    return subtotal
+                }
+
+                return subtotal + (weight * Double(reps))
+            }
+        }
+    }
+
+    var body: some View {
+        ZStack {
+            AppBackground()
+
+            ScrollView {
+                LazyVStack(spacing: 16) {
+                    AppHeroCard(
+                        eyebrow: "Completed Session",
+                        title: session.templateNameSnapshot,
+                        subtitle: session.completedAt.formatted(date: .abbreviated, time: .shortened),
+                        systemImage: "checkmark.circle.fill",
+                        metrics: [
+                            AppHeroMetric(
+                                id: "exercises",
+                                label: "Exercises",
+                                value: "\(session.blocks.count)",
+                                systemImage: "dumbbell"
+                            ),
+                            AppHeroMetric(
+                                id: "sets",
+                                label: "Completed Sets",
+                                value: "\(totalCompletedSetCount)",
+                                systemImage: "checklist"
+                            ),
+                            AppHeroMetric(
+                                id: "volume",
+                                label: "Volume",
+                                value: WeightFormatter.displayString(totalVolume, unit: settingsStore.weightUnit),
+                                systemImage: "scalemass"
+                            ),
+                            AppHeroMetric(
+                                id: "finished",
+                                label: "Finished",
+                                value: session.completedAt.formatted(date: .omitted, time: .shortened),
+                                systemImage: "clock"
+                            ),
+                        ],
+                        tone: highlightedExerciseID == nil ? .progress : .success
+                    )
+
+                    VStack(alignment: .leading, spacing: 12) {
+                        AppSectionHeader(
+                            title: "Exercises",
+                            systemImage: "list.bullet",
+                            trailing: "\(session.blocks.count)",
+                            tone: .progress
+                        )
+
+                        VStack(spacing: 0) {
+                            ForEach(Array(session.blocks.enumerated()), id: \.element.id) { index, block in
+                                CompletedSessionBlockDetailView(
+                                    block: block,
+                                    weightUnit: settingsStore.weightUnit,
+                                    isHighlighted: highlightedExerciseID == block.exerciseID
+                                )
+
+                                if index < session.blocks.count - 1 {
+                                    SectionSurfaceDivider()
+                                }
+                            }
+                        }
+                        .appSectionFrame(
+                            tone: highlightedExerciseID == nil ? .progress : .success,
+                            topPadding: 8,
+                            bottomPadding: 8
+                        )
+                    }
+                }
+                .padding(.horizontal, 14)
+                .padding(.vertical, 14)
+            }
+            .scrollIndicators(.hidden)
+        }
+        .navigationTitle(session.templateNameSnapshot)
+        .navigationBarTitleDisplayMode(.inline)
+    }
+}
+
+struct PersonalRecordDetailView: View {
+    @Environment(SettingsStore.self) private var settingsStore
+    @Environment(SessionStore.self) private var sessionStore
+
+    let record: PersonalRecord
+
+    private var relatedSession: CompletedSession? {
+        sessionStore.completedSessions.first(where: { $0.id == record.sessionID })
+    }
+
+    var body: some View {
+        ZStack {
+            AppBackground()
+
+            ScrollView {
+                LazyVStack(spacing: 16) {
+                    AppHeroCard(
+                        eyebrow: "Personal Record",
+                        title: record.displayName,
+                        subtitle: record.achievedAt.formatted(date: .abbreviated, time: .shortened),
+                        systemImage: "rosette.fill",
+                        metrics: [
+                            AppHeroMetric(
+                                id: "load",
+                                label: "Load",
+                                value: "\(WeightFormatter.displayString(record.weight, unit: settingsStore.weightUnit)) \(settingsStore.weightUnit.symbol)",
+                                systemImage: "scalemass"
+                            ),
+                            AppHeroMetric(
+                                id: "reps",
+                                label: "Reps",
+                                value: "\(record.reps)",
+                                systemImage: "number"
+                            ),
+                            AppHeroMetric(
+                                id: "e1rm",
+                                label: "e1RM",
+                                value:
+                                    "\(WeightFormatter.displayString(record.estimatedOneRepMax, unit: settingsStore.weightUnit)) \(settingsStore.weightUnit.symbol)",
+                                systemImage: "waveform.path.ecg"
+                            ),
+                            AppHeroMetric(
+                                id: "day",
+                                label: "Logged",
+                                value: record.achievedAt.formatted(date: .numeric, time: .omitted),
+                                systemImage: "calendar"
+                            ),
+                        ],
+                        tone: .success
+                    )
+
+                    AppInlineMessage(
+                        systemImage: "bolt.fill",
+                        title: "Estimated strength milestone",
+                        message:
+                            "This set projects an estimated 1RM of \(WeightFormatter.displayString(record.estimatedOneRepMax, unit: settingsStore.weightUnit)) \(settingsStore.weightUnit.symbol).",
+                        tone: .success
+                    )
+                    .appSectionFrame(tone: .success)
+
+                    if let relatedSession {
+                        VStack(alignment: .leading, spacing: 12) {
+                            AppSectionHeader(
+                                title: "Related Workout",
+                                systemImage: "clock.arrow.circlepath",
+                                tone: .progress,
+                                trailingStyle: .plain
+                            )
+
+                            NavigationLink {
+                                CompletedSessionDetailView(
+                                    session: relatedSession,
+                                    highlightedExerciseID: record.exerciseID
+                                )
+                            } label: {
+                                CompletedSessionSummaryCardView(
+                                    session: relatedSession,
+                                    detailSuffix: " logged",
+                                    tone: .progress,
+                                    showsDisclosureIndicator: true
+                                )
+                            }
+                            .buttonStyle(.plain)
+                        }
+                    }
+                }
+                .padding(.horizontal, 14)
+                .padding(.vertical, 14)
+            }
+            .scrollIndicators(.hidden)
+        }
+        .navigationTitle("PR")
+        .navigationBarTitleDisplayMode(.inline)
+    }
+}
+
+private struct CompletedSessionBlockDetailView: View {
+    let block: CompletedSessionBlock
+    let weightUnit: WeightUnit
+    let isHighlighted: Bool
+
+    private var tone: AppToneStyle {
+        isHighlighted ? .success : .progress
+    }
+
+    private var completedSetCount: Int {
+        block.sets.filter(\.isCompleted).count
+    }
+
+    var body: some View {
+        VStack(alignment: .leading, spacing: 12) {
+            HStack(alignment: .top, spacing: 12) {
+                VStack(alignment: .leading, spacing: 6) {
+                    Text(block.exerciseNameSnapshot)
+                        .font(.headline.weight(.semibold))
+                        .foregroundStyle(AppColors.textPrimary)
+
+                    Text("\(completedSetCount) logged set\(completedSetCount == 1 ? "" : "s")")
+                        .font(.subheadline)
+                        .foregroundStyle(AppColors.textSecondary)
+                }
+
+                Spacer(minLength: 12)
+
+                if isHighlighted {
+                    AppStatePill(title: "Record", systemImage: "rosette.fill", tone: .success, style: .plain)
+                }
+            }
+
+            VStack(spacing: 8) {
+                ForEach(Array(block.sets.enumerated()), id: \.element.id) { index, set in
+                    CompletedSessionSetDetailRow(
+                        setNumber: index + 1,
+                        set: set,
+                        weightUnit: weightUnit,
+                        tone: tone
+                    )
+                }
+            }
+        }
+        .padding(.vertical, 14)
+    }
+}
+
+private struct CompletedSessionSetDetailRow: View {
+    let setNumber: Int
+    let set: CompletedSetRow
+    let weightUnit: WeightUnit
+    let tone: AppToneStyle
+
+    private var performanceText: String {
+        if let weight = set.weight, let reps = set.reps {
+            return "\(WeightFormatter.displayString(weight, unit: weightUnit)) \(weightUnit.symbol) x \(reps)"
+        }
+
+        if let reps = set.reps {
+            return "\(reps) reps"
+        }
+
+        if let weight = set.weight {
+            return "\(WeightFormatter.displayString(weight, unit: weightUnit)) \(weightUnit.symbol)"
+        }
+
+        return set.isCompleted ? "Completed" : "Skipped"
+    }
+
+    var body: some View {
+        HStack(alignment: .top, spacing: 12) {
+            VStack(alignment: .leading, spacing: 4) {
+                Text("Set \(setNumber)")
+                    .font(.caption.weight(.black))
+                    .foregroundStyle(tone.accent)
+
+                Text(set.setKind.displayName)
+                    .font(.caption)
+                    .foregroundStyle(AppColors.textSecondary)
+            }
+
+            Spacer(minLength: 12)
+
+            VStack(alignment: .trailing, spacing: 4) {
+                Text(performanceText)
+                    .font(.subheadline.weight(.semibold))
+                    .foregroundStyle(AppColors.textPrimary)
+
+                if let completedAt = set.completedAt {
+                    Text(completedAt.formatted(date: .omitted, time: .shortened))
+                        .font(.caption)
+                        .foregroundStyle(AppColors.textSecondary)
+                        .monospacedDigit()
+                }
+            }
+            .multilineTextAlignment(.trailing)
+        }
+        .frame(maxWidth: .infinity, alignment: .leading)
+        .padding(.horizontal, 12)
+        .padding(.vertical, 10)
+        .appInsetCard(
+            cornerRadius: 8,
+            fill: tone.softFill.opacity(0.48),
+            border: tone.softBorder.opacity(0.72)
+        )
     }
 }

@@ -34,63 +34,52 @@ struct TodayGroupedPanel<Content: View>: View {
 struct TodayQuickStartRow: View {
     let reference: TemplateReference
 
-    private var scheduleLabel: String {
-        weekdaySummary(reference.scheduledWeekdays, emptyLabel: "READY ANY DAY")
+    private var detailLine: String {
+        let scheduleSummary = weekdaySummary(reference.scheduledWeekdays, emptyLabel: "")
+        guard !scheduleSummary.isEmpty else {
+            return reference.planName
+        }
+
+        return "\(reference.planName) • \(scheduleSummary)"
     }
 
     var body: some View {
-        HStack(alignment: .top, spacing: 14) {
-            Image(systemName: "bolt.fill")
-                .font(.system(size: 17, weight: .black))
-                .foregroundStyle(AppToneStyle.today.accent)
-                .frame(width: 40, height: 40)
-                .appInsetCard(
-                    cornerRadius: 8,
-                    fill: AppToneStyle.today.softFill.opacity(0.78),
-                    border: AppToneStyle.today.softBorder
-                )
-
+        HStack(alignment: .top, spacing: 12) {
             VStack(alignment: .leading, spacing: 6) {
-                Text("QUICK START")
-                    .font(.caption2.weight(.black))
-                    .tracking(0.8)
-                    .foregroundStyle(AppToneStyle.today.accent)
-
                 Text(reference.templateName)
-                    .font(.system(size: 21, weight: .black))
+                    .font(.headline.weight(.semibold))
                     .foregroundStyle(AppColors.textPrimary)
                     .multilineTextAlignment(.leading)
                     .fixedSize(horizontal: false, vertical: true)
 
-                Text(reference.planName)
+                Text(detailLine)
                     .font(.subheadline)
                     .foregroundStyle(AppColors.textSecondary)
                     .multilineTextAlignment(.leading)
                     .fixedSize(horizontal: false, vertical: true)
-
-                Text(scheduleLabel)
-                    .font(.caption.weight(.black))
-                    .tracking(0.7)
-                    .foregroundStyle(AppColors.textPrimary.opacity(0.88))
-
-                if let lastStartedAt = reference.lastStartedAt {
-                    Text("Last started \(lastStartedAt.formatted(date: .abbreviated, time: .omitted))")
-                        .font(.caption)
-                        .foregroundStyle(AppColors.textSecondary)
-                } else {
-                    Text("Fresh template ready to launch")
-                        .font(.caption)
-                        .foregroundStyle(AppColors.textSecondary)
-                }
             }
             .layoutPriority(1)
 
             Spacer(minLength: 12)
 
-            Image(systemName: "arrow.right")
-                .font(.caption.weight(.black))
-                .foregroundStyle(AppToneStyle.today.accent)
-                .padding(.top, 4)
+            if let lastStartedAt = reference.lastStartedAt {
+                HStack(alignment: .top, spacing: 8) {
+                    Text(lastStartedAt.formatted(date: .abbreviated, time: .omitted))
+                        .font(.caption.weight(.medium))
+                        .foregroundStyle(AppColors.textSecondary)
+                        .multilineTextAlignment(.trailing)
+
+                    Image(systemName: "play.fill")
+                        .font(.caption.weight(.bold))
+                        .foregroundStyle(AppToneStyle.today.accent)
+                        .padding(.top, 2)
+                }
+            } else {
+                Image(systemName: "play.fill")
+                    .font(.caption.weight(.bold))
+                    .foregroundStyle(AppToneStyle.today.accent)
+                    .padding(.top, 2)
+            }
         }
         .padding(.vertical, 14)
     }
@@ -100,38 +89,36 @@ struct TodayPersonalRecordRow: View {
     let record: PersonalRecord
     let weightUnit: WeightUnit
     let tone: AppToneStyle
+    var showsDisclosureIndicator = false
 
     var body: some View {
         HStack(alignment: .top, spacing: 12) {
             VStack(alignment: .leading, spacing: 6) {
-                Text("PR")
-                    .font(.caption2.weight(.black))
-                    .tracking(0.8)
-                    .foregroundStyle(tone.accent)
-
                 Text(record.displayName)
-                    .font(.system(size: 19, weight: .black))
+                    .font(.headline.weight(.semibold))
                     .foregroundStyle(AppColors.textPrimary)
                     .multilineTextAlignment(.leading)
                     .fixedSize(horizontal: false, vertical: true)
 
-                Text("\(WeightFormatter.displayString(record.weight, unit: weightUnit)) \(weightUnit.symbol) x \(record.reps)")
-                    .font(.subheadline.weight(.medium))
+                Text(
+                    "\(WeightFormatter.displayString(record.weight, unit: weightUnit)) \(weightUnit.symbol) x \(record.reps) • "
+                        + "e1RM \(WeightFormatter.displayString(record.estimatedOneRepMax, unit: weightUnit))"
+                )
+                    .font(.subheadline)
                     .foregroundStyle(AppColors.textSecondary)
             }
 
             Spacer(minLength: 12)
 
-            VStack(alignment: .trailing, spacing: 6) {
-                Text(record.achievedAt.formatted(date: .abbreviated, time: .omitted).uppercased())
-                    .font(.caption2.weight(.black))
-                    .tracking(0.7)
+            HStack(alignment: .top, spacing: 8) {
+                Text(record.achievedAt.formatted(date: .abbreviated, time: .omitted))
+                    .font(.caption.weight(.medium))
                     .foregroundStyle(AppColors.textSecondary)
+                    .multilineTextAlignment(.trailing)
 
-                Text("E1RM \(WeightFormatter.displayString(record.estimatedOneRepMax, unit: weightUnit))")
-                    .font(.caption.weight(.black))
-                    .monospacedDigit()
-                    .foregroundStyle(tone.accent)
+                if showsDisclosureIndicator {
+                    AppDisclosureIndicator()
+                }
             }
         }
         .padding(.vertical, 12)
@@ -141,32 +128,34 @@ struct TodayPersonalRecordRow: View {
 struct TodayCompletedSessionRow: View {
     let session: CompletedSession
     let tone: AppToneStyle
+    var showsDisclosureIndicator = false
 
     var body: some View {
         HStack(alignment: .top, spacing: 12) {
             VStack(alignment: .leading, spacing: 6) {
-                Text("LOGGED")
-                    .font(.caption2.weight(.black))
-                    .tracking(0.8)
-                    .foregroundStyle(tone.accent)
-
                 Text(session.templateNameSnapshot)
-                    .font(.system(size: 19, weight: .black))
+                    .font(.headline.weight(.semibold))
                     .foregroundStyle(AppColors.textPrimary)
                     .multilineTextAlignment(.leading)
                     .fixedSize(horizontal: false, vertical: true)
 
                 Text("\(session.blocks.count) exercise block\(session.blocks.count == 1 ? "" : "s")")
-                    .font(.subheadline.weight(.medium))
+                    .font(.subheadline)
                     .foregroundStyle(AppColors.textSecondary)
             }
 
             Spacer(minLength: 12)
 
-            Text(session.completedAt.formatted(date: .abbreviated, time: .shortened).uppercased())
-                .font(.caption.weight(.black))
-                .monospacedDigit()
-                .foregroundStyle(AppColors.textSecondary)
+            HStack(alignment: .top, spacing: 8) {
+                Text(session.completedAt.formatted(date: .abbreviated, time: .shortened))
+                    .font(.caption.weight(.medium))
+                    .monospacedDigit()
+                    .foregroundStyle(AppColors.textSecondary)
+
+                if showsDisclosureIndicator {
+                    AppDisclosureIndicator()
+                }
+            }
         }
         .padding(.vertical, 12)
     }

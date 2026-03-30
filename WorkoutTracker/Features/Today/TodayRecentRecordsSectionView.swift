@@ -9,27 +9,28 @@ struct TodayRecentRecordsSectionView: View {
             AppSectionHeader(
                 title: "Recent PRs",
                 systemImage: "rosette",
-                subtitle: "Your latest high points stay visible after every session.",
-                tone: .success
+                trailing: "\(todayStore.recentPersonalRecords.count)",
+                tone: .success,
+                trailingStyle: .plain
             )
 
-            if todayStore.recentPersonalRecords.isEmpty {
-                AppInlineMessage(
-                    systemImage: "rosette",
-                    title: "No PRs yet",
-                    message: "Finish sessions and the latest PRs will appear here.",
-                    tone: .success
-                )
-                .appSectionFrame(tone: .success)
-            } else {
-                TodayGroupedPanel(tone: .success) {
-                    VStack(spacing: 0) {
-                        ForEach(Array(todayStore.recentPersonalRecords.enumerated()), id: \.element.id) { index, record in
-                            TodayPersonalRecordRow(record: record, weightUnit: settingsStore.weightUnit, tone: .success)
+            TodayGroupedPanel(tone: .success) {
+                VStack(spacing: 0) {
+                    ForEach(Array(todayStore.recentPersonalRecords.enumerated()), id: \.element.id) { index, record in
+                        NavigationLink {
+                            PersonalRecordDetailView(record: record)
+                        } label: {
+                            TodayPersonalRecordRow(
+                                record: record,
+                                weightUnit: settingsStore.weightUnit,
+                                tone: .success,
+                                showsDisclosureIndicator: true
+                            )
+                        }
+                        .buttonStyle(.plain)
 
-                            if index < todayStore.recentPersonalRecords.count - 1 {
-                                SectionSurfaceDivider()
-                            }
+                        if index < todayStore.recentPersonalRecords.count - 1 {
+                            SectionSurfaceDivider()
                         }
                     }
                 }

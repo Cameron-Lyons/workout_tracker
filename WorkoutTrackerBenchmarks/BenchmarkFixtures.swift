@@ -39,9 +39,48 @@ enum WorkoutBenchmarkFixtures {
                     planID: UUID(),
                     templateID: UUID(),
                     templateNameSnapshot: "Benchmark Template \(sessionIndex % 8)",
-                    startedAt: completedAt.addingTimeInterval(-3_600),
                     completedAt: completedAt,
                     blocks: blocks
+                )
+            )
+        }
+
+        return sessions
+    }
+
+    static func makeCompletedSessions(
+        from plans: [Plan],
+        profiles: [ExerciseProfile],
+        sessionCount: Int
+    ) -> [CompletedSession] {
+        let references = plans.flatMap { plan in
+            plan.templates.map { (planID: plan.id, template: $0) }
+        }
+
+        guard !references.isEmpty else {
+            return []
+        }
+
+        var sessions: [CompletedSession] = []
+        sessions.reserveCapacity(sessionCount)
+
+        for sessionIndex in 0..<sessionCount {
+            let reference = references[sessionIndex % references.count]
+            let completedAt = referenceNow.addingTimeInterval(TimeInterval(sessionIndex - sessionCount) * 86_400)
+            let draft = completedDraft(
+                from: makeDraft(
+                    planID: reference.planID,
+                    template: reference.template,
+                    profiles: profiles,
+                    startedAt: completedAt.addingTimeInterval(-3_600)
+                ),
+                completedAt: completedAt
+            )
+
+            sessions.append(
+                SessionEngine.finishSession(
+                    draft: draft,
+                    completedAt: completedAt
                 )
             )
         }
@@ -214,10 +253,6 @@ enum WorkoutBenchmarkFixtures {
         return CompletedSessionBlock(
             exerciseID: exercise.id,
             exerciseNameSnapshot: exercise.name,
-            blockNote: "",
-            restSeconds: 90,
-            supersetGroup: nil,
-            progressionRule: .manual,
             sets: sets
         )
     }
