@@ -305,23 +305,15 @@ final class AppStore {
             return
         }
 
-        let needsPlanLibrary = plansStore.hasLoadedPlanLibrary == false
         let needsCompletedHistory = sessionStore.hasLoadedCompletedSessionHistory == false
-        guard needsPlanLibrary || needsCompletedHistory else {
+        guard needsCompletedHistory else {
             return
         }
 
-        async let planLibraryLoad: Void = preloadPlanLibraryIfNeeded(
-            needsPlanLibrary,
-            priority: priority
-        )
-        async let completedHistoryLoad: Void = preloadCompletedSessionHistoryIfNeeded(
+        await preloadCompletedSessionHistoryIfNeeded(
             needsCompletedHistory,
             priority: priority
         )
-
-        _ = await planLibraryLoad
-        await completedHistoryLoad
     }
 
     func refreshTodayStore() {
@@ -386,17 +378,6 @@ final class AppStore {
         completedSessionHistoryLoadGeneration &+= 1
         completedSessionHistoryTask?.cancel()
         completedSessionHistoryTask = nil
-    }
-
-    private func preloadPlanLibraryIfNeeded(
-        _ shouldLoad: Bool,
-        priority: TaskPriority
-    ) async {
-        guard shouldLoad else {
-            return
-        }
-
-        _ = await plansStore.loadPlanLibraryIfNeeded(priority: priority)
     }
 
     private func preloadCompletedSessionHistoryIfNeeded(

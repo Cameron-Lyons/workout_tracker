@@ -3,7 +3,7 @@ import SwiftUI
 struct PlanCardView: View {
     @Environment(AppStore.self) private var appStore
 
-    let plan: Plan
+    let plan: PlanSummary
     let activeDraft: SessionDraft?
     @Binding var editingPlan: Plan?
     @Binding var editingTemplateContext: TemplateEditorContext?
@@ -38,7 +38,7 @@ struct PlanCardView: View {
 
                 Menu {
                     Button("Edit Program", systemImage: "square.and.pencil") {
-                        editingPlan = plan
+                        editingPlan = appStore.plansStore.plan(for: plan.id)
                     }
                     Button("Delete Program", systemImage: "trash", role: .destructive) {
                         appStore.deletePlan(plan.id)
@@ -80,8 +80,8 @@ struct PlanCardView: View {
 private struct TemplateCardView: View {
     @Environment(AppStore.self) private var appStore
 
-    let plan: Plan
-    let template: WorkoutTemplate
+    let plan: PlanSummary
+    let template: TemplateSummary
     let activeDraft: SessionDraft?
     @Binding var editingTemplateContext: TemplateEditorContext?
     @Binding var pendingStartRequest: SessionStartRequest?
@@ -102,8 +102,7 @@ private struct TemplateCardView: View {
             parts.append(scheduleSummary)
         }
 
-        parts.append("\(template.blocks.count) exercise\(template.blocks.count == 1 ? "" : "s")")
-        return parts.joined(separator: " • ")
+        return parts.isEmpty ? "Ready to start" : parts.joined(separator: " • ")
     }
 
     var body: some View {
@@ -158,7 +157,17 @@ private struct TemplateCardView: View {
                     }
 
                     Button("Edit Template", systemImage: "square.and.pencil") {
-                        editingTemplateContext = TemplateEditorContext(planID: plan.id, template: template)
+                        guard let loadedTemplate = appStore.plansStore.plan(for: plan.id)?
+                            .templates
+                            .first(where: { $0.id == template.id })
+                        else {
+                            return
+                        }
+
+                        editingTemplateContext = TemplateEditorContext(
+                            planID: plan.id,
+                            template: loadedTemplate
+                        )
                     }
 
                     Button("Delete Template", systemImage: "trash", role: .destructive) {

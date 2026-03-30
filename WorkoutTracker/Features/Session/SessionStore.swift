@@ -191,6 +191,14 @@ final class SessionStore {
     }
 
     func mergeCompletedSessionHistory(_ sessions: [CompletedSession]) {
+        if completedSessions.isEmpty {
+            completedSessions = sessions
+            hasLoadedCompletedSessionHistory = true
+            isLoadingCompletedSessionHistory = false
+            bumpCompletedSessionsRevision()
+            return
+        }
+
         var sessionsByID = Dictionary(uniqueKeysWithValues: sessions.map { ($0.id, $0) })
         sessionsByID.reserveCapacity(max(sessionsByID.count, completedSessions.count))
 

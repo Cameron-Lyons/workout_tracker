@@ -23,8 +23,8 @@ final class AppFlowBenchmarks: BenchmarkTestCase {
         )
         static let appStorePreloadDeferredTabDataLargeLibraryAndHistory = BenchmarkThreshold(
             measuredIterationCount: 3,
-            averageSecondsUpperBound: 4.100,
-            maxSecondsUpperBound: 4.300
+            averageSecondsUpperBound: 2.300,
+            maxSecondsUpperBound: 2.450
         )
         static let persistenceHydrationLoaderLoadStartupSnapshotLargeLibrary = BenchmarkThreshold(
             measuredIterationCount: 3,
@@ -204,7 +204,7 @@ final class AppFlowBenchmarks: BenchmarkTestCase {
         )
 
         await benchmark(
-            named: "App store preloadDeferredTabDataIfNeeded / large library and history",
+            named: "App store preloadDeferredTabDataIfNeeded / deferred history with summary-backed plans",
             threshold: Thresholds.appStorePreloadDeferredTabDataLargeLibraryAndHistory,
             setup: {
                 let container = WorkoutModelContainerFactory.makeContainer(isStoredInMemoryOnly: true)
@@ -227,8 +227,8 @@ final class AppFlowBenchmarks: BenchmarkTestCase {
             operation: { store in
                 await store.preloadDeferredTabDataIfNeeded(priority: .utility)
 
-                XCTAssertTrue(store.plansStore.hasLoadedPlanLibrary)
-                XCTAssertEqual(store.plansStore.plans.count, plans.count)
+                XCTAssertFalse(store.plansStore.hasLoadedPlanLibrary)
+                XCTAssertEqual(store.plansStore.planSummaries.count, plans.count)
                 XCTAssertTrue(store.sessionStore.hasLoadedCompletedSessionHistory)
                 XCTAssertEqual(store.sessionStore.completedSessions.count, completedSessions.count)
                 XCTAssertEqual(store.progressStore.overview.totalSessions, completedSessions.count)

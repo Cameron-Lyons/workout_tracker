@@ -326,6 +326,7 @@ final class PlanRepository: RepositoryBase {
         TemplateSummary(
             id: record.id,
             name: record.name,
+            note: record.note,
             scheduledWeekdays: decode(
                 [Weekday].self,
                 from: record.scheduledWeekdaysData,

@@ -132,58 +132,51 @@ struct PlansView: View {
         NavigationStack {
             ZStack {
                 AppBackground()
-                if plansStore.hasLoadedPlanLibrary == false {
-                    PlansLibraryLoadingCard()
-                } else {
-                    ScrollView {
-                        LazyVStack(spacing: 16) {
-                            if plansStore.plans.isEmpty {
-                                AvailableProgramsSectionView(
-                                    presetPacks: availablePrograms,
-                                    onSelectPack: { pack in
-                                        selectedPresetPack = pack
-                                    }
-                                )
-                            }
-
-                            AppSectionHeader(
-                                title: "Your Programs",
-                                systemImage: "list.bullet.rectangle",
-                                trailing: "\(plansStore.planCount)",
-                                tone: .plans,
-                                trailingStyle: .plain
-                            )
-
-                            if plansStore.plans.isEmpty {
-                                AppEmptyStateCard(
-                                    systemImage: "list.bullet.rectangle",
-                                    title: "No programs yet",
-                                    message: "Create a custom program or add one of the available programs above.",
-                                    tone: .plans
-                                )
-                            } else {
-                                ForEach(plansStore.plans) { plan in
-                                    PlanCardView(
-                                        plan: plan,
-                                        activeDraft: activeDraft,
-                                        editingPlan: $editingPlan,
-                                        editingTemplateContext: $editingTemplateContext,
-                                        pendingStartRequest: $pendingStartRequest
-                                    )
+                ScrollView {
+                    LazyVStack(spacing: 16) {
+                        if plansStore.planSummaries.isEmpty {
+                            AvailableProgramsSectionView(
+                                presetPacks: availablePrograms,
+                                onSelectPack: { pack in
+                                    selectedPresetPack = pack
                                 }
+                            )
+                        }
+
+                        AppSectionHeader(
+                            title: "Your Programs",
+                            systemImage: "list.bullet.rectangle",
+                            trailing: "\(plansStore.planCount)",
+                            tone: .plans,
+                            trailingStyle: .plain
+                        )
+
+                        if plansStore.planSummaries.isEmpty {
+                            AppEmptyStateCard(
+                                systemImage: "list.bullet.rectangle",
+                                title: "No programs yet",
+                                message: "Create a custom program or add one of the available programs above.",
+                                tone: .plans
+                            )
+                        } else {
+                            ForEach(plansStore.planSummaries) { plan in
+                                PlanCardView(
+                                    plan: plan,
+                                    activeDraft: activeDraft,
+                                    editingPlan: $editingPlan,
+                                    editingTemplateContext: $editingTemplateContext,
+                                    pendingStartRequest: $pendingStartRequest
+                                )
                             }
                         }
-                        .padding(.horizontal, 14)
-                        .padding(.vertical, 14)
                     }
-                    .scrollIndicators(.hidden)
+                    .padding(.horizontal, 14)
+                    .padding(.vertical, 14)
                 }
+                .scrollIndicators(.hidden)
             }
             .navigationTitle("Programs")
             .navigationBarTitleDisplayMode(.inline)
-            .task {
-                await appStore.loadPlanLibraryIfNeeded(priority: .userInitiated)
-            }
             .toolbar {
                 ToolbarItem(placement: .topBarTrailing) {
                     Menu {

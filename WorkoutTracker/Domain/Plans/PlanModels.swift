@@ -84,6 +84,7 @@ struct Plan: Identifiable, Codable, Equatable, Sendable {
 struct TemplateSummary: Identifiable, Codable, Equatable, Sendable {
     var id: UUID
     var name: String
+    var note: String
     var scheduledWeekdays: [Weekday]
     var lastStartedAt: Date?
     var blockExerciseIDs: [UUID]
@@ -91,12 +92,14 @@ struct TemplateSummary: Identifiable, Codable, Equatable, Sendable {
     init(
         id: UUID,
         name: String,
+        note: String,
         scheduledWeekdays: [Weekday],
         lastStartedAt: Date?,
         blockExerciseIDs: [UUID]
     ) {
         self.id = id
         self.name = name
+        self.note = note
         self.scheduledWeekdays = scheduledWeekdays
         self.lastStartedAt = lastStartedAt
         self.blockExerciseIDs = blockExerciseIDs
@@ -106,6 +109,7 @@ struct TemplateSummary: Identifiable, Codable, Equatable, Sendable {
         self.init(
             id: template.id,
             name: template.name,
+            note: template.note,
             scheduledWeekdays: template.scheduledWeekdays,
             lastStartedAt: template.lastStartedAt,
             blockExerciseIDs: template.blocks.map(\.exerciseID)

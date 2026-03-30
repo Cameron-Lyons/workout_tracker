@@ -180,13 +180,28 @@ struct AnalyticsRepository: Sendable {
             )
         }
 
-        let chronologicalSessions = sessions.sorted(by: { $0.completedAt < $1.completedAt })
+        let chronologicalSessions = orderedSessionsIfNeeded(sessions)
+        let calendar = Calendar.autoupdatingCurrent
+        let startOfToday = calendar.startOfDay(for: now)
+        let startOfWeek = calendar.dateInterval(of: .weekOfYear, for: startOfToday)?.start ?? startOfToday
+        let last30Days = AnalyticsDefaults.rollingWindowStart(from: startOfToday, calendar: calendar)
+        let firstSessionDate = chronologicalSessions.first?.completedAt ?? startOfToday
         var totalVolume = 0.0
+        var sessionsThisWeek = 0
+        var sessionsLast30Days = 0
         var bestOneRepMaxByExerciseID: [UUID: Double] = [:]
         var personalRecords: [PersonalRecord] = []
         var exerciseAccumulatorsByID: [UUID: ExerciseAnalyticsAccumulator] = [:]
 
         for session in chronologicalSessions {
+            if session.completedAt >= startOfWeek {
+                sessionsThisWeek += 1
+            }
+
+            if session.completedAt >= last30Days {
+                sessionsLast30Days += 1
+            }
+
             let analysis = analyzeSession(
                 session,
                 displayNameForBlock: { block in
@@ -236,6 +251,7 @@ struct AnalyticsRepository: Sendable {
 
             totalVolume += analysis.totalVolume
         }
+
         let exerciseSummaries = exerciseAccumulatorsByID.values
             .map { accumulator in
                 ExerciseAnalyticsSummary(
@@ -250,7 +266,14 @@ struct AnalyticsRepository: Sendable {
             .sorted(by: { $0.displayName < $1.displayName })
 
         return SessionAnalyticsSnapshot(
-            overview: makeOverview(sessions: chronologicalSessions, now: now),
+            overview: ProgressOverview(
+                totalSessions: chronologicalSessions.count,
+                sessionsThisWeek: sessionsThisWeek,
+                sessionsLast30Days: sessionsLast30Days,
+                totalVolume: totalVolume,
+                averageSessionsPerWeek: Double(chronologicalSessions.count)
+                    / AnalyticsDefaults.weeksSpan(from: firstSessionDate, to: startOfToday)
+            ),
             personalRecords: personalRecords,
             exerciseSummaries: exerciseSummaries,
             recentPersonalRecords: Array(personalRecords.suffix(AnalyticsDefaults.recentActivityLimit).reversed()),
@@ -498,6 +521,22 @@ struct AnalyticsRepository: Sendable {
         }
 
         return bestRecords
+    }
+
+    private func orderedSessionsIfNeeded(_ sessions: [CompletedSession]) -> [CompletedSession] {
+        guard sessions.count > 1 else {
+            return sessions
+        }
+
+        var previousCompletedAt = sessions[0].completedAt
+        for session in sessions.dropFirst() {
+            if session.completedAt < previousCompletedAt {
+                return sessions.sorted(by: { $0.completedAt < $1.completedAt })
+            }
+            previousCompletedAt = session.completedAt
+        }
+
+        return sessions
     }
 
 }
