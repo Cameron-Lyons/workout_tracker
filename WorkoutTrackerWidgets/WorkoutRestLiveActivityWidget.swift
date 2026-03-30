@@ -48,25 +48,36 @@ private struct WorkoutRestLiveActivityLockScreenView: View {
     let context: ActivityViewContext<WorkoutRestLiveActivityAttributes>
 
     var body: some View {
-        HStack(alignment: .center, spacing: 12) {
-            Image(systemName: "timer")
-                .font(.title3.weight(.bold))
-                .foregroundStyle(.orange)
+        VStack(spacing: 8) {
+            HStack(spacing: 6) {
+                Image(systemName: "timer")
+                    .font(.caption.weight(.bold))
 
-            VStack(alignment: .leading, spacing: 4) {
                 Text("REST")
                     .font(.caption.weight(.black))
-                    .tracking(1)
-                    .foregroundStyle(.orange)
-
-                Text(context.state.endDate, style: .timer)
-                    .font(.system(size: 34, weight: .black, design: .rounded))
-                    .monospacedDigit()
-                    .foregroundStyle(.primary)
+                    .tracking(1.1)
             }
+            .foregroundStyle(.orange)
+            .padding(.horizontal, 10)
+            .padding(.vertical, 4)
+            .background(.orange.opacity(0.16), in: Capsule())
 
-            Spacer(minLength: 0)
+            Text(context.state.endDate, style: .timer)
+                .font(.system(size: 34, weight: .black, design: .rounded))
+                .monospacedDigit()
+                .foregroundStyle(.primary)
+                .frame(maxWidth: .infinity, alignment: .center)
+
+            Text(context.attributes.workoutName)
+                .font(.caption2.weight(.medium))
+                .foregroundStyle(.secondary)
+                .lineLimit(1)
+                .minimumScaleFactor(0.8)
+                .frame(maxWidth: .infinity, alignment: .center)
         }
-        .padding(.vertical, 10)
+        .multilineTextAlignment(.center)
+        .frame(maxWidth: .infinity)
+        .padding(.horizontal, 16)
+        .padding(.vertical, 12)
     }
 }

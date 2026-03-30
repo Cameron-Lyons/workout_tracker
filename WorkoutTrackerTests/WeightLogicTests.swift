@@ -57,8 +57,8 @@ final class WeightLogicTests: XCTestCase {
     }
 
     @MainActor
-    func testActiveSessionWeightStepUsesExerciseSpecificIncrement() throws {
-        let suiteName = "WeightLogicTests.ActiveSessionWeightStep.\(UUID().uuidString)"
+    func testSettingsStorePreferredIncrementUsesExerciseSpecificIncrement() throws {
+        let suiteName = "WeightLogicTests.SettingsStorePreferredIncrement.\(UUID().uuidString)"
         let defaults = try XCTUnwrap(UserDefaults(suiteName: suiteName))
         defer {
             defaults.removePersistentDomain(forName: suiteName)
@@ -68,23 +68,8 @@ final class WeightLogicTests: XCTestCase {
         settings.upperBodyIncrement = 5
         settings.lowerBodyIncrement = 10
 
-        let benchBlock = SessionBlock(
-            exerciseID: CatalogSeed.benchPress,
-            exerciseNameSnapshot: "Bench Press",
-            restSeconds: 90,
-            progressionRule: .manual,
-            sets: []
-        )
-        let squatBlock = SessionBlock(
-            exerciseID: CatalogSeed.backSquat,
-            exerciseNameSnapshot: "Back Squat",
-            restSeconds: 120,
-            progressionRule: .manual,
-            sets: []
-        )
-
-        XCTAssertEqual(ActiveSessionWeightStep.resolve(for: benchBlock, settings: settings), 5)
-        XCTAssertEqual(ActiveSessionWeightStep.resolve(for: squatBlock, settings: settings), 10)
+        XCTAssertEqual(settings.preferredIncrement(for: "Bench Press"), 5)
+        XCTAssertEqual(settings.preferredIncrement(for: "Back Squat"), 10)
     }
 
     @MainActor

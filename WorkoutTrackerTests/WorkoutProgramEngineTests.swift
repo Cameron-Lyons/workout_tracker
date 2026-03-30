@@ -35,38 +35,30 @@ final class WorkoutProgramEngineTests: XCTestCase {
             ]
         )
 
-        let completedBlock = CompletedSessionBlock(
-            exerciseID: CatalogSeed.backSquat,
-            exerciseNameSnapshot: "Back Squat",
-            blockNote: "",
-            restSeconds: 90,
-            supersetGroup: nil,
-            progressionRule: block.progressionRule,
-            sets: [
-                SessionSetRow(
-                    target: block.targets[0],
-                    log: SetLog(
-                        setTargetID: block.targets[0].id,
-                        weight: 225,
-                        reps: 10,
-                        completedAt: .now
-                    )
-                ),
-                SessionSetRow(
-                    target: block.targets[1],
-                    log: SetLog(
-                        setTargetID: block.targets[1].id,
-                        weight: 225,
-                        reps: 11,
-                        completedAt: .now
-                    )
-                ),
-            ]
-        )
+        let completedRows = [
+            SessionSetRow(
+                target: block.targets[0],
+                log: SetLog(
+                    setTargetID: block.targets[0].id,
+                    weight: 225,
+                    reps: 10,
+                    completedAt: .now
+                )
+            ),
+            SessionSetRow(
+                target: block.targets[1],
+                log: SetLog(
+                    setTargetID: block.targets[1].id,
+                    weight: 225,
+                    reps: 11,
+                    completedAt: .now
+                )
+            ),
+        ]
 
         let updated = ProgressionEngine.applyCompletion(
             to: block,
-            using: completedBlock,
+            using: completedRows,
             profile: nil,
             fallbackIncrement: 5
         )
@@ -91,38 +83,30 @@ final class WorkoutProgramEngineTests: XCTestCase {
             ]
         )
 
-        let completedBlock = CompletedSessionBlock(
-            exerciseID: CatalogSeed.backSquat,
-            exerciseNameSnapshot: "Back Squat",
-            blockNote: "",
-            restSeconds: 90,
-            supersetGroup: nil,
-            progressionRule: block.progressionRule,
-            sets: [
-                SessionSetRow(
-                    target: block.targets[0],
-                    log: SetLog(
-                        setTargetID: block.targets[0].id,
-                        weight: 225,
-                        reps: 5,
-                        completedAt: .now
-                    )
-                ),
-                SessionSetRow(
-                    target: block.targets[1],
-                    log: SetLog(
-                        setTargetID: block.targets[1].id,
-                        weight: 225,
-                        reps: 5,
-                        completedAt: .now
-                    )
-                ),
-            ]
-        )
+        let completedRows = [
+            SessionSetRow(
+                target: block.targets[0],
+                log: SetLog(
+                    setTargetID: block.targets[0].id,
+                    weight: 225,
+                    reps: 5,
+                    completedAt: .now
+                )
+            ),
+            SessionSetRow(
+                target: block.targets[1],
+                log: SetLog(
+                    setTargetID: block.targets[1].id,
+                    weight: 225,
+                    reps: 5,
+                    completedAt: .now
+                )
+            ),
+        ]
 
         let updated = ProgressionEngine.applyCompletion(
             to: block,
-            using: completedBlock,
+            using: completedRows,
             profile: nil,
             fallbackIncrement: 5
         )
@@ -154,19 +138,11 @@ final class WorkoutProgramEngineTests: XCTestCase {
                 completedAt: .now
             )
         )
-        let completedBlock = CompletedSessionBlock(
-            exerciseID: CatalogSeed.backSquat,
-            exerciseNameSnapshot: "Back Squat",
-            blockNote: "",
-            restSeconds: 90,
-            supersetGroup: nil,
-            progressionRule: block.progressionRule,
-            sets: [duplicateRow, duplicateRow]
-        )
+        let completedRows = [duplicateRow, duplicateRow]
 
         let updated = ProgressionEngine.applyCompletion(
             to: block,
-            using: completedBlock,
+            using: completedRows,
             profile: nil,
             fallbackIncrement: 5
         )
@@ -223,25 +199,17 @@ final class WorkoutProgramEngineTests: XCTestCase {
         )
 
         let completedTarget = SetTarget(setKind: .working, targetWeight: 140, repRange: RepRange(3, 3))
-        let completedBlock = CompletedSessionBlock(
-            exerciseID: CatalogSeed.deadlift,
-            exerciseNameSnapshot: "Deadlift",
-            blockNote: "",
-            restSeconds: 180,
-            supersetGroup: nil,
-            progressionRule: block.progressionRule,
-            sets: [
-                SessionSetRow(
-                    target: completedTarget,
-                    log: SetLog(setTargetID: completedTarget.id, weight: 140, reps: 3, completedAt: .now)
-                )
-            ]
-        )
+        let completedRows = [
+            SessionSetRow(
+                target: completedTarget,
+                log: SetLog(setTargetID: completedTarget.id, weight: 140, reps: 3, completedAt: .now)
+            )
+        ]
         let profile = ExerciseProfile(exerciseID: CatalogSeed.deadlift, trainingMax: 200, preferredIncrement: 10)
 
         let updated = ProgressionEngine.applyCompletion(
             to: block,
-            using: completedBlock,
+            using: completedRows,
             profile: profile,
             fallbackIncrement: 10
         )
@@ -273,25 +241,17 @@ final class WorkoutProgramEngineTests: XCTestCase {
         )
 
         let incompleteTarget = SetTarget(setKind: .working, targetWeight: 140, repRange: RepRange(3, 3))
-        let completedBlock = CompletedSessionBlock(
-            exerciseID: CatalogSeed.deadlift,
-            exerciseNameSnapshot: "Deadlift",
-            blockNote: "",
-            restSeconds: 180,
-            supersetGroup: nil,
-            progressionRule: block.progressionRule,
-            sets: [
-                SessionSetRow(
-                    target: incompleteTarget,
-                    log: SetLog(setTargetID: incompleteTarget.id, weight: 140, reps: 3, completedAt: nil)
-                )
-            ]
-        )
+        let completedRows = [
+            SessionSetRow(
+                target: incompleteTarget,
+                log: SetLog(setTargetID: incompleteTarget.id, weight: 140, reps: 3, completedAt: nil)
+            )
+        ]
         let profile = ExerciseProfile(exerciseID: CatalogSeed.deadlift, trainingMax: 200, preferredIncrement: 10)
 
         let updated = ProgressionEngine.applyCompletion(
             to: block,
-            using: completedBlock,
+            using: completedRows,
             profile: profile,
             fallbackIncrement: 10
         )
@@ -320,25 +280,17 @@ final class WorkoutProgramEngineTests: XCTestCase {
             targets: []
         )
         let completedTarget = SetTarget(setKind: .working, targetWeight: 140, repRange: RepRange(3, 3))
-        let completedBlock = CompletedSessionBlock(
-            exerciseID: CatalogSeed.deadlift,
-            exerciseNameSnapshot: "Deadlift",
-            blockNote: "",
-            restSeconds: 180,
-            supersetGroup: nil,
-            progressionRule: block.progressionRule,
-            sets: [
-                SessionSetRow(
-                    target: completedTarget,
-                    log: SetLog(setTargetID: completedTarget.id, weight: 140, reps: 3, completedAt: .now)
-                )
-            ]
-        )
+        let completedRows = [
+            SessionSetRow(
+                target: completedTarget,
+                log: SetLog(setTargetID: completedTarget.id, weight: 140, reps: 3, completedAt: .now)
+            )
+        ]
         let profile = ExerciseProfile(exerciseID: CatalogSeed.deadlift, trainingMax: 200, preferredIncrement: 10)
 
         let updated = ProgressionEngine.applyCompletion(
             to: block,
-            using: completedBlock,
+            using: completedRows,
             profile: profile,
             fallbackIncrement: 10
         )
@@ -363,24 +315,16 @@ final class WorkoutProgramEngineTests: XCTestCase {
             ]
         )
 
-        let completedBlock = CompletedSessionBlock(
-            exerciseID: CatalogSeed.backSquat,
-            exerciseNameSnapshot: "Back Squat",
-            blockNote: "",
-            restSeconds: 90,
-            supersetGroup: nil,
-            progressionRule: block.progressionRule,
-            sets: [
-                SessionSetRow(
-                    target: SetTarget(setKind: .warmup, targetWeight: 135, repRange: RepRange(5, 5)),
-                    log: SetLog(setTargetID: UUID(), weight: 135, reps: 5, completedAt: .now)
-                )
-            ]
-        )
+        let completedRows = [
+            SessionSetRow(
+                target: SetTarget(setKind: .warmup, targetWeight: 135, repRange: RepRange(5, 5)),
+                log: SetLog(setTargetID: UUID(), weight: 135, reps: 5, completedAt: .now)
+            )
+        ]
 
         let updated = ProgressionEngine.applyCompletion(
             to: block,
-            using: completedBlock,
+            using: completedRows,
             profile: nil,
             fallbackIncrement: 5
         )
@@ -405,38 +349,30 @@ final class WorkoutProgramEngineTests: XCTestCase {
             ]
         )
 
-        let completedBlock = CompletedSessionBlock(
-            exerciseID: CatalogSeed.backSquat,
-            exerciseNameSnapshot: "Back Squat",
-            blockNote: "",
-            restSeconds: 90,
-            supersetGroup: nil,
-            progressionRule: block.progressionRule,
-            sets: [
-                SessionSetRow(
-                    target: block.targets[0],
-                    log: SetLog(
-                        setTargetID: block.targets[0].id,
-                        weight: 225,
-                        reps: 10,
-                        completedAt: .now
-                    )
-                ),
-                SessionSetRow(
-                    target: block.targets[1],
-                    log: SetLog(
-                        setTargetID: block.targets[1].id,
-                        weight: 225,
-                        reps: 10,
-                        completedAt: nil
-                    )
-                ),
-            ]
-        )
+        let completedRows = [
+            SessionSetRow(
+                target: block.targets[0],
+                log: SetLog(
+                    setTargetID: block.targets[0].id,
+                    weight: 225,
+                    reps: 10,
+                    completedAt: .now
+                )
+            ),
+            SessionSetRow(
+                target: block.targets[1],
+                log: SetLog(
+                    setTargetID: block.targets[1].id,
+                    weight: 225,
+                    reps: 10,
+                    completedAt: nil
+                )
+            ),
+        ]
 
         let updated = ProgressionEngine.applyCompletion(
             to: block,
-            using: completedBlock,
+            using: completedRows,
             profile: nil,
             fallbackIncrement: 5
         )

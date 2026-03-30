@@ -30,7 +30,12 @@ WorkoutTracker is an iPhone-first SwiftUI strength training app for building pla
 
 ## Project Layout
 
-- `WorkoutTracker/`: app source, models, views, persistence, and resources
+- `WorkoutTracker/App/`: app entry point, root shell, settings, and app-level coordinators
+- `WorkoutTracker/Features/`: feature folders for onboarding, plans, progress, session, and today flows
+- `WorkoutTracker/Domain/`: pure workout, progression, analytics-selection, and preset domain models
+- `WorkoutTracker/Data/`: repositories, persistence controllers, hydration, and analytics data access
+- `WorkoutTracker/Shared/`: theme tokens, shared components, modifiers, extensions, and utilities
+- `WorkoutTracker/Resources/`: assets and localized strings
 - `WorkoutTrackerTests/`: unit tests for stores, progression logic, and weight handling
 - `WorkoutTrackerUITests/`: UI coverage and layout smoke tests
 - `WorkoutTrackerBenchmarks/`: performance guardrails for analytics, persistence, startup, and session flows
