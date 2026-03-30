@@ -8,18 +8,36 @@ struct SessionMutationContext {
     let setIndex: Int?
 }
 
-enum SessionMutationResult {
-    case unchanged
-    case changed
-    case structureChanged
+struct SessionMutationResult {
+    let didMutate: Bool
+    let invalidatesIndexCache: Bool
+    let requiresProgressRebuild: Bool
 
-    var didMutate: Bool {
-        self != .unchanged
-    }
-
-    var invalidatesIndexCache: Bool {
-        self == .structureChanged
-    }
+    static let unchanged = SessionMutationResult(
+        didMutate: false,
+        invalidatesIndexCache: false,
+        requiresProgressRebuild: false
+    )
+    static let changed = SessionMutationResult(
+        didMutate: true,
+        invalidatesIndexCache: false,
+        requiresProgressRebuild: false
+    )
+    static let progressChanged = SessionMutationResult(
+        didMutate: true,
+        invalidatesIndexCache: false,
+        requiresProgressRebuild: true
+    )
+    static let structureChanged = SessionMutationResult(
+        didMutate: true,
+        invalidatesIndexCache: true,
+        requiresProgressRebuild: false
+    )
+    static let structureAndProgressChanged = SessionMutationResult(
+        didMutate: true,
+        invalidatesIndexCache: true,
+        requiresProgressRebuild: true
+    )
 }
 
 private struct SessionDraftMetadata {
@@ -239,7 +257,7 @@ final class SessionStore {
         pushMutation(persistence: persistence) { draft, _ in
             let previousDraft = draft
             mutation(&draft)
-            return draft == previousDraft ? .unchanged : .changed
+            return draft == previousDraft ? .unchanged : .progressChanged
         }
     }
 
@@ -265,7 +283,11 @@ final class SessionStore {
         }
 
         appendUndoEntry(snapshot, strategy: undoStrategy, context: context)
-        updateActiveDraft(draft, invalidateIndexCache: result.invalidatesIndexCache)
+        updateActiveDraft(
+            draft,
+            invalidateIndexCache: result.invalidatesIndexCache,
+            recomputeProgress: result.requiresProgressRebuild
+        )
         persistActiveDraft(using: persistence)
     }
 
@@ -301,7 +323,7 @@ final class SessionStore {
             metadata.applying(to: &draft)
             replaceActiveDraft(draft)
         }
-        persistActiveDraft(using: .immediate)
+        persistActiveDraft(using: .deferred)
     }
 
     func clearRestTimer() {
@@ -314,7 +336,7 @@ final class SessionStore {
         }
 
         activeDraft.restTimerEndsAt = nil
-        updateActiveDraft(activeDraft)
+        updateActiveDraft(activeDraft, recomputeProgress: false)
         cancelPendingDraftSave()
         persistActiveDraft(using: .immediate)
     }
@@ -381,7 +403,7 @@ final class SessionStore {
             return
         }
 
-        updateActiveDraft(activeDraft)
+        updateActiveDraft(activeDraft, recomputeProgress: false)
         cancelPendingDraftSave()
         persistActiveDraft(using: .immediate)
     }
@@ -426,10 +448,16 @@ final class SessionStore {
         updateActiveDraft(draft, invalidateIndexCache: true)
     }
 
-    private func updateActiveDraft(_ draft: SessionDraft?, invalidateIndexCache: Bool = false) {
+    private func updateActiveDraft(
+        _ draft: SessionDraft?,
+        invalidateIndexCache: Bool = false,
+        recomputeProgress: Bool = true
+    ) {
         let previousDraft = activeDraft
         activeDraft = draft
-        activeDraftProgress = ActiveSessionProgress(draft: draft)
+        if recomputeProgress || draft == nil {
+            activeDraftProgress = ActiveSessionProgress(draft: draft)
+        }
         if invalidateIndexCache {
             rebuildActiveDraftIndexCache()
         }

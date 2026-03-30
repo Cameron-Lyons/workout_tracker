@@ -62,10 +62,13 @@ struct TodayView: View {
                     appStore.resumeActiveSession()
                 },
                 onReplace: { request in
-                    appStore.replaceActiveSessionAndStart(
-                        planID: request.planID,
-                        templateID: request.templateID
-                    )
+                    Task { @MainActor in
+                        await appStore.preparePlanInteractionDataIfNeeded()
+                        appStore.replaceActiveSessionAndStart(
+                            planID: request.planID,
+                            templateID: request.templateID
+                        )
+                    }
                 }
             )
         }

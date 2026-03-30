@@ -23,6 +23,7 @@ final class PlansStore {
     @ObservationIgnored private var profilesByExerciseID: [UUID: ExerciseProfile] = [:]
     @ObservationIgnored private var cachedTemplateReferences: [TemplateReference] = []
     @ObservationIgnored private var fullPlanLibraryLoadTask: Task<[Plan], Never>?
+    @ObservationIgnored private var profileLoadTask: Task<[ExerciseProfile], Never>?
     @ObservationIgnored private var hasLoadedProfiles = true
 
     var catalog: [ExerciseCatalogItem] = []
@@ -48,6 +49,7 @@ final class PlansStore {
         hasLoadedPlanLibrary = snapshot.includesFullPlanLibrary
         isLoadingPlanLibrary = false
         fullPlanLibraryLoadTask = nil
+        profileLoadTask = nil
         rebuildCaches()
         bumpCatalogRevision()
     }
@@ -56,6 +58,8 @@ final class PlansStore {
         persistenceController.scheduleDeleteEverything()
         fullPlanLibraryLoadTask?.cancel()
         fullPlanLibraryLoadTask = nil
+        profileLoadTask?.cancel()
+        profileLoadTask = nil
         catalog = CatalogSeed.defaultCatalog()
         planSummaries = []
         plans = []
@@ -90,6 +94,28 @@ final class PlansStore {
         let loadedPlans = await task.value
         fullPlanLibraryLoadTask = nil
         applyLoadedPlanLibrary(loadedPlans)
+        return true
+    }
+
+    @discardableResult
+    func loadProfilesIfNeeded(priority: TaskPriority = .utility) async -> Bool {
+        guard hasLoadedProfiles == false else {
+            return false
+        }
+
+        if let existingTask = profileLoadTask {
+            let loadedProfiles = await existingTask.value
+            applyLoadedProfiles(loadedProfiles)
+            return true
+        }
+
+        let task = Task(priority: priority) { [persistenceController] in
+            persistenceController.loadProfiles()
+        }
+        profileLoadTask = task
+        let loadedProfiles = await task.value
+        profileLoadTask = nil
+        applyLoadedProfiles(loadedProfiles)
         return true
     }
 
@@ -392,6 +418,16 @@ final class PlansStore {
         rebuildPlanCaches()
     }
 
+    private func applyLoadedProfiles(_ loadedProfiles: [ExerciseProfile]) {
+        guard hasLoadedProfiles == false else {
+            return
+        }
+
+        profiles = loadedProfiles
+        hasLoadedProfiles = true
+        rebuildProfileCaches()
+    }
+
     private func rebuildCaches() {
         rebuildCatalogCaches()
         rebuildPlanCaches()
@@ -531,6 +567,7 @@ final class PlansStore {
         }
 
         profiles = persistenceController.loadProfiles()
+        profileLoadTask = nil
         hasLoadedProfiles = true
         rebuildProfileCaches()
     }

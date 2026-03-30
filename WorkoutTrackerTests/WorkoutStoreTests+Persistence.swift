@@ -4,6 +4,10 @@ import XCTest
 @testable import WorkoutTracker
 
 extension WorkoutStoreTests {
+    private struct LoadIssueModelContainerError: Error, CustomStringConvertible {
+        let description: String
+    }
+
     func testPinnedTemplateUsesStartingStrengthRotationInsteadOfStaticWeekdaySchedule() throws {
         var calendar = Calendar(identifier: .gregorian)
         calendar.timeZone = try XCTUnwrap(TimeZone(secondsFromGMT: 0))
@@ -275,53 +279,36 @@ extension WorkoutStoreTests {
     }
 
     @MainActor
-    func testPlanRepositoryDropsBlocksWithInvalidProgressionRulePayloads() throws {
+    func testPlanRepositorySkipsPlansWithInvalidPayloads() throws {
         let container = WorkoutModelContainerFactory.makeContainer(isStoredInMemoryOnly: true)
         let context = ModelContext(container)
         context.autosaveEnabled = false
 
+        let planID = UUID()
+        let summaryData = try JSONEncoder().encode(
+            PlanSummary(
+                id: planID,
+                name: "Starter",
+                createdAt: .now,
+                pinnedTemplateID: nil,
+                templates: []
+            )
+        )
         let plan = StoredPlan(
-            id: UUID(),
+            id: planID,
             name: "Starter",
             createdAt: .now,
-            pinnedTemplateID: nil
+            pinnedTemplateID: nil,
+            payloadData: Data("invalid".utf8),
+            summaryData: summaryData
         )
-        let template = StoredTemplate(
-            id: UUID(),
-            name: "Bench Day",
-            note: "",
-            scheduledWeekdaysData: Data("[]".utf8),
-            lastStartedAt: nil,
-            orderIndex: 0
-        )
-        let block = StoredTemplateBlock(
-            id: UUID(),
-            exerciseID: CatalogSeed.benchPress,
-            exerciseNameSnapshot: "Bench Press",
-            blockNote: "",
-            restSeconds: 90,
-            supersetGroup: nil,
-            allowsAutoWarmups: true,
-            orderIndex: 0,
-            progressionRuleData: Data("invalid".utf8)
-        )
-
-        template.plan = plan
-        template.blocks = [block]
-        block.template = template
 
         context.insert(plan)
-        context.insert(template)
-        context.insert(block)
         try context.save()
 
         let repository = PlanRepository(modelContext: context)
-        let loadedPlan = try XCTUnwrap(repository.loadPlans().first)
-        let loadedTemplate = try XCTUnwrap(loadedPlan.templates.first)
-
-        XCTAssertEqual(loadedPlan.name, "Starter")
-        XCTAssertEqual(loadedTemplate.name, "Bench Day")
-        XCTAssertTrue(loadedTemplate.blocks.isEmpty)
+        XCTAssertTrue(repository.loadPlans().isEmpty)
+        XCTAssertEqual(repository.loadPlanSummaries().count, 1)
     }
 
     @MainActor
@@ -358,5 +345,46 @@ extension WorkoutStoreTests {
         )
         XCTAssertTrue(repository.saveCatalog([catalogItem]))
         XCTAssertEqual(repository.loadCatalog().first?.name, "Bench Press")
+    }
+
+    func testRecoveryClassifierResetsForSwiftDataLoadIssueWhenStoreFileExists() throws {
+        let storeDirectory = FileManager.default.temporaryDirectory
+            .appendingPathComponent(UUID().uuidString, isDirectory: true)
+        let storeURL = storeDirectory.appendingPathComponent("WorkoutTracker.store")
+
+        try FileManager.default.createDirectory(at: storeDirectory, withIntermediateDirectories: true)
+        try Data("legacy-store".utf8).write(to: storeURL)
+        defer { try? FileManager.default.removeItem(at: storeDirectory) }
+
+        let error = LoadIssueModelContainerError(
+            description: "SwiftDataError(_error: SwiftData.SwiftDataError._Error.loadIssueModelContainer, _explanation: nil)"
+        )
+
+        XCTAssertTrue(
+            PersistenceRecoveryClassifier.shouldAttemptReset(
+                after: error,
+                storeURL: storeURL
+            )
+        )
+    }
+
+    func testRecoveryClassifierDoesNotResetSwiftDataLoadIssueForDirectoryPath() throws {
+        let storeDirectory = FileManager.default.temporaryDirectory
+            .appendingPathComponent(UUID().uuidString, isDirectory: true)
+        let storeURL = storeDirectory.appendingPathComponent("WorkoutTracker.store", isDirectory: true)
+
+        try FileManager.default.createDirectory(at: storeURL, withIntermediateDirectories: true)
+        defer { try? FileManager.default.removeItem(at: storeDirectory) }
+
+        let error = LoadIssueModelContainerError(
+            description: "SwiftDataError(_error: SwiftData.SwiftDataError._Error.loadIssueModelContainer, _explanation: nil)"
+        )
+
+        XCTAssertFalse(
+            PersistenceRecoveryClassifier.shouldAttemptReset(
+                after: error,
+                storeURL: storeURL
+            )
+        )
     }
 }

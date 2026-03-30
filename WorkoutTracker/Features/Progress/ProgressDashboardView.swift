@@ -79,7 +79,8 @@ private struct ProgressDashboardBodyView: View {
                 title: "No progress yet",
                 message: "Finish a session and PRs, trends, and calendar history will populate here.",
                 tone: .progress,
-                style: .plain
+                style: .plain,
+                textAlignment: .center
             )
         } else {
             ProgressDashboardLoadedView(displayedMonth: $displayedMonth)

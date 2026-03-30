@@ -300,20 +300,30 @@ final class AppStore {
         await plansStore.loadPlanLibraryIfNeeded(priority: priority)
     }
 
+    @discardableResult
+    func loadProfilesIfNeeded(priority: TaskPriority = .userInitiated) async -> Bool {
+        await plansStore.loadProfilesIfNeeded(priority: priority)
+    }
+
+    func preparePlanInteractionDataIfNeeded(priority: TaskPriority = .userInitiated) async {
+        async let loadedPlanLibrary = plansStore.loadPlanLibraryIfNeeded(priority: priority)
+        async let loadedProfiles = plansStore.loadProfilesIfNeeded(priority: priority)
+        _ = await loadedPlanLibrary
+        _ = await loadedProfiles
+    }
+
     func preloadDeferredTabDataIfNeeded(priority: TaskPriority = .utility) async {
         guard isHydrated else {
             return
         }
 
         let needsCompletedHistory = sessionStore.hasLoadedCompletedSessionHistory == false
-        guard needsCompletedHistory else {
-            return
+        if needsCompletedHistory {
+            await preloadCompletedSessionHistoryIfNeeded(
+                needsCompletedHistory,
+                priority: priority
+            )
         }
-
-        await preloadCompletedSessionHistoryIfNeeded(
-            needsCompletedHistory,
-            priority: priority
-        )
     }
 
     func refreshTodayStore() {

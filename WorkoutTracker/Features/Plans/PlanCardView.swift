@@ -38,7 +38,10 @@ struct PlanCardView: View {
 
                 Menu {
                     Button("Edit Program", systemImage: "square.and.pencil") {
-                        editingPlan = appStore.plansStore.plan(for: plan.id)
+                        Task { @MainActor in
+                            await appStore.preparePlanInteractionDataIfNeeded()
+                            editingPlan = appStore.plansStore.plan(for: plan.id)
+                        }
                     }
                     Button("Delete Program", systemImage: "trash", role: .destructive) {
                         appStore.deletePlan(plan.id)
@@ -139,7 +142,10 @@ private struct TemplateCardView: View {
                             appStore.resumeActiveSession()
                         },
                         onStartNew: { planID, templateID in
-                            appStore.startSession(planID: planID, templateID: templateID)
+                            Task { @MainActor in
+                                await appStore.preparePlanInteractionDataIfNeeded()
+                                appStore.startSession(planID: planID, templateID: templateID)
+                            }
                         }
                     )
                 } label: {
@@ -157,17 +163,21 @@ private struct TemplateCardView: View {
                     }
 
                     Button("Edit Template", systemImage: "square.and.pencil") {
-                        guard let loadedTemplate = appStore.plansStore.plan(for: plan.id)?
-                            .templates
-                            .first(where: { $0.id == template.id })
-                        else {
-                            return
-                        }
+                        Task { @MainActor in
+                            await appStore.preparePlanInteractionDataIfNeeded()
 
-                        editingTemplateContext = TemplateEditorContext(
-                            planID: plan.id,
-                            template: loadedTemplate
-                        )
+                            guard let loadedTemplate = appStore.plansStore.plan(for: plan.id)?
+                                .templates
+                                .first(where: { $0.id == template.id })
+                            else {
+                                return
+                            }
+
+                            editingTemplateContext = TemplateEditorContext(
+                                planID: plan.id,
+                                template: loadedTemplate
+                            )
+                        }
                     }
 
                     Button("Delete Template", systemImage: "trash", role: .destructive) {

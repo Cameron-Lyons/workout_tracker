@@ -1,0 +1,97 @@
+{
+  "version": "2.0.0",
+  "tasks": [
+    {
+      "label": "XcodeGen: Generate Project",
+      "type": "shell",
+      "command": "xcodegen",
+      "args": [
+        "generate"
+      ],
+      "options": {
+        "cwd": "${workspaceFolder}"
+      },
+      "problemMatcher": []
+    },
+    {
+      "label": "Xcode: Build WorkoutTracker",
+      "type": "shell",
+      "command": "xcodebuild",
+      "args": [
+        "build",
+        "-project",
+        "WorkoutTracker.xcodeproj",
+        "-scheme",
+        "WorkoutTracker",
+        "-destination",
+        "platform=iOS Simulator,name=iPhone 17"
+      ],
+      "options": {
+        "cwd": "${workspaceFolder}"
+      },
+      "group": {
+        "kind": "build",
+        "isDefault": true
+      },
+      "problemMatcher": [
+        "$gcc"
+      ]
+    },
+    {
+      "label": "Xcode: Test WorkoutTracker Unit",
+      "type": "shell",
+      "command": "xcodebuild",
+      "args": [
+        "test",
+        "-project",
+        "WorkoutTracker.xcodeproj",
+        "-scheme",
+        "WorkoutTracker",
+        "-destination",
+        "platform=iOS Simulator,name=iPhone 17",
+        "-only-testing:WorkoutTrackerTests"
+      ],
+      "options": {
+        "cwd": "${workspaceFolder}"
+      },
+      "group": "test",
+      "problemMatcher": [
+        "$gcc"
+      ]
+    },
+    {
+      "label": "Xcode: Test WorkoutTracker UI",
+      "type": "shell",
+      "command": "xcodebuild",
+      "args": [
+        "test",
+        "-project",
+        "WorkoutTracker.xcodeproj",
+        "-scheme",
+        "WorkoutTracker",
+        "-destination",
+        "platform=iOS Simulator,name=iPhone 17",
+        "-parallel-testing-enabled",
+        "NO",
+        "-only-testing:WorkoutTrackerUITests"
+      ],
+      "options": {
+        "cwd": "${workspaceFolder}"
+      },
+      "problemMatcher": [
+        "$gcc"
+      ]
+    },
+    {
+      "label": "Xcode: Run Benchmarks",
+      "type": "shell",
+      "command": "./scripts/run-benchmarks.sh",
+      "options": {
+        "cwd": "${workspaceFolder}"
+      },
+      "problemMatcher": [
+        "$gcc"
+      ]
+    }
+  ]
+}

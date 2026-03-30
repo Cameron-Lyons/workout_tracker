@@ -66,7 +66,7 @@ extension WorkoutStoreTests {
     }
 
     @MainActor
-    func testPreloadDeferredTabDataWarmsPlansAndProgressAfterStartupHydration() async throws {
+    func testPreloadDeferredTabDataWarmsProgressWithoutLoadingFullPlanLibrary() async throws {
         let container = WorkoutModelContainerFactory.makeContainer(isStoredInMemoryOnly: true)
         let seededStore = makeStore(container: container)
         await seededStore.hydrateIfNeeded()
@@ -96,8 +96,8 @@ extension WorkoutStoreTests {
 
         await rehydratedStore.preloadDeferredTabDataIfNeeded(priority: .utility)
 
-        XCTAssertTrue(rehydratedStore.plansStore.hasLoadedPlanLibrary)
-        XCTAssertEqual(rehydratedStore.plansStore.plans.count, 1)
+        XCTAssertFalse(rehydratedStore.plansStore.hasLoadedPlanLibrary)
+        XCTAssertEqual(rehydratedStore.plansStore.planSummaries.count, 1)
         XCTAssertTrue(rehydratedStore.sessionStore.hasLoadedCompletedSessionHistory)
         XCTAssertEqual(rehydratedStore.sessionStore.completedSessions.count, 1)
         XCTAssertEqual(rehydratedStore.todayStore.recentSessions.first?.templateNameSnapshot, "Bench Day")
@@ -135,7 +135,7 @@ extension WorkoutStoreTests {
     }
 
     @MainActor
-    func testStartupHydrationDefersProfilesButLoadsThemOnDemand() async throws {
+    func testStartupHydrationLoadsProfilesAlongsidePlanSummaries() async throws {
         let container = WorkoutModelContainerFactory.makeContainer(isStoredInMemoryOnly: true)
         let seededStore = makeStore(container: container)
         await seededStore.hydrateIfNeeded()
@@ -152,7 +152,7 @@ extension WorkoutStoreTests {
         let rehydratedStore = makeStore(container: container)
         await rehydratedStore.hydrateIfNeeded()
 
-        XCTAssertTrue(rehydratedStore.plansStore.profiles.isEmpty)
+        XCTAssertEqual(rehydratedStore.plansStore.profiles.count, 1)
         XCTAssertEqual(rehydratedStore.plansStore.profileCount, 1)
 
         let loadedProfile = try XCTUnwrap(rehydratedStore.plansStore.profile(for: CatalogSeed.benchPress))
@@ -164,7 +164,7 @@ extension WorkoutStoreTests {
     }
 
     @MainActor
-    func testStartingSessionAfterStartupHydrationUsesDeferredProfiles() async throws {
+    func testStartingSessionAfterStartupHydrationUsesHydratedProfiles() async throws {
         let container = WorkoutModelContainerFactory.makeContainer(isStoredInMemoryOnly: true)
         let seededStore = makeStore(container: container)
         await seededStore.hydrateIfNeeded()
@@ -201,7 +201,7 @@ extension WorkoutStoreTests {
         let rehydratedStore = makeStore(container: container)
         await rehydratedStore.hydrateIfNeeded()
 
-        XCTAssertTrue(rehydratedStore.plansStore.profiles.isEmpty)
+        XCTAssertEqual(rehydratedStore.plansStore.profiles.count, 1)
         XCTAssertEqual(rehydratedStore.plansStore.profileCount, 1)
 
         rehydratedStore.startSession(planID: plan.id, templateID: template.id)

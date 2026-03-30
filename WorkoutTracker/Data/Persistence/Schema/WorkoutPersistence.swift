@@ -4,22 +4,15 @@ import SwiftData
 import os
 
 enum WorkoutSchema: VersionedSchema {
-    static let versionIdentifier = Schema.Version(3, 0, 0)
+    static let versionIdentifier = Schema.Version(5, 0, 0)
 
     static var models: [any PersistentModel.Type] {
         [
             StoredCatalogItem.self,
             StoredExerciseProfile.self,
             StoredPlan.self,
-            StoredTemplate.self,
-            StoredTemplateBlock.self,
-            StoredTemplateTarget.self,
             StoredActiveSession.self,
-            StoredActiveSessionBlock.self,
-            StoredActiveSessionRow.self,
             StoredCompletedSession.self,
-            StoredCompletedSessionBlock.self,
-            StoredCompletedSessionRow.self,
         ]
     }
 
@@ -69,119 +62,23 @@ enum WorkoutSchema: VersionedSchema {
         var name: String
         var createdAt: Date
         var pinnedTemplateID: UUID?
-        @Relationship(deleteRule: .cascade, inverse: \StoredTemplate.plan) var templates: [StoredTemplate]
+        var payloadData: Data
+        var summaryData: Data
 
         init(
             id: UUID,
             name: String,
             createdAt: Date,
-            pinnedTemplateID: UUID?
+            pinnedTemplateID: UUID?,
+            payloadData: Data,
+            summaryData: Data
         ) {
             self.id = id
             self.name = name
             self.createdAt = createdAt
             self.pinnedTemplateID = pinnedTemplateID
-            templates = []
-        }
-    }
-
-    @Model
-    final class StoredTemplate {
-        @Attribute(.unique) var id: UUID
-        var name: String
-        var note: String
-        var scheduledWeekdaysData: Data
-        var lastStartedAt: Date?
-        var orderIndex: Int
-        var plan: StoredPlan?
-        @Relationship(deleteRule: .cascade, inverse: \StoredTemplateBlock.template) var blocks: [StoredTemplateBlock]
-
-        init(
-            id: UUID,
-            name: String,
-            note: String,
-            scheduledWeekdaysData: Data,
-            lastStartedAt: Date?,
-            orderIndex: Int
-        ) {
-            self.id = id
-            self.name = name
-            self.note = note
-            self.scheduledWeekdaysData = scheduledWeekdaysData
-            self.lastStartedAt = lastStartedAt
-            self.orderIndex = orderIndex
-            blocks = []
-        }
-    }
-
-    @Model
-    final class StoredTemplateBlock {
-        @Attribute(.unique) var id: UUID
-        var exerciseID: UUID
-        var exerciseNameSnapshot: String
-        var blockNote: String
-        var restSeconds: Int
-        var supersetGroup: String?
-        var allowsAutoWarmups: Bool
-        var orderIndex: Int
-        var progressionRuleData: Data
-        var template: StoredTemplate?
-        @Relationship(deleteRule: .cascade, inverse: \StoredTemplateTarget.block) var targets: [StoredTemplateTarget]
-
-        init(
-            id: UUID,
-            exerciseID: UUID,
-            exerciseNameSnapshot: String,
-            blockNote: String,
-            restSeconds: Int,
-            supersetGroup: String?,
-            allowsAutoWarmups: Bool,
-            orderIndex: Int,
-            progressionRuleData: Data
-        ) {
-            self.id = id
-            self.exerciseID = exerciseID
-            self.exerciseNameSnapshot = exerciseNameSnapshot
-            self.blockNote = blockNote
-            self.restSeconds = restSeconds
-            self.supersetGroup = supersetGroup
-            self.allowsAutoWarmups = allowsAutoWarmups
-            self.orderIndex = orderIndex
-            self.progressionRuleData = progressionRuleData
-            targets = []
-        }
-    }
-
-    @Model
-    final class StoredTemplateTarget {
-        @Attribute(.unique) var id: UUID
-        var orderIndex: Int
-        var setKindRaw: String
-        var targetWeight: Double?
-        var repLower: Int
-        var repUpper: Int
-        var restSeconds: Int?
-        var note: String?
-        var block: StoredTemplateBlock?
-
-        init(
-            id: UUID,
-            orderIndex: Int,
-            setKindRaw: String,
-            targetWeight: Double?,
-            repLower: Int,
-            repUpper: Int,
-            restSeconds: Int?,
-            note: String?
-        ) {
-            self.id = id
-            self.orderIndex = orderIndex
-            self.setKindRaw = setKindRaw
-            self.targetWeight = targetWeight
-            self.repLower = repLower
-            self.repUpper = repUpper
-            self.restSeconds = restSeconds
-            self.note = note
+            self.payloadData = payloadData
+            self.summaryData = summaryData
         }
     }
 
@@ -195,7 +92,7 @@ enum WorkoutSchema: VersionedSchema {
         var lastUpdatedAt: Date
         var notes: String
         var restTimerEndsAt: Date?
-        @Relationship(deleteRule: .cascade, inverse: \StoredActiveSessionBlock.session) var blocks: [StoredActiveSessionBlock]
+        var payloadData: Data
 
         init(
             id: UUID,
@@ -205,7 +102,8 @@ enum WorkoutSchema: VersionedSchema {
             startedAt: Date,
             lastUpdatedAt: Date,
             notes: String,
-            restTimerEndsAt: Date?
+            restTimerEndsAt: Date?,
+            payloadData: Data
         ) {
             self.id = id
             self.planID = planID
@@ -215,87 +113,7 @@ enum WorkoutSchema: VersionedSchema {
             self.lastUpdatedAt = lastUpdatedAt
             self.notes = notes
             self.restTimerEndsAt = restTimerEndsAt
-            blocks = []
-        }
-    }
-
-    @Model
-    final class StoredActiveSessionBlock {
-        @Attribute(.unique) var id: UUID
-        var orderIndex: Int
-        var exerciseID: UUID
-        var exerciseNameSnapshot: String
-        var blockNote: String
-        var restSeconds: Int
-        var supersetGroup: String?
-        var progressionRuleData: Data
-        var session: StoredActiveSession?
-        @Relationship(deleteRule: .cascade, inverse: \StoredActiveSessionRow.block) var rows: [StoredActiveSessionRow]
-
-        init(
-            id: UUID,
-            orderIndex: Int,
-            exerciseID: UUID,
-            exerciseNameSnapshot: String,
-            blockNote: String,
-            restSeconds: Int,
-            supersetGroup: String?,
-            progressionRuleData: Data
-        ) {
-            self.id = id
-            self.orderIndex = orderIndex
-            self.exerciseID = exerciseID
-            self.exerciseNameSnapshot = exerciseNameSnapshot
-            self.blockNote = blockNote
-            self.restSeconds = restSeconds
-            self.supersetGroup = supersetGroup
-            self.progressionRuleData = progressionRuleData
-            rows = []
-        }
-    }
-
-    @Model
-    final class StoredActiveSessionRow {
-        @Attribute(.unique) var id: UUID
-        var orderIndex: Int
-        var targetID: UUID
-        var targetSetKindRaw: String
-        var targetWeight: Double?
-        var targetRepLower: Int
-        var targetRepUpper: Int
-        var targetRestSeconds: Int?
-        var targetNote: String?
-        var logWeight: Double?
-        var logReps: Int?
-        var logCompletedAt: Date?
-        var block: StoredActiveSessionBlock?
-
-        init(
-            id: UUID,
-            orderIndex: Int,
-            targetID: UUID,
-            targetSetKindRaw: String,
-            targetWeight: Double?,
-            targetRepLower: Int,
-            targetRepUpper: Int,
-            targetRestSeconds: Int?,
-            targetNote: String?,
-            logWeight: Double?,
-            logReps: Int?,
-            logCompletedAt: Date?
-        ) {
-            self.id = id
-            self.orderIndex = orderIndex
-            self.targetID = targetID
-            self.targetSetKindRaw = targetSetKindRaw
-            self.targetWeight = targetWeight
-            self.targetRepLower = targetRepLower
-            self.targetRepUpper = targetRepUpper
-            self.targetRestSeconds = targetRestSeconds
-            self.targetNote = targetNote
-            self.logWeight = logWeight
-            self.logReps = logReps
-            self.logCompletedAt = logCompletedAt
+            self.payloadData = payloadData
         }
     }
 
@@ -306,71 +124,22 @@ enum WorkoutSchema: VersionedSchema {
         var templateID: UUID
         var templateNameSnapshot: String
         var completedAt: Date
-        @Relationship(deleteRule: .cascade, inverse: \StoredCompletedSessionBlock.session) var blocks: [StoredCompletedSessionBlock]
+        var payloadData: Data
 
         init(
             id: UUID,
             planID: UUID?,
             templateID: UUID,
             templateNameSnapshot: String,
-            completedAt: Date
+            completedAt: Date,
+            payloadData: Data
         ) {
             self.id = id
             self.planID = planID
             self.templateID = templateID
             self.templateNameSnapshot = templateNameSnapshot
             self.completedAt = completedAt
-            blocks = []
-        }
-    }
-
-    @Model
-    final class StoredCompletedSessionBlock {
-        @Attribute(.unique) var id: UUID
-        var orderIndex: Int
-        var exerciseID: UUID
-        var exerciseNameSnapshot: String
-        var session: StoredCompletedSession?
-        @Relationship(deleteRule: .cascade, inverse: \StoredCompletedSessionRow.block) var rows: [StoredCompletedSessionRow]
-
-        init(
-            id: UUID,
-            orderIndex: Int,
-            exerciseID: UUID,
-            exerciseNameSnapshot: String
-        ) {
-            self.id = id
-            self.orderIndex = orderIndex
-            self.exerciseID = exerciseID
-            self.exerciseNameSnapshot = exerciseNameSnapshot
-            rows = []
-        }
-    }
-
-    @Model
-    final class StoredCompletedSessionRow {
-        @Attribute(.unique) var id: UUID
-        var orderIndex: Int
-        var targetSetKindRaw: String
-        var logWeight: Double?
-        var logReps: Int?
-        var logCompletedAt: Date?
-        var block: StoredCompletedSessionBlock?
-
-        init(
-            id: UUID,
-            orderIndex: Int,
-            targetSetKindRaw: String,
-            logWeight: Double?,
-            logReps: Int?,
-            logCompletedAt: Date?
-        ) {
-            self.id = id
-            self.orderIndex = orderIndex
-            self.targetSetKindRaw = targetSetKindRaw
-            self.logWeight = logWeight
-            self.logReps = logReps
-            self.logCompletedAt = logCompletedAt
+            self.payloadData = payloadData
         }
     }
 }
@@ -378,15 +147,8 @@ enum WorkoutSchema: VersionedSchema {
 typealias StoredCatalogItem = WorkoutSchema.StoredCatalogItem
 typealias StoredExerciseProfile = WorkoutSchema.StoredExerciseProfile
 typealias StoredPlan = WorkoutSchema.StoredPlan
-typealias StoredTemplate = WorkoutSchema.StoredTemplate
-typealias StoredTemplateBlock = WorkoutSchema.StoredTemplateBlock
-typealias StoredTemplateTarget = WorkoutSchema.StoredTemplateTarget
 typealias StoredActiveSession = WorkoutSchema.StoredActiveSession
-typealias StoredActiveSessionBlock = WorkoutSchema.StoredActiveSessionBlock
-typealias StoredActiveSessionRow = WorkoutSchema.StoredActiveSessionRow
 typealias StoredCompletedSession = WorkoutSchema.StoredCompletedSession
-typealias StoredCompletedSessionBlock = WorkoutSchema.StoredCompletedSessionBlock
-typealias StoredCompletedSessionRow = WorkoutSchema.StoredCompletedSessionRow
 
 struct PersistenceStartupIssue: Identifiable, Equatable {
     let id = UUID()
@@ -415,7 +177,7 @@ enum PersistenceDiagnostics {
     }
 }
 
-private enum PersistenceRecoveryClassifier {
+enum PersistenceRecoveryClassifier {
     private static let resettableSQLiteCodes: Set<Int> = [
         11, // SQLITE_CORRUPT
         26, // SQLITE_NOTADB
@@ -427,8 +189,22 @@ private enum PersistenceRecoveryClassifier {
         NSMigrationMissingSourceModelError,
     ]
 
-    static func shouldAttemptReset(after error: any Error) -> Bool {
-        flattenedErrors(from: error).contains(where: isResettableStoreError)
+    static func shouldAttemptReset(after error: any Error, storeURL: URL? = nil) -> Bool {
+        if flattenedErrors(from: error).contains(where: isResettableStoreError) {
+            return true
+        }
+
+        let errorDescription = String(describing: error).lowercased()
+        if isResettableMigrationDescription(errorDescription) {
+            return true
+        }
+
+        guard let storeURL else {
+            return false
+        }
+
+        return errorDescription.contains("loadissuemodelcontainer")
+            && hasExistingPersistentStoreArtifact(at: storeURL)
     }
 
     private static func isResettableStoreError(_ error: NSError) -> Bool {
@@ -454,6 +230,33 @@ private enum PersistenceRecoveryClassifier {
         return description.contains("corrupt")
             || description.contains("malformed")
             || description.contains("not a database")
+            || isResettableMigrationDescription(description)
+    }
+
+    private static func isResettableMigrationDescription(_ description: String) -> Bool {
+        description.contains("cannot migrate store in-place")
+            || description.contains("persistent store migration")
+            || description.contains("mandatory destination attribute")
+            || description.contains("missing attribute values")
+    }
+
+    private static func hasExistingPersistentStoreArtifact(at url: URL) -> Bool {
+        storeArtifactURLs(for: url).contains { candidate in
+            var isDirectory = ObjCBool(false)
+            let exists = FileManager.default.fileExists(
+                atPath: candidate.path,
+                isDirectory: &isDirectory
+            )
+            return exists && !isDirectory.boolValue
+        }
+    }
+
+    private static func storeArtifactURLs(for url: URL) -> [URL] {
+        [
+            url,
+            URL(fileURLWithPath: url.path + "-shm"),
+            URL(fileURLWithPath: url.path + "-wal"),
+        ]
     }
 
     private static func flattenedErrors(from error: any Error) -> [NSError] {
@@ -470,6 +273,8 @@ private enum PersistenceRecoveryClassifier {
 
             if let underlyingError = error.userInfo[NSUnderlyingErrorKey] as? NSError {
                 append(underlyingError)
+            } else if let underlyingError = error.userInfo[NSUnderlyingErrorKey] as? any Error {
+                append(underlyingError as NSError)
             }
 
             if let detailedErrors = error.userInfo[NSDetailedErrorsKey] as? [NSError] {
@@ -527,7 +332,10 @@ enum WorkoutModelContainerFactory {
         } catch {
             PersistenceDiagnostics.record("Failed to initialize persistent SwiftData container", error: error)
 
-            guard PersistenceRecoveryClassifier.shouldAttemptReset(after: error) else {
+            guard PersistenceRecoveryClassifier.shouldAttemptReset(
+                after: error,
+                storeURL: resolvedStoreURL
+            ) else {
                 PersistenceDiagnostics.record(
                     "Persistent store failure did not match a resettable corruption signature. Falling back to in-memory storage."
                 )

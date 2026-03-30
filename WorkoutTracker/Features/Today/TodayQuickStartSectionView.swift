@@ -31,7 +31,10 @@ struct TodayQuickStartSectionView: View {
                                     appStore.resumeActiveSession()
                                 },
                                 onStartNew: { planID, templateID in
-                                    appStore.startSession(planID: planID, templateID: templateID)
+                                    Task { @MainActor in
+                                        await appStore.preparePlanInteractionDataIfNeeded()
+                                        appStore.startSession(planID: planID, templateID: templateID)
+                                    }
                                 }
                             )
                         } label: {

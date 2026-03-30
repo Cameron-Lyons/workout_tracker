@@ -121,20 +121,17 @@ final class PlanRepository: RepositoryBase {
     func loadPlans() -> [Plan] {
         let descriptor = FetchDescriptor<StoredPlan>(sortBy: [SortDescriptor(\.createdAt)])
         let records = (try? modelContext.fetch(descriptor)) ?? []
-        return records.compactMap(plan(from:))
+        return records.compactMap(decodedPlan(from:))
     }
 
     func loadPlanSummaries() -> [PlanSummary] {
         let descriptor = FetchDescriptor<StoredPlan>(sortBy: [SortDescriptor(\.createdAt)])
         let records = (try? modelContext.fetch(descriptor)) ?? []
-        return records.map(planSummary(from:))
+        return records.compactMap(decodedPlanSummary(from:))
     }
 
     func loadPlan(_ planID: UUID) -> Plan? {
-        let descriptor = FetchDescriptor<StoredPlan>(
-            predicate: #Predicate<StoredPlan> { $0.id == planID }
-        )
-        return (try? modelContext.fetch(descriptor))?.first.flatMap(plan(from:))
+        loadPlanRecord(planID).flatMap(decodedPlan(from:))
     }
 
     @discardableResult
@@ -162,9 +159,20 @@ final class PlanRepository: RepositoryBase {
 
     @discardableResult
     private func persistPlans(_ plans: [Plan], deleteMissing: Bool) -> Bool {
-        var recordsByID = Dictionary(uniqueKeysWithValues: loadPlanRecords().map { ($0.id, $0) })
+        let existingRecords: [StoredPlan]
+        if deleteMissing {
+            existingRecords = loadPlanRecords()
+        } else {
+            existingRecords = plans.compactMap { loadPlanRecord($0.id) }
+        }
+
+        var recordsByID = Dictionary(uniqueKeysWithValues: existingRecords.map { ($0.id, $0) })
 
         for plan in plans {
+            guard let storage = encodedPlanStorage(for: plan) else {
+                continue
+            }
+
             let record: StoredPlan
             if let existing = recordsByID.removeValue(forKey: plan.id) {
                 record = existing
@@ -173,13 +181,14 @@ final class PlanRepository: RepositoryBase {
                     id: plan.id,
                     name: plan.name,
                     createdAt: plan.createdAt,
-                    pinnedTemplateID: plan.pinnedTemplateID
+                    pinnedTemplateID: plan.pinnedTemplateID,
+                    payloadData: storage.payloadData,
+                    summaryData: storage.summaryData
                 )
                 modelContext.insert(record)
             }
 
-            apply(plan, to: record)
-            syncTemplates(of: record, with: plan.templates)
+            apply(plan, payloadData: storage.payloadData, summary: storage.summary, summaryData: storage.summaryData, to: record)
         }
 
         if deleteMissing {
@@ -191,21 +200,23 @@ final class PlanRepository: RepositoryBase {
 
     @discardableResult
     func markTemplateStarted(planID: UUID, templateID: UUID, startedAt: Date) -> Bool {
-        let descriptor = FetchDescriptor<StoredPlan>(
-            predicate: #Predicate<StoredPlan> { $0.id == planID }
-        )
-
-        guard let record = (try? modelContext.fetch(descriptor))?.first,
-            let template = record.templates.first(where: { $0.id == templateID })
+        guard let record = loadPlanRecord(planID),
+            var plan = decodedPlan(from: record),
+            let templateIndex = plan.templates.firstIndex(where: { $0.id == templateID })
         else {
             return false
         }
 
-        guard template.lastStartedAt != startedAt else {
+        guard plan.templates[templateIndex].lastStartedAt != startedAt else {
             return true
         }
 
-        template.lastStartedAt = startedAt
+        plan.templates[templateIndex].lastStartedAt = startedAt
+        guard let storage = encodedPlanStorage(for: plan) else {
+            return false
+        }
+
+        apply(plan, payloadData: storage.payloadData, summary: storage.summary, summaryData: storage.summaryData, to: record)
         return saveContext("template start")
     }
 
@@ -277,102 +288,6 @@ final class PlanRepository: RepositoryBase {
         )
     }
 
-    private func plan(from record: StoredPlan) -> Plan? {
-        Plan(
-            id: record.id,
-            name: record.name,
-            createdAt: record.createdAt,
-            pinnedTemplateID: record.pinnedTemplateID,
-            templates: orderedRecordsIfNeeded(record.templates, by: \.orderIndex)
-                .compactMap(template(from:))
-            )
-    }
-
-    private func planSummary(from record: StoredPlan) -> PlanSummary {
-        let orderedTemplates = orderedRecordsIfNeeded(record.templates, by: \.orderIndex)
-        let includesBlockExerciseIDs = orderedTemplates.count == 2
-
-        return PlanSummary(
-            id: record.id,
-            name: record.name,
-            createdAt: record.createdAt,
-            pinnedTemplateID: record.pinnedTemplateID,
-            templates: orderedTemplates.map { template in
-                templateSummary(from: template, includeBlockExerciseIDs: includesBlockExerciseIDs)
-            }
-        )
-    }
-
-    private func template(from record: StoredTemplate) -> WorkoutTemplate? {
-        WorkoutTemplate(
-            id: record.id,
-            name: record.name,
-            note: record.note,
-            scheduledWeekdays: decode(
-                [Weekday].self,
-                from: record.scheduledWeekdaysData,
-                operation: "template weekdays for \(record.id.uuidString)"
-            ) ?? [],
-            blocks: orderedRecordsIfNeeded(record.blocks, by: \.orderIndex)
-                .compactMap(templateBlock(from:)),
-            lastStartedAt: record.lastStartedAt
-        )
-    }
-
-    private func templateSummary(
-        from record: StoredTemplate,
-        includeBlockExerciseIDs: Bool
-    ) -> TemplateSummary {
-        TemplateSummary(
-            id: record.id,
-            name: record.name,
-            note: record.note,
-            scheduledWeekdays: decode(
-                [Weekday].self,
-                from: record.scheduledWeekdaysData,
-                operation: "template weekdays for \(record.id.uuidString)"
-            ) ?? [],
-            lastStartedAt: record.lastStartedAt,
-            blockExerciseIDs: includeBlockExerciseIDs
-                ? orderedRecordsIfNeeded(record.blocks, by: \.orderIndex).map(\.exerciseID)
-                : []
-        )
-    }
-
-    private func templateBlock(from record: StoredTemplateBlock) -> ExerciseBlock? {
-        guard let progressionRule = decode(
-            ProgressionRule.self,
-            from: record.progressionRuleData,
-            operation: "template block progression rule for \(record.id.uuidString)"
-        ) else {
-            return nil
-        }
-
-        return ExerciseBlock(
-            id: record.id,
-            exerciseID: record.exerciseID,
-            exerciseNameSnapshot: record.exerciseNameSnapshot,
-            blockNote: record.blockNote,
-            restSeconds: record.restSeconds,
-            supersetGroup: record.supersetGroup,
-            progressionRule: progressionRule,
-            targets: orderedRecordsIfNeeded(record.targets, by: \.orderIndex)
-                .compactMap(templateTarget(from:)),
-            allowsAutoWarmups: record.allowsAutoWarmups
-        )
-    }
-
-    private func templateTarget(from record: StoredTemplateTarget) -> SetTarget? {
-        SetTarget(
-            id: record.id,
-            setKind: SetKind(rawValue: record.setKindRaw) ?? .working,
-            targetWeight: record.targetWeight,
-            repRange: RepRange(record.repLower, record.repUpper),
-            restSeconds: record.restSeconds,
-            note: record.note
-        )
-    }
-
     private func profile(from record: StoredExerciseProfile) -> ExerciseProfile? {
         ExerciseProfile(
             id: record.id,
@@ -400,7 +315,13 @@ final class PlanRepository: RepositoryBase {
         }
     }
 
-    private func apply(_ plan: Plan, to record: StoredPlan) {
+    private func apply(
+        _ plan: Plan,
+        payloadData: Data,
+        summary: PlanSummary,
+        summaryData: Data,
+        to record: StoredPlan
+    ) {
         if record.name != plan.name {
             record.name = plan.name
         }
@@ -412,215 +333,76 @@ final class PlanRepository: RepositoryBase {
         if record.pinnedTemplateID != plan.pinnedTemplateID {
             record.pinnedTemplateID = plan.pinnedTemplateID
         }
+
+        if record.payloadData != payloadData {
+            record.payloadData = payloadData
+        }
+
+        if record.summaryData != summaryData {
+            record.summaryData = summaryData
+        }
+
+        if record.name != summary.name {
+            record.name = summary.name
+        }
     }
 
-    private func syncTemplates(of planRecord: StoredPlan, with templates: [WorkoutTemplate]) {
-        var existingByID = Dictionary(uniqueKeysWithValues: planRecord.templates.map { ($0.id, $0) })
-        var orderedRecords: [StoredTemplate] = []
-        orderedRecords.reserveCapacity(templates.count)
+    private func encodedPlanStorage(for plan: Plan) -> (payloadData: Data, summary: PlanSummary, summaryData: Data)? {
+        guard let payloadData = encode(plan, operation: "plan \(plan.id.uuidString)") else {
+            return nil
+        }
 
-        for (index, template) in templates.enumerated() {
-            let record: StoredTemplate
-            if let existing = existingByID.removeValue(forKey: template.id) {
-                record = existing
-            } else {
-                record = StoredTemplate(
+        let summary = startupSummary(for: plan)
+        guard let summaryData = encode(summary, operation: "plan summary for \(plan.id.uuidString)") else {
+            return nil
+        }
+
+        return (payloadData, summary, summaryData)
+    }
+
+    private func decodedPlan(from record: StoredPlan) -> Plan? {
+        decode(
+            Plan.self,
+            from: record.payloadData,
+            operation: "plan \(record.id.uuidString)"
+        )
+    }
+
+    private func decodedPlanSummary(from record: StoredPlan) -> PlanSummary? {
+        if let summary = decode(
+            PlanSummary.self,
+            from: record.summaryData,
+            operation: "plan summary for \(record.id.uuidString)"
+        ) {
+            return summary
+        }
+
+        guard let plan = decodedPlan(from: record) else {
+            return nil
+        }
+
+        return startupSummary(for: plan)
+    }
+
+    private func startupSummary(for plan: Plan) -> PlanSummary {
+        let includeBlockExerciseIDs = plan.templates.count == 2
+
+        return PlanSummary(
+            id: plan.id,
+            name: plan.name,
+            createdAt: plan.createdAt,
+            pinnedTemplateID: plan.pinnedTemplateID,
+            templates: plan.templates.map { template in
+                TemplateSummary(
                     id: template.id,
                     name: template.name,
                     note: template.note,
-                    scheduledWeekdaysData: emptyArrayData,
+                    scheduledWeekdays: template.scheduledWeekdays,
                     lastStartedAt: template.lastStartedAt,
-                    orderIndex: index
+                    blockExerciseIDs: includeBlockExerciseIDs ? template.blocks.map(\.exerciseID) : []
                 )
-                modelContext.insert(record)
             }
-
-            if record.plan?.id != planRecord.id {
-                record.plan = planRecord
-            }
-
-            apply(template, to: record, orderIndex: index)
-            syncBlocks(of: record, with: template.blocks)
-            orderedRecords.append(record)
-        }
-
-        existingByID.values.forEach(modelContext.delete)
-        if sameRecordOrder(planRecord.templates, orderedRecords, id: \.id) == false {
-            planRecord.templates = orderedRecords
-        }
-    }
-
-    private func apply(_ template: WorkoutTemplate, to record: StoredTemplate, orderIndex: Int) {
-        if record.name != template.name {
-            record.name = template.name
-        }
-
-        if record.note != template.note {
-            record.note = template.note
-        }
-
-        if let weekdaysData = encode(
-            template.scheduledWeekdays,
-            operation: "template weekdays for \(template.id.uuidString)"
-        ), record.scheduledWeekdaysData != weekdaysData
-        {
-            record.scheduledWeekdaysData = weekdaysData
-        }
-
-        if record.lastStartedAt != template.lastStartedAt {
-            record.lastStartedAt = template.lastStartedAt
-        }
-
-        if record.orderIndex != orderIndex {
-            record.orderIndex = orderIndex
-        }
-    }
-
-    private func syncBlocks(of templateRecord: StoredTemplate, with blocks: [ExerciseBlock]) {
-        var existingByID = Dictionary(uniqueKeysWithValues: templateRecord.blocks.map { ($0.id, $0) })
-        var orderedRecords: [StoredTemplateBlock] = []
-        orderedRecords.reserveCapacity(blocks.count)
-
-        for (index, block) in blocks.enumerated() {
-            let record: StoredTemplateBlock
-            if let existing = existingByID.removeValue(forKey: block.id) {
-                record = existing
-            } else {
-                record = StoredTemplateBlock(
-                    id: block.id,
-                    exerciseID: block.exerciseID,
-                    exerciseNameSnapshot: block.exerciseNameSnapshot,
-                    blockNote: block.blockNote,
-                    restSeconds: block.restSeconds,
-                    supersetGroup: block.supersetGroup,
-                    allowsAutoWarmups: block.allowsAutoWarmups,
-                    orderIndex: index,
-                    progressionRuleData: encode(
-                        block.progressionRule,
-                        operation: "template block progression rule for \(block.id.uuidString)"
-                    ) ?? Data()
-                )
-                modelContext.insert(record)
-            }
-
-            if record.template?.id != templateRecord.id {
-                record.template = templateRecord
-            }
-
-            apply(block, to: record, orderIndex: index)
-            syncTargets(of: record, with: block.targets)
-            orderedRecords.append(record)
-        }
-
-        existingByID.values.forEach(modelContext.delete)
-        if sameRecordOrder(templateRecord.blocks, orderedRecords, id: \.id) == false {
-            templateRecord.blocks = orderedRecords
-        }
-    }
-
-    private func apply(_ block: ExerciseBlock, to record: StoredTemplateBlock, orderIndex: Int) {
-        if record.exerciseID != block.exerciseID {
-            record.exerciseID = block.exerciseID
-        }
-
-        if record.exerciseNameSnapshot != block.exerciseNameSnapshot {
-            record.exerciseNameSnapshot = block.exerciseNameSnapshot
-        }
-
-        if record.blockNote != block.blockNote {
-            record.blockNote = block.blockNote
-        }
-
-        if record.restSeconds != block.restSeconds {
-            record.restSeconds = block.restSeconds
-        }
-
-        if record.supersetGroup != block.supersetGroup {
-            record.supersetGroup = block.supersetGroup
-        }
-
-        if record.allowsAutoWarmups != block.allowsAutoWarmups {
-            record.allowsAutoWarmups = block.allowsAutoWarmups
-        }
-
-        if record.orderIndex != orderIndex {
-            record.orderIndex = orderIndex
-        }
-
-        if let progressionRuleData = encode(
-            block.progressionRule,
-            operation: "template block progression rule for \(block.id.uuidString)"
-        ), record.progressionRuleData != progressionRuleData
-        {
-            record.progressionRuleData = progressionRuleData
-        }
-    }
-
-    private func syncTargets(of blockRecord: StoredTemplateBlock, with targets: [SetTarget]) {
-        var existingByID = Dictionary(uniqueKeysWithValues: blockRecord.targets.map { ($0.id, $0) })
-        var orderedRecords: [StoredTemplateTarget] = []
-        orderedRecords.reserveCapacity(targets.count)
-
-        for (index, target) in targets.enumerated() {
-            let record: StoredTemplateTarget
-            if let existing = existingByID.removeValue(forKey: target.id) {
-                record = existing
-            } else {
-                record = StoredTemplateTarget(
-                    id: target.id,
-                    orderIndex: index,
-                    setKindRaw: target.setKind.rawValue,
-                    targetWeight: target.targetWeight,
-                    repLower: target.repRange.lowerBound,
-                    repUpper: target.repRange.upperBound,
-                    restSeconds: target.restSeconds,
-                    note: target.note
-                )
-                modelContext.insert(record)
-            }
-
-            if record.block?.id != blockRecord.id {
-                record.block = blockRecord
-            }
-
-            apply(target, to: record, orderIndex: index)
-            orderedRecords.append(record)
-        }
-
-        existingByID.values.forEach(modelContext.delete)
-        if sameRecordOrder(blockRecord.targets, orderedRecords, id: \.id) == false {
-            blockRecord.targets = orderedRecords
-        }
-    }
-
-    private func apply(_ target: SetTarget, to record: StoredTemplateTarget, orderIndex: Int) {
-        if record.orderIndex != orderIndex {
-            record.orderIndex = orderIndex
-        }
-
-        if record.setKindRaw != target.setKind.rawValue {
-            record.setKindRaw = target.setKind.rawValue
-        }
-
-        if record.targetWeight != target.targetWeight {
-            record.targetWeight = target.targetWeight
-        }
-
-        if record.repLower != target.repRange.lowerBound {
-            record.repLower = target.repRange.lowerBound
-        }
-
-        if record.repUpper != target.repRange.upperBound {
-            record.repUpper = target.repRange.upperBound
-        }
-
-        if record.restSeconds != target.restSeconds {
-            record.restSeconds = target.restSeconds
-        }
-
-        if record.note != target.note {
-            record.note = target.note
-        }
+        )
     }
 
     private func apply(_ profile: ExerciseProfile, to record: StoredExerciseProfile) {
@@ -645,18 +427,14 @@ final class PlanRepository: RepositoryBase {
         (try? modelContext.fetch(FetchDescriptor<StoredPlan>())) ?? []
     }
 
-    private func loadProfileRecords() -> [StoredExerciseProfile] {
-        (try? modelContext.fetch(FetchDescriptor<StoredExerciseProfile>())) ?? []
+    private func loadPlanRecord(_ planID: UUID) -> StoredPlan? {
+        let descriptor = FetchDescriptor<StoredPlan>(
+            predicate: #Predicate<StoredPlan> { $0.id == planID }
+        )
+        return (try? modelContext.fetch(descriptor))?.first
     }
 
-    private func sameRecordOrder<Record>(
-        _ existing: [Record],
-        _ updated: [Record],
-        id: KeyPath<Record, UUID>
-    ) -> Bool {
-        existing.count == updated.count
-            && zip(existing, updated).allSatisfy { lhs, rhs in
-                lhs[keyPath: id] == rhs[keyPath: id]
-            }
+    private func loadProfileRecords() -> [StoredExerciseProfile] {
+        (try? modelContext.fetch(FetchDescriptor<StoredExerciseProfile>())) ?? []
     }
 }

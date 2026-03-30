@@ -122,7 +122,7 @@ final class AppFlowBenchmarks: BenchmarkTestCase {
         let seededPlans = plans + [progressivePlan]
 
         await benchmark(
-            named: "App store startSession after startup hydration / deferred plan and profiles",
+            named: "App store startSession after startup hydration / deferred plan library",
             threshold: Thresholds.appStoreStartSessionAfterStartupHydrationLargeLibrary,
             setup: {
                 let container = WorkoutModelContainerFactory.makeContainer(isStoredInMemoryOnly: true)
@@ -138,7 +138,7 @@ final class AppFlowBenchmarks: BenchmarkTestCase {
                 await store.hydrateIfNeeded()
                 store.completeOnboarding(with: nil)
                 XCTAssertFalse(store.plansStore.hasLoadedPlanLibrary)
-                XCTAssertTrue(store.plansStore.profiles.isEmpty)
+                XCTAssertEqual(store.plansStore.profiles.count, profiles.count)
                 return store
             },
             operation: { store in

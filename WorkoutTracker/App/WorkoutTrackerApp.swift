@@ -59,7 +59,6 @@ struct WorkoutTrackerApp: App {
         WindowGroup {
             RootAppView()
                 .environment(appStore)
-                .allowsHitTesting(appStore.isHydrated)
                 .overlay(alignment: .top) {
                     if appStore.isHydrated == false {
                         AppStartupShellView()

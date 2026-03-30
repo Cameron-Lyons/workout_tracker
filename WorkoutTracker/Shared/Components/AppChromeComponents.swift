@@ -117,41 +117,64 @@ struct AppEmptyStateCard: View {
     let message: String
     var tone: AppToneStyle = .base
     var style: AppChromeStyle = .boxed
+    var textAlignment: TextAlignment = .leading
 
     var body: some View {
         Group {
             if style == .boxed {
                 content
                     .padding(.vertical, 18)
-                    .frame(maxWidth: .infinity, alignment: .leading)
+                    .frame(maxWidth: .infinity, alignment: frameAlignment)
                     .appFeatureSurface(tone: tone)
             } else {
                 content
                     .padding(.vertical, 8)
-                    .frame(maxWidth: .infinity, alignment: .leading)
+                    .frame(maxWidth: .infinity, alignment: frameAlignment)
             }
         }
     }
 
     private var content: some View {
-        VStack(alignment: .leading, spacing: 16) {
+        VStack(alignment: stackAlignment, spacing: 16) {
             Image(systemName: systemImage)
                 .font(.title2.weight(.black))
                 .foregroundStyle(tone.accent)
 
-            VStack(alignment: .leading, spacing: 8) {
+            VStack(alignment: stackAlignment, spacing: 8) {
                 Text(title)
                     .font(.system(size: 24, weight: .black))
                     .foregroundStyle(AppColors.textPrimary)
-                    .multilineTextAlignment(.leading)
+                    .multilineTextAlignment(textAlignment)
                     .fixedSize(horizontal: false, vertical: true)
 
                 Text(message)
                     .font(.subheadline.weight(.medium))
                     .foregroundStyle(AppColors.textSecondary)
-                    .multilineTextAlignment(.leading)
+                    .multilineTextAlignment(textAlignment)
                     .fixedSize(horizontal: false, vertical: true)
             }
+        }
+    }
+
+    private var stackAlignment: HorizontalAlignment {
+        switch textAlignment {
+        case .center:
+            .center
+        case .trailing:
+            .trailing
+        default:
+            .leading
+        }
+    }
+
+    private var frameAlignment: Alignment {
+        switch textAlignment {
+        case .center:
+            .center
+        case .trailing:
+            .trailing
+        default:
+            .leading
         }
     }
 }

@@ -66,6 +66,10 @@ targets:
       - target: WorkoutTracker
     settings:
       base:
+        CODE_SIGNING_ALLOWED: "YES"
+        CODE_SIGN_STYLE: Automatic
+        DEVELOPMENT_TEAM: W9YS23J6FT
+        PRODUCT_BUNDLE_IDENTIFIER: com.cam.workouttracker.tests
         PRODUCT_NAME: WorkoutTrackerTests
         GENERATE_INFOPLIST_FILE: YES
         TEST_HOST: "$(BUILT_PRODUCTS_DIR)/WorkoutTracker.app/WorkoutTracker"
@@ -81,6 +85,10 @@ targets:
       - target: WorkoutTracker
     settings:
       base:
+        CODE_SIGNING_ALLOWED: "YES"
+        CODE_SIGN_STYLE: Automatic
+        DEVELOPMENT_TEAM: W9YS23J6FT
+        PRODUCT_BUNDLE_IDENTIFIER: com.cam.workouttracker.benchmarks
         PRODUCT_NAME: WorkoutTrackerBenchmarks
         GENERATE_INFOPLIST_FILE: YES
         TEST_HOST: "$(BUILT_PRODUCTS_DIR)/WorkoutTracker.app/WorkoutTracker"
@@ -96,6 +104,10 @@ targets:
       - target: WorkoutTracker
     settings:
       base:
+        CODE_SIGNING_ALLOWED: "YES"
+        CODE_SIGN_STYLE: Automatic
+        DEVELOPMENT_TEAM: W9YS23J6FT
+        PRODUCT_BUNDLE_IDENTIFIER: com.cam.workouttracker.uitests
         PRODUCT_NAME: WorkoutTrackerUITests
         GENERATE_INFOPLIST_FILE: YES
         TEST_TARGET_NAME: WorkoutTracker

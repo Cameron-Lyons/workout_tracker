@@ -35,14 +35,15 @@ actor PersistenceHydrationLoader {
             catalog = CatalogSeed.defaultCatalog()
             planRepository.saveCatalog(catalog)
         }
+        let profiles = planRepository.loadProfiles()
 
         return AppHydrationSnapshot(
             plans: PlansStore.HydrationSnapshot(
                 catalog: catalog,
                 plans: [],
-                profiles: [],
-                includesProfiles: false,
-                profileCount: planRepository.loadProfileCount(),
+                profiles: profiles,
+                includesProfiles: true,
+                profileCount: profiles.count,
                 planSummaries: planRepository.loadPlanSummaries(),
                 includesFullPlanLibrary: false
             ),

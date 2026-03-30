@@ -152,7 +152,7 @@ struct ExercisePickerSheet: View {
                                             tone: .warning
                                         )
                                     } else {
-                                        VStack(spacing: 0) {
+                                        LazyVStack(spacing: 0) {
                                             ForEach(Array(visibleCatalog.enumerated()), id: \.element.id) { index, item in
                                                 Button {
                                                     onPick(item)

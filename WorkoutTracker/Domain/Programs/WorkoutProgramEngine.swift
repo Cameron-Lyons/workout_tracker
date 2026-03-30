@@ -269,7 +269,7 @@ enum SessionEngine {
         }
 
         draft.touch(now: completedAt)
-        return .changed
+        return .progressChanged
     }
 
     @discardableResult
@@ -521,7 +521,7 @@ enum SessionEngine {
             )
         )
         draft.touch(now: now)
-        return .structureChanged
+        return .structureAndProgressChanged
     }
 
     static func finishSession(

@@ -44,7 +44,7 @@ struct ProgressHistorySectionView: View {
             } else {
                 let listTone: AppToneStyle = progressStore.selectedDay == nil ? .progress : .success
 
-                VStack(spacing: 0) {
+                LazyVStack(spacing: 0) {
                     ForEach(Array(progressStore.historySessions.enumerated()), id: \.element.id) { index, session in
                         NavigationLink {
                             CompletedSessionDetailView(session: session)
@@ -63,9 +63,9 @@ struct ProgressHistorySectionView: View {
                             Rectangle()
                                 .fill(AppColors.stroke.opacity(0.78))
                                 .frame(height: 1)
-                            }
                         }
                     }
+                }
                 .progressSectionSpacing()
             }
         }
