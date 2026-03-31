@@ -46,8 +46,6 @@ final class SettingsStore {
         }
     }
 
-    var isCompletingOnboarding = false
-
     var warmupRamp: [WarmupRampStep] {
         didSet {
             do {
@@ -105,5 +103,4 @@ final class SettingsStore {
             lowerBodyIncrement: lowerBodyIncrement
         )
     }
-
 }

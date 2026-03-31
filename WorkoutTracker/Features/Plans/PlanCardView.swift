@@ -166,9 +166,10 @@ private struct TemplateCardView: View {
                         Task { @MainActor in
                             await appStore.preparePlanInteractionDataIfNeeded()
 
-                            guard let loadedTemplate = appStore.plansStore.plan(for: plan.id)?
-                                .templates
-                                .first(where: { $0.id == template.id })
+                            guard
+                                let loadedTemplate = appStore.plansStore.plan(for: plan.id)?
+                                    .templates
+                                    .first(where: { $0.id == template.id })
                             else {
                                 return
                             }

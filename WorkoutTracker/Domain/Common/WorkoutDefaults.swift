@@ -2,8 +2,30 @@ import Foundation
 
 enum StrengthProgressionDefaults {
     static let gymRoundingIncrement = 2.5
-    static let upperBodyIncreaseInPounds = 2.5
-    static let lowerBodyIncreaseInPounds = 5.0
+    static let upperBodyIncreaseInPounds = ExerciseRecommendationDefaults.defaultIncrementInPounds
+    static let lowerBodyIncreaseInPounds = ExerciseRecommendationDefaults.defaultIncrementInPounds
+}
+
+enum ExerciseRecommendationDefaults {
+    static let defaultIncrementInPounds = 5.0
+    static let defaultTrainingMaxInPounds = 135.0
+
+    private static let defaultTrainingMaxExerciseNames: Set<String> = [
+        "bench",
+        "bench press",
+        "squat",
+        "back squat",
+        "deadlift",
+    ]
+
+    static func defaultTrainingMax(for exerciseName: String) -> Double? {
+        let normalizedName = exerciseName.trimmingCharacters(in: .whitespacesAndNewlines).lowercased()
+        guard defaultTrainingMaxExerciseNames.contains(normalizedName) else {
+            return nil
+        }
+
+        return defaultTrainingMaxInPounds
+    }
 }
 
 enum ExerciseBlockDefaults {

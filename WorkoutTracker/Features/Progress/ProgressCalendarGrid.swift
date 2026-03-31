@@ -2,7 +2,7 @@ import SwiftUI
 
 struct AppCalendarMonthLayout: Equatable {
     struct DayEntry: Identifiable, Equatable {
-        let id: Int
+        let id: String
         let date: Date?
         let dayNumber: Int?
         let hasWorkout: Bool
@@ -43,7 +43,7 @@ struct AppCalendarMonthLayout: Equatable {
         for _ in 0..<normalizedLeading {
             dayEntries.append(
                 DayEntry(
-                    id: dayEntries.count,
+                    id: "leading-\(dayEntries.count)",
                     date: nil,
                     dayNumber: nil,
                     hasWorkout: false
@@ -56,7 +56,7 @@ struct AppCalendarMonthLayout: Equatable {
             let normalizedDate = date.map { calendar.startOfDay(for: $0) }
             dayEntries.append(
                 DayEntry(
-                    id: dayEntries.count,
+                    id: "day-\(dayNumber)",
                     date: normalizedDate,
                     dayNumber: dayNumber,
                     hasWorkout: normalizedDate.map { workoutDays.contains($0) } ?? false

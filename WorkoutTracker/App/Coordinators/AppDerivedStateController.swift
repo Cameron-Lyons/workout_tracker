@@ -402,4 +402,3 @@ final class AppDerivedStateController {
         Calendar.autoupdatingCurrent.startOfDay(for: now)
     }
 }
-

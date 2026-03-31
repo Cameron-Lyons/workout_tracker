@@ -28,6 +28,7 @@ final class AppStore {
     let progressStore: ProgressStore
 
     var isHydrated = false
+    var isCompletingOnboarding = false
     var persistenceStartupIssue: PersistenceStartupIssue?
 
     init(
@@ -166,6 +167,20 @@ final class AppStore {
 
     func completeOnboarding(with presetPack: PresetPack?) {
         planCoordinator.completeOnboarding(with: presetPack)
+    }
+
+    func beginPresetOnboarding(_ presetPack: PresetPack) async {
+        guard isCompletingOnboarding == false else {
+            return
+        }
+
+        isCompletingOnboarding = true
+        await Task.yield()
+        defer {
+            isCompletingOnboarding = false
+        }
+
+        completeOnboarding(with: presetPack)
     }
 
     func startSession(planID: UUID, templateID: UUID) {

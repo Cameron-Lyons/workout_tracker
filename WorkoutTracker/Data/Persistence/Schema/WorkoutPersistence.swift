@@ -179,8 +179,8 @@ enum PersistenceDiagnostics {
 
 enum PersistenceRecoveryClassifier {
     private static let resettableSQLiteCodes: Set<Int> = [
-        11, // SQLITE_CORRUPT
-        26, // SQLITE_NOTADB
+        11,  // SQLITE_CORRUPT
+        26,  // SQLITE_NOTADB
     ]
     private static let resettableCocoaCodes: Set<Int> = [
         NSPersistentStoreIncompatibleSchemaError,
@@ -332,10 +332,12 @@ enum WorkoutModelContainerFactory {
         } catch {
             PersistenceDiagnostics.record("Failed to initialize persistent SwiftData container", error: error)
 
-            guard PersistenceRecoveryClassifier.shouldAttemptReset(
-                after: error,
-                storeURL: resolvedStoreURL
-            ) else {
+            guard
+                PersistenceRecoveryClassifier.shouldAttemptReset(
+                    after: error,
+                    storeURL: resolvedStoreURL
+                )
+            else {
                 PersistenceDiagnostics.record(
                     "Persistent store failure did not match a resettable corruption signature. Falling back to in-memory storage."
                 )

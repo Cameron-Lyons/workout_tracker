@@ -13,10 +13,10 @@ struct RootAppView: View {
         @Bindable var appStore = appStore
 
         Group {
-            if appStore.shouldShowOnboarding {
-                OnboardingView()
-            } else if appStore.settingsStore.isCompletingOnboarding {
+            if appStore.isCompletingOnboarding {
                 OnboardingSetupView()
+            } else if appStore.shouldShowOnboarding {
+                OnboardingView()
             } else {
                 RootTabView()
                     .environment(appStore)

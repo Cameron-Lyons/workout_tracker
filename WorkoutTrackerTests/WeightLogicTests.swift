@@ -88,6 +88,22 @@ final class WeightLogicTests: XCTestCase {
         XCTAssertEqual(settings.lowerBodyIncrement, WeightUnit.kilograms.defaultLowerBodyIncrement)
     }
 
+    @MainActor
+    func testSettingsStoreUsesFivePoundDefaultsForPounds() throws {
+        let suiteName = "WeightLogicTests.SettingsStorePoundDefaults.\(UUID().uuidString)"
+        let defaults = try XCTUnwrap(UserDefaults(suiteName: suiteName))
+        defaults.set(WeightUnit.pounds.rawValue, forKey: WeightUnit.settingsKey)
+        defer {
+            defaults.removePersistentDomain(forName: suiteName)
+        }
+
+        let settings = SettingsStore(defaults: defaults)
+
+        XCTAssertEqual(settings.weightUnit, .pounds)
+        XCTAssertEqual(settings.upperBodyIncrement, 5)
+        XCTAssertEqual(settings.lowerBodyIncrement, 5)
+    }
+
     func testTemplateProfileResolverPreservesExistingProfileWhenTemplateLeavesOverridesBlank() {
         let existingProfile = ExerciseProfile(
             exerciseID: CatalogSeed.benchPress,
@@ -115,6 +131,7 @@ final class WeightLogicTests: XCTestCase {
         let resolvedFields = TemplateExerciseSelectionResolver.resolvedFields(
             previousExerciseID: CatalogSeed.benchPress,
             newExerciseID: CatalogSeed.backSquat,
+            newExerciseName: "Back Squat",
             currentTrainingMaxText: "235",
             currentPreferredIncrementText: "5",
             currentIncrementText: "2.5",
@@ -138,6 +155,7 @@ final class WeightLogicTests: XCTestCase {
         let resolvedFields = TemplateExerciseSelectionResolver.resolvedFields(
             previousExerciseID: nil,
             newExerciseID: CatalogSeed.benchPress,
+            newExerciseName: "Bench Press",
             currentTrainingMaxText: "225",
             currentPreferredIncrementText: "2.5",
             currentIncrementText: "1.25",
@@ -157,6 +175,30 @@ final class WeightLogicTests: XCTestCase {
                 trainingMaxText: "225",
                 preferredIncrementText: "2.5",
                 incrementText: "1.25"
+            )
+        )
+    }
+
+    func testTemplateExerciseSelectionResolverSeedsRecommendedTrainingMaxWhenProfileIsMissing() {
+        let resolvedFields = TemplateExerciseSelectionResolver.resolvedFields(
+            previousExerciseID: CatalogSeed.overheadPress,
+            newExerciseID: CatalogSeed.benchPress,
+            newExerciseName: "Bench Press",
+            currentTrainingMaxText: "",
+            currentPreferredIncrementText: "",
+            currentIncrementText: "",
+            progressionKind: .percentageWave,
+            existingProfile: nil,
+            defaultIncrement: 5,
+            weightUnit: .pounds
+        )
+
+        XCTAssertEqual(
+            resolvedFields,
+            .init(
+                trainingMaxText: "135",
+                preferredIncrementText: "",
+                incrementText: "5"
             )
         )
     }

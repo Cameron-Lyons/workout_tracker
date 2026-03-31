@@ -305,8 +305,7 @@ final class PlanRepository: RepositoryBase {
         if let aliasesData = encode(
             item.aliases,
             operation: "catalog item aliases for \(item.id.uuidString)"
-        ), record.aliasesData != aliasesData
-        {
+        ), record.aliasesData != aliasesData {
             record.aliasesData = aliasesData
         }
 

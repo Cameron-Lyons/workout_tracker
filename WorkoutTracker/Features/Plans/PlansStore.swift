@@ -9,8 +9,8 @@ final class PlansStore {
         var plans: [Plan]
         var profiles: [ExerciseProfile]
         var includesProfiles = true
-        var profileCount: Int? = nil
-        var planSummaries: [PlanSummary]? = nil
+        var profileCount: Int?
+        var planSummaries: [PlanSummary]?
         var includesFullPlanLibrary = true
     }
 
@@ -461,7 +461,8 @@ final class PlansStore {
             }
         }
 
-        let insertionIndex = records.firstIndex(where: { $0[keyPath: createdAt] > record[keyPath: createdAt] })
+        let insertionIndex =
+            records.firstIndex(where: { $0[keyPath: createdAt] > record[keyPath: createdAt] })
             ?? records.endIndex
         records.insert(record, at: insertionIndex)
     }

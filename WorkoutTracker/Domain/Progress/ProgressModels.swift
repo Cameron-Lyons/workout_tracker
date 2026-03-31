@@ -116,4 +116,3 @@ struct SessionFinishSummary: Identifiable, Equatable, Sendable {
         self.personalRecords = personalRecords
     }
 }
-

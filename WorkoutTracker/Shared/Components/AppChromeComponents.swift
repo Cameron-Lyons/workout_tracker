@@ -212,9 +212,9 @@ struct AppInlineMessage: View {
     @ViewBuilder
     private var icon: some View {
         let content = Image(systemName: systemImage)
-                .font(.system(size: 16, weight: .black))
-                .foregroundStyle(tone.accent)
-                .frame(width: 36, height: 36)
+            .font(.system(size: 16, weight: .black))
+            .foregroundStyle(tone.accent)
+            .frame(width: 36, height: 36)
 
         if style == .boxed {
             content
@@ -260,7 +260,7 @@ struct AppStatePill: View {
 }
 
 struct AppDisclosureIndicator: View {
-    var tone: AppToneStyle? = nil
+    var tone: AppToneStyle?
 
     var body: some View {
         Image(systemName: "chevron.right")

@@ -60,18 +60,6 @@ enum PresetPackBuilder {
         static let madcowBackoff = "Backoff set"
     }
 
-    private enum PresetPackTrainingMax {
-        static let benchPress = 135.0
-        static let overheadPress = 95.0
-        static let backSquat = 185.0
-        static let deadlift = 225.0
-    }
-
-    private enum PresetPackWave {
-        static let upperBodyCycleIncrement = 5.0
-        static let lowerBodyCycleIncrement = 10.0
-    }
-
     static func makePlans(for pack: PresetPack, settings: SettingsStore) -> [Plan] {
         switch pack {
         case .generalGym:
@@ -85,9 +73,9 @@ enum PresetPackBuilder {
         case .greyskullLP:
             return [makeGreyskullPlan(settings: settings)]
         case .fiveThreeOne:
-            return [makeFiveThreeOnePlan()]
+            return [makeFiveThreeOnePlan(settings: settings)]
         case .boringButBig:
-            return [makeBoringButBigPlan()]
+            return [makeBoringButBigPlan(settings: settings)]
         case .madcowFiveByFive:
             return [makeMadcowPlan()]
         case .gzclp:
@@ -662,11 +650,12 @@ enum PresetPackBuilder {
         )
     }
 
-    private static func makeFiveThreeOnePlan() -> Plan {
+    private static func makeFiveThreeOnePlan(settings: SettingsStore) -> Plan {
         let squatDay = waveTemplate(
             name: "Squat Day",
             mainExerciseID: CatalogSeed.backSquat,
             mainExerciseName: "Back Squat",
+            settings: settings,
             accessories: [
                 accessoryBlock(id: CatalogSeed.frontSquat, name: "Front Squat"),
                 accessoryBlock(id: CatalogSeed.legCurl, name: "Leg Curl"),
@@ -676,6 +665,7 @@ enum PresetPackBuilder {
             name: "Bench Day",
             mainExerciseID: CatalogSeed.benchPress,
             mainExerciseName: "Bench Press",
+            settings: settings,
             accessories: [
                 accessoryBlock(id: CatalogSeed.pullUp, name: "Pull Up"),
                 accessoryBlock(id: CatalogSeed.tricepsPushdown, name: "Triceps Pushdown"),
@@ -685,6 +675,7 @@ enum PresetPackBuilder {
             name: "Deadlift Day",
             mainExerciseID: CatalogSeed.deadlift,
             mainExerciseName: "Deadlift",
+            settings: settings,
             accessories: [
                 accessoryBlock(id: CatalogSeed.barbellRow, name: "Barbell Row"),
                 accessoryBlock(id: CatalogSeed.seatedCalfRaise, name: "Seated Calf Raise"),
@@ -694,6 +685,7 @@ enum PresetPackBuilder {
             name: "Press Day",
             mainExerciseID: CatalogSeed.overheadPress,
             mainExerciseName: "Overhead Press",
+            settings: settings,
             accessories: [
                 accessoryBlock(id: CatalogSeed.latPulldown, name: "Lat Pulldown"),
                 accessoryBlock(id: CatalogSeed.hammerCurl, name: "Hammer Curl"),
@@ -707,11 +699,12 @@ enum PresetPackBuilder {
         )
     }
 
-    private static func makeBoringButBigPlan() -> Plan {
+    private static func makeBoringButBigPlan(settings: SettingsStore) -> Plan {
         let squatDay = bbbTemplate(
             name: "BBB Squat Day",
             mainExerciseID: CatalogSeed.backSquat,
             mainExerciseName: "Back Squat",
+            settings: settings,
             bbbExerciseID: CatalogSeed.backSquat,
             bbbExerciseName: "Back Squat"
         )
@@ -719,6 +712,7 @@ enum PresetPackBuilder {
             name: "BBB Bench Day",
             mainExerciseID: CatalogSeed.benchPress,
             mainExerciseName: "Bench Press",
+            settings: settings,
             bbbExerciseID: CatalogSeed.benchPress,
             bbbExerciseName: "Bench Press"
         )
@@ -726,6 +720,7 @@ enum PresetPackBuilder {
             name: "BBB Deadlift Day",
             mainExerciseID: CatalogSeed.deadlift,
             mainExerciseName: "Deadlift",
+            settings: settings,
             bbbExerciseID: CatalogSeed.deadlift,
             bbbExerciseName: "Deadlift"
         )
@@ -733,6 +728,7 @@ enum PresetPackBuilder {
             name: "BBB Press Day",
             mainExerciseID: CatalogSeed.overheadPress,
             mainExerciseName: "Overhead Press",
+            settings: settings,
             bbbExerciseID: CatalogSeed.overheadPress,
             bbbExerciseName: "Overhead Press"
         )
@@ -1120,24 +1116,29 @@ enum PresetPackBuilder {
         )
     }
 
-    private static func waveProgressionRule(for exerciseID: UUID, exerciseName: String) -> ProgressionRule {
+    private static func waveProgressionRule(
+        for exerciseName: String,
+        settings: SettingsStore
+    ) -> ProgressionRule {
         ProgressionRule(
             kind: .percentageWave,
             percentageWave: PercentageWaveRule.fiveThreeOne(
-                trainingMax: defaultTrainingMax(for: exerciseID),
-                cycleIncrement: ExerciseClassification.isLowerBody(exerciseName)
-                    ? PresetPackWave.lowerBodyCycleIncrement
-                    : PresetPackWave.upperBodyCycleIncrement
+                trainingMax: ExerciseRecommendationDefaults.defaultTrainingMax(for: exerciseName),
+                cycleIncrement: settings.preferredIncrement(for: exerciseName)
             )
         )
     }
 
-    private static func waveMainBlock(exerciseID: UUID, exerciseName: String) -> ExerciseBlock {
+    private static func waveMainBlock(
+        exerciseID: UUID,
+        exerciseName: String,
+        settings: SettingsStore
+    ) -> ExerciseBlock {
         var block = ExerciseBlock(
             exerciseID: exerciseID,
             exerciseNameSnapshot: exerciseName,
             restSeconds: PresetPackRest.waveMainLift,
-            progressionRule: waveProgressionRule(for: exerciseID, exerciseName: exerciseName),
+            progressionRule: waveProgressionRule(for: exerciseName, settings: settings),
             targets: []
         )
 
@@ -1145,30 +1146,22 @@ enum PresetPackBuilder {
         return block
     }
 
-    private static func defaultTrainingMax(for exerciseID: UUID) -> Double? {
-        switch exerciseID {
-        case CatalogSeed.benchPress:
-            return PresetPackTrainingMax.benchPress
-        case CatalogSeed.overheadPress:
-            return PresetPackTrainingMax.overheadPress
-        case CatalogSeed.backSquat:
-            return PresetPackTrainingMax.backSquat
-        case CatalogSeed.deadlift:
-            return PresetPackTrainingMax.deadlift
-        default:
-            return nil
-        }
-    }
-
     private static func waveTemplate(
         name: String,
         mainExerciseID: UUID,
         mainExerciseName: String,
+        settings: SettingsStore,
         accessories: [ExerciseBlock]
     ) -> WorkoutTemplate {
         WorkoutTemplate(
             name: name,
-            blocks: [waveMainBlock(exerciseID: mainExerciseID, exerciseName: mainExerciseName)] + accessories
+            blocks: [
+                waveMainBlock(
+                    exerciseID: mainExerciseID,
+                    exerciseName: mainExerciseName,
+                    settings: settings
+                )
+            ] + accessories
         )
     }
 
@@ -1176,13 +1169,18 @@ enum PresetPackBuilder {
         name: String,
         mainExerciseID: UUID,
         mainExerciseName: String,
+        settings: SettingsStore,
         bbbExerciseID: UUID,
         bbbExerciseName: String
     ) -> WorkoutTemplate {
         WorkoutTemplate(
             name: name,
             blocks: [
-                waveMainBlock(exerciseID: mainExerciseID, exerciseName: mainExerciseName),
+                waveMainBlock(
+                    exerciseID: mainExerciseID,
+                    exerciseName: mainExerciseName,
+                    settings: settings
+                ),
                 ExerciseBlock(
                     exerciseID: bbbExerciseID,
                     exerciseNameSnapshot: bbbExerciseName,

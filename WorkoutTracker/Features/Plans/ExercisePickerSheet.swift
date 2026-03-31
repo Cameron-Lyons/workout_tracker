@@ -197,7 +197,6 @@ struct ExercisePickerSheet: View {
     }
 }
 
-
 private struct InlineResultsEmptyState: View {
     let title: String
     let message: String
@@ -319,7 +318,6 @@ private struct ExercisePickerResultRow: View {
         .padding(.vertical, 12)
     }
 }
-
 
 private extension ExerciseCatalogItem {
     var aliasPreview: String? {

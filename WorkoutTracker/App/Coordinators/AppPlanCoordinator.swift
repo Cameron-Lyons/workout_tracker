@@ -84,4 +84,3 @@ final class AppPlanCoordinator {
         derivedStateController.scheduleProgressRefresh(plansStore: plansStore, sessionStore: sessionStore)
     }
 }
-

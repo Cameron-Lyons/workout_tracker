@@ -98,17 +98,18 @@ struct SessionSetRowView: View, Equatable {
                     },
                     onIncrease: {
                         actions.adjustWeight(blockID, row.id, weightStep)
+                    },
+                    valueContent: {
+                        metricInputField(
+                            text: $weightInputText,
+                            placeholder: "0",
+                            suffix: weightUnit.symbol,
+                            keyboardType: .decimalPad,
+                            field: .weight,
+                            accessibilityIdentifier: "session.input.load.\(blockID.uuidString).\(row.id.uuidString)"
+                        )
                     }
-                ) {
-                    metricInputField(
-                        text: $weightInputText,
-                        placeholder: "0",
-                        suffix: weightUnit.symbol,
-                        keyboardType: .decimalPad,
-                        field: .weight,
-                        accessibilityIdentifier: "session.input.load.\(blockID.uuidString).\(row.id.uuidString)"
-                    )
-                }
+                )
 
                 statControl(
                     title: "Reps",
@@ -124,16 +125,17 @@ struct SessionSetRowView: View, Equatable {
                     },
                     onIncrease: {
                         actions.adjustReps(blockID, row.id, 1)
+                    },
+                    valueContent: {
+                        metricInputField(
+                            text: $repsInputText,
+                            placeholder: canonicalRepsText,
+                            keyboardType: .numberPad,
+                            field: .reps,
+                            accessibilityIdentifier: "session.input.reps.\(blockID.uuidString).\(row.id.uuidString)"
+                        )
                     }
-                ) {
-                    metricInputField(
-                        text: $repsInputText,
-                        placeholder: canonicalRepsText,
-                        keyboardType: .numberPad,
-                        field: .reps,
-                        accessibilityIdentifier: "session.input.reps.\(blockID.uuidString).\(row.id.uuidString)"
-                    )
-                }
+                )
             }
 
             if showsDetailedChrome, let note = row.target.note, !note.isEmpty {

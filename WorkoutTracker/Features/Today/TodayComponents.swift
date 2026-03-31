@@ -104,8 +104,8 @@ struct TodayPersonalRecordRow: View {
                     "\(WeightFormatter.displayString(record.weight, unit: weightUnit)) \(weightUnit.symbol) x \(record.reps) • "
                         + "e1RM \(WeightFormatter.displayString(record.estimatedOneRepMax, unit: weightUnit))"
                 )
-                    .font(.subheadline)
-                    .foregroundStyle(AppColors.textSecondary)
+                .font(.subheadline)
+                .foregroundStyle(AppColors.textSecondary)
             }
 
             Spacer(minLength: 12)

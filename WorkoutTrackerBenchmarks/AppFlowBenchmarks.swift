@@ -468,9 +468,10 @@ final class AppFlowBenchmarks: BenchmarkTestCase {
         sessionStore.beginSession(draft)
         sessionStore.flushPendingDraftSave()
 
-        let mutationTargets = sessionStore.activeDraft?.blocks.prefix(4).compactMap { block in
-            block.sets.first(where: { $0.target.setKind == .working }).map { (block.id, $0.id) }
-        } ?? []
+        let mutationTargets =
+            sessionStore.activeDraft?.blocks.prefix(4).compactMap { block in
+                block.sets.first(where: { $0.target.setKind == .working }).map { (block.id, $0.id) }
+            } ?? []
 
         return SessionMutationBenchmarkFixture(
             sessionStore: sessionStore,

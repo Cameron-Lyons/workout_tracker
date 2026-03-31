@@ -88,6 +88,7 @@ enum TemplateExerciseSelectionResolver {
     static func resolvedFields(
         previousExerciseID: UUID?,
         newExerciseID: UUID,
+        newExerciseName: String,
         currentTrainingMaxText: String,
         currentPreferredIncrementText: String,
         currentIncrementText: String,
@@ -97,7 +98,10 @@ enum TemplateExerciseSelectionResolver {
         weightUnit: WeightUnit
     ) -> ResolvedFields {
         let isSwitchingExercises = previousExerciseID != nil && previousExerciseID != newExerciseID
-        let profileTrainingMaxText = WeightFormatter.displayString(existingProfile?.trainingMax, unit: weightUnit)
+        let recommendedTrainingMax =
+            existingProfile?.trainingMax
+            ?? ExerciseRecommendationDefaults.defaultTrainingMax(for: newExerciseName)
+        let profileTrainingMaxText = WeightFormatter.displayString(recommendedTrainingMax, unit: weightUnit)
         let profilePreferredIncrementText = WeightFormatter.displayString(
             existingProfile?.preferredIncrement,
             unit: weightUnit
@@ -345,6 +349,7 @@ struct TemplateEditorSheet: View {
         let resolvedFields = TemplateExerciseSelectionResolver.resolvedFields(
             previousExerciseID: previousExerciseID,
             newExerciseID: exercise.id,
+            newExerciseName: exercise.name,
             currentTrainingMaxText: blocks[index].trainingMaxText,
             currentPreferredIncrementText: blocks[index].preferredIncrementText,
             currentIncrementText: blocks[index].incrementText,

@@ -63,14 +63,17 @@ final class SessionRepository: RepositoryBase {
 
     @discardableResult
     func persistCompletedSessionAndClearActiveDraft(_ session: CompletedSession) -> Bool {
-        guard let payloadData = encode(
-            session,
-            operation: "completed session \(session.id.uuidString)"
-        ) else {
+        guard
+            let payloadData = encode(
+                session,
+                operation: "completed session \(session.id.uuidString)"
+            )
+        else {
             return false
         }
 
-        let record = loadCompletedSessionRecord(session.id)
+        let record =
+            loadCompletedSessionRecord(session.id)
             ?? StoredCompletedSession(
                 id: session.id,
                 planID: session.planID,

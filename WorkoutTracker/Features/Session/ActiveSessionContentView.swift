@@ -1,6 +1,12 @@
 import SwiftUI
 
 struct ActiveSessionContentView: View {
+    private enum Layout {
+        static let notesToBlocksSpacing: CGFloat = 24
+        static let defaultBlockSpacing: CGFloat = 24
+        static let repeatedExerciseBlockSpacing: CGFloat = 10
+    }
+
     let headerState: ActiveSessionHeaderState
     let notes: String
     let blocks: [SessionBlock]
@@ -14,11 +20,16 @@ struct ActiveSessionContentView: View {
                 .equatable()
 
             ScrollView {
-                LazyVStack(spacing: 24) {
+                LazyVStack(spacing: 0) {
                     ActiveSessionNotesCardView(notes: notes, onUpdateNotes: actions.updateSessionNotes)
                         .equatable()
 
-                    ForEach(blocks) { block in
+                    if !blocks.isEmpty {
+                        Color.clear
+                            .frame(height: Layout.notesToBlocksSpacing)
+                    }
+
+                    ForEach(Array(blocks.enumerated()), id: \.element.id) { index, block in
                         SessionBlockCardView(
                             block: block,
                             displaySettings: displaySettings,
@@ -26,6 +37,11 @@ struct ActiveSessionContentView: View {
                             showsDetailedChrome: showsDetailedChrome
                         )
                         .equatable()
+
+                        if index < blocks.count - 1 {
+                            Color.clear
+                                .frame(height: spacing(after: index))
+                        }
                     }
                 }
                 .padding(.horizontal, 16)
@@ -40,5 +56,15 @@ struct ActiveSessionContentView: View {
                 onFinishWorkout: actions.finishWorkout
             )
         }
+    }
+
+    private func spacing(after index: Int) -> CGFloat {
+        guard index < blocks.count - 1 else {
+            return 0
+        }
+
+        return blocks[index].exerciseID == blocks[index + 1].exerciseID
+            ? Layout.repeatedExerciseBlockSpacing
+            : Layout.defaultBlockSpacing
     }
 }

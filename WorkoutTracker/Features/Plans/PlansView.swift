@@ -1,12 +1,15 @@
 import SwiftUI
 
 struct TemplateEditorContext: Identifiable {
-    var id: UUID {
-        template?.id ?? UUID()
-    }
-
+    let id: UUID
     var planID: UUID
     var template: WorkoutTemplate?
+
+    init(planID: UUID, template: WorkoutTemplate?) {
+        id = template?.id ?? UUID()
+        self.planID = planID
+        self.template = template
+    }
 }
 
 private struct PlansLibraryLoadingCard: View {

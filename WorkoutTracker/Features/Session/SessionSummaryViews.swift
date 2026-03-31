@@ -222,7 +222,7 @@ struct PersonalRecordSummaryCardView: View, Equatable {
                 VStack(alignment: .trailing, spacing: 8) {
                     AppStatePill(
                         title: "Record",
-                        systemImage: "rosette.fill",
+                        systemImage: "rosette",
                         tone: tone,
                         style: style == .plain ? .plain : .boxed
                     )
@@ -331,7 +331,7 @@ struct CompletedSessionDetailView: View {
     @Environment(SettingsStore.self) private var settingsStore
 
     let session: CompletedSession
-    var highlightedExerciseID: UUID? = nil
+    var highlightedExerciseID: UUID?
 
     private var totalCompletedSetCount: Int {
         session.blocks.reduce(0) { count, block in
@@ -341,13 +341,14 @@ struct CompletedSessionDetailView: View {
 
     private var totalVolume: Double {
         session.blocks.reduce(0) { total, block in
-            total + block.sets.reduce(0) { subtotal, set in
-                guard let weight = set.weight, let reps = set.reps, set.isCompleted else {
-                    return subtotal
-                }
+            total
+                + block.sets.reduce(0) { subtotal, set in
+                    guard let weight = set.weight, let reps = set.reps, set.isCompleted else {
+                        return subtotal
+                    }
 
-                return subtotal + (weight * Double(reps))
-            }
+                    return subtotal + (weight * Double(reps))
+                }
         }
     }
 
@@ -449,12 +450,13 @@ struct PersonalRecordDetailView: View {
                         eyebrow: "Personal Record",
                         title: record.displayName,
                         subtitle: record.achievedAt.formatted(date: .abbreviated, time: .shortened),
-                        systemImage: "rosette.fill",
+                        systemImage: "rosette",
                         metrics: [
                             AppHeroMetric(
                                 id: "load",
                                 label: "Load",
-                                value: "\(WeightFormatter.displayString(record.weight, unit: settingsStore.weightUnit)) \(settingsStore.weightUnit.symbol)",
+                                value:
+                                    "\(WeightFormatter.displayString(record.weight, unit: settingsStore.weightUnit)) \(settingsStore.weightUnit.symbol)",
                                 systemImage: "scalemass"
                             ),
                             AppHeroMetric(
@@ -467,7 +469,10 @@ struct PersonalRecordDetailView: View {
                                 id: "e1rm",
                                 label: "e1RM",
                                 value:
-                                    "\(WeightFormatter.displayString(record.estimatedOneRepMax, unit: settingsStore.weightUnit)) \(settingsStore.weightUnit.symbol)",
+                                    """
+                                    \(WeightFormatter.displayString(record.estimatedOneRepMax, unit: settingsStore.weightUnit)) \
+                                    \(settingsStore.weightUnit.symbol)
+                                    """,
                                 systemImage: "waveform.path.ecg"
                             ),
                             AppHeroMetric(
@@ -484,7 +489,11 @@ struct PersonalRecordDetailView: View {
                         systemImage: "bolt.fill",
                         title: "Estimated strength milestone",
                         message:
-                            "This set projects an estimated 1RM of \(WeightFormatter.displayString(record.estimatedOneRepMax, unit: settingsStore.weightUnit)) \(settingsStore.weightUnit.symbol).",
+                            """
+                            This set projects an estimated 1RM of \
+                            \(WeightFormatter.displayString(record.estimatedOneRepMax, unit: settingsStore.weightUnit)) \
+                            \(settingsStore.weightUnit.symbol).
+                            """,
                         tone: .success
                     )
                     .appSectionFrame(tone: .success)
@@ -554,7 +563,7 @@ private struct CompletedSessionBlockDetailView: View {
                 Spacer(minLength: 12)
 
                 if isHighlighted {
-                    AppStatePill(title: "Record", systemImage: "rosette.fill", tone: .success, style: .plain)
+                    AppStatePill(title: "Record", systemImage: "rosette", tone: .success, style: .plain)
                 }
             }
 

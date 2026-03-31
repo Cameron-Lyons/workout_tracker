@@ -4,6 +4,25 @@ import XCTest
 @testable import WorkoutTracker
 
 extension WorkoutStoreTests {
+    func testTemplateEditorContextKeepsStableIdentityForNewTemplateSheet() {
+        let context = TemplateEditorContext(planID: UUID(), template: nil)
+
+        XCTAssertEqual(context.id, context.id)
+    }
+
+    @MainActor
+    func testPresetSetupStateDoesNotPersistOnboardingCompletion() async {
+        let store = makeStore()
+        await store.hydrateIfNeeded()
+
+        XCTAssertTrue(store.shouldShowOnboarding)
+
+        store.isCompletingOnboarding = true
+
+        XCTAssertFalse(store.settingsStore.hasCompletedOnboarding)
+        XCTAssertTrue(store.shouldShowOnboarding)
+    }
+
     @MainActor
     func testWavePresetPacksSeedDefaultTrainingMaxTargets() async throws {
         let store = makeStore()
@@ -27,6 +46,26 @@ extension WorkoutStoreTests {
             XCTAssertNotNil(store.sessionStore.activeDraft?.blocks.first?.sets.first?.target.targetWeight)
             store.discardActiveSession()
         }
+    }
+
+    @MainActor
+    func testWavePresetPacksUseRecommendedFallbackWeightsAndAdjustableIncrements() throws {
+        let settings = SettingsStore(defaults: testDefaults)
+        settings.upperBodyIncrement = 5
+        settings.lowerBodyIncrement = 12.5
+
+        let plan = try XCTUnwrap(PresetPackBuilder.makePlans(for: .fiveThreeOne, settings: settings).first)
+
+        let squatDay = try XCTUnwrap(plan.templates.first(where: { $0.name == "Squat Day" }))
+        let benchDay = try XCTUnwrap(plan.templates.first(where: { $0.name == "Bench Day" }))
+        let deadliftDay = try XCTUnwrap(plan.templates.first(where: { $0.name == "Deadlift Day" }))
+
+        XCTAssertEqual(squatDay.blocks.first?.progressionRule.percentageWave?.trainingMax, 135)
+        XCTAssertEqual(squatDay.blocks.first?.progressionRule.percentageWave?.cycleIncrement, 12.5)
+        XCTAssertEqual(benchDay.blocks.first?.progressionRule.percentageWave?.trainingMax, 135)
+        XCTAssertEqual(benchDay.blocks.first?.progressionRule.percentageWave?.cycleIncrement, 5)
+        XCTAssertEqual(deadliftDay.blocks.first?.progressionRule.percentageWave?.trainingMax, 135)
+        XCTAssertEqual(deadliftDay.blocks.first?.progressionRule.percentageWave?.cycleIncrement, 12.5)
     }
 
     @MainActor

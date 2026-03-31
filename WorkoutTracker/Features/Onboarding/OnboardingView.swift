@@ -36,17 +36,8 @@ struct OnboardingView: View {
     }
 
     private func beginPresetOnboarding(_ pack: PresetPack) {
-        guard appStore.settingsStore.isCompletingOnboarding == false else {
-            return
-        }
-
-        appStore.settingsStore.isCompletingOnboarding = true
-        appStore.settingsStore.hasCompletedOnboarding = true
-
         Task { @MainActor in
-            await Task.yield()
-            appStore.completeOnboarding(with: pack)
-            appStore.settingsStore.isCompletingOnboarding = false
+            await appStore.beginPresetOnboarding(pack)
         }
     }
 }
@@ -194,7 +185,6 @@ private struct OnboardingBlankRow: View {
         .padding(.vertical, 14)
     }
 }
-
 
 private extension PresetPack {
     var onboardingTone: AppToneStyle {

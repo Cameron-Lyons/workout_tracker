@@ -15,7 +15,6 @@ private extension Color {
 }
 
 private enum RestActivityColors {
-    static let background = Color(hex: 0x16161D)
     static let textPrimary = Color(hex: 0xDCD7BA)
     static let textSecondary = Color(hex: 0xC8C093)
     static let warning = Color(hex: 0xFFA066)
@@ -25,7 +24,7 @@ struct WorkoutRestLiveActivityWidget: Widget {
     var body: some WidgetConfiguration {
         ActivityConfiguration(for: WorkoutRestLiveActivityAttributes.self) { context in
             WorkoutRestLiveActivityLockScreenView(context: context)
-                .activityBackgroundTint(RestActivityColors.background.opacity(0.84))
+                .activityBackgroundTint(.clear)
                 .activitySystemActionForegroundColor(RestActivityColors.textPrimary)
         } dynamicIsland: { context in
             DynamicIsland {
