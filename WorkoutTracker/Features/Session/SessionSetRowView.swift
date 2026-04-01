@@ -10,7 +10,6 @@ struct SessionSetRowView: View, Equatable {
     let blockID: UUID
     let row: SessionSetRow
     let weightUnit: WeightUnit
-    let weightStep: Double
     let actions: ActiveSessionActions
     let showsDetailedChrome: Bool
     @State private var weightInputText: String
@@ -23,14 +22,12 @@ struct SessionSetRowView: View, Equatable {
         blockID: UUID,
         row: SessionSetRow,
         weightUnit: WeightUnit,
-        weightStep: Double,
         actions: ActiveSessionActions,
         showsDetailedChrome: Bool
     ) {
         self.blockID = blockID
         self.row = row
         self.weightUnit = weightUnit
-        self.weightStep = weightStep
         self.actions = actions
         self.showsDetailedChrome = showsDetailedChrome
         _weightInputText = State(initialValue: Self.weightInputText(for: row, unit: weightUnit))
@@ -41,7 +38,6 @@ struct SessionSetRowView: View, Equatable {
         lhs.blockID == rhs.blockID
             && lhs.row == rhs.row
             && lhs.weightUnit == rhs.weightUnit
-            && lhs.weightStep == rhs.weightStep
             && lhs.showsDetailedChrome == rhs.showsDetailedChrome
     }
 
@@ -57,12 +53,6 @@ struct SessionSetRowView: View, Equatable {
                         .font(.caption.weight(.black))
                         .tracking(0.8)
                         .foregroundStyle(row.log.isCompleted ? AppToneStyle.success.accent : AppColors.textSecondary)
-
-                    if showsDetailedChrome {
-                        Text(targetSummary)
-                            .font(.caption.weight(.medium))
-                            .foregroundStyle(AppColors.textSecondary)
-                    }
                 }
 
                 Spacer()
@@ -87,18 +77,6 @@ struct SessionSetRowView: View, Equatable {
                 statControl(
                     title: "Load",
                     caption: loadCaption,
-                    tone: tone,
-                    decreaseAccessibilityLabel: "Decrease load for the \(accessibilityContext) set",
-                    increaseAccessibilityLabel: "Increase load for the \(accessibilityContext) set",
-                    accessibilityValue: loadAccessibilityValue,
-                    decreaseAccessibilityIdentifier: "session.adjust.load.\(blockID.uuidString).\(row.id.uuidString).decrease",
-                    increaseAccessibilityIdentifier: "session.adjust.load.\(blockID.uuidString).\(row.id.uuidString).increase",
-                    onDecrease: {
-                        actions.adjustWeight(blockID, row.id, -weightStep)
-                    },
-                    onIncrease: {
-                        actions.adjustWeight(blockID, row.id, weightStep)
-                    },
                     valueContent: {
                         metricInputField(
                             text: $weightInputText,
@@ -114,18 +92,6 @@ struct SessionSetRowView: View, Equatable {
                 statControl(
                     title: "Reps",
                     caption: "Target \(repsLabel)",
-                    tone: tone,
-                    decreaseAccessibilityLabel: "Decrease reps for the \(accessibilityContext) set",
-                    increaseAccessibilityLabel: "Increase reps for the \(accessibilityContext) set",
-                    accessibilityValue: repsAccessibilityValue,
-                    decreaseAccessibilityIdentifier: "session.adjust.reps.\(blockID.uuidString).\(row.id.uuidString).decrease",
-                    increaseAccessibilityIdentifier: "session.adjust.reps.\(blockID.uuidString).\(row.id.uuidString).increase",
-                    onDecrease: {
-                        actions.adjustReps(blockID, row.id, -1)
-                    },
-                    onIncrease: {
-                        actions.adjustReps(blockID, row.id, 1)
-                    },
                     valueContent: {
                         metricInputField(
                             text: $repsInputText,
@@ -186,10 +152,6 @@ struct SessionSetRowView: View, Equatable {
         row.target.setKind.displayName
     }
 
-    private var accessibilityContext: String {
-        setKindTitle.lowercased()
-    }
-
     private var canonicalWeightText: String {
         Self.weightInputText(for: row, unit: weightUnit)
     }
@@ -198,25 +160,8 @@ struct SessionSetRowView: View, Equatable {
         Self.repsInputText(for: row)
     }
 
-    private var loadAccessibilityValue: String {
-        let displayValue = weightInputText.nonEmptyTrimmed ?? canonicalWeightText.nonEmptyTrimmed ?? "0"
-        return "\(displayValue) \(weightUnit.symbol)"
-    }
-
-    private var repsAccessibilityValue: String {
-        repsInputText.nonEmptyTrimmed ?? canonicalRepsText
-    }
-
     private var repsLabel: String {
         row.target.repRange.displayLabel
-    }
-
-    private var targetSummary: String {
-        if let targetWeight = row.target.targetWeight {
-            return "\(WeightFormatter.displayString(targetWeight, unit: weightUnit)) \(weightUnit.symbol) • \(repsLabel)"
-        }
-
-        return repsLabel
     }
 
     private var loadCaption: String {
@@ -224,20 +169,12 @@ struct SessionSetRowView: View, Equatable {
             return "Target \(WeightFormatter.displayString(targetWeight, unit: weightUnit)) \(weightUnit.symbol)"
         }
 
-        return "Adjust load"
+        return "Enter load"
     }
 
     private func statControl<ValueContent: View>(
         title: String,
         caption: String?,
-        tone: AppToneStyle,
-        decreaseAccessibilityLabel: String,
-        increaseAccessibilityLabel: String,
-        accessibilityValue: String,
-        decreaseAccessibilityIdentifier: String,
-        increaseAccessibilityIdentifier: String,
-        onDecrease: @escaping () -> Void,
-        onIncrease: @escaping () -> Void,
         @ViewBuilder valueContent: () -> ValueContent
     ) -> some View {
         VStack(alignment: .leading, spacing: 8) {
@@ -255,27 +192,8 @@ struct SessionSetRowView: View, Equatable {
                     .lineLimit(1)
                     .minimumScaleFactor(0.7)
             }
-
-            HStack(spacing: 14) {
-                adjustButton(
-                    systemImage: "minus",
-                    tone: tone,
-                    accessibilityLabel: decreaseAccessibilityLabel,
-                    accessibilityValue: accessibilityValue,
-                    accessibilityIdentifier: decreaseAccessibilityIdentifier,
-                    action: onDecrease
-                )
-                adjustButton(
-                    systemImage: "plus",
-                    tone: tone,
-                    accessibilityLabel: increaseAccessibilityLabel,
-                    accessibilityValue: accessibilityValue,
-                    accessibilityIdentifier: increaseAccessibilityIdentifier,
-                    action: onIncrease
-                )
-            }
         }
-        .frame(maxWidth: .infinity, minHeight: ActiveSessionViewMetrics.statControlHeight, alignment: .leading)
+        .frame(maxWidth: .infinity, alignment: .leading)
     }
 
     private func metricInputField(
@@ -319,26 +237,6 @@ struct SessionSetRowView: View, Equatable {
                 .fill(isFocused ? tone.softBorder : AppColors.strokeStrong.opacity(0.72))
                 .frame(height: 1)
         }
-    }
-
-    private func adjustButton(
-        systemImage: String,
-        tone: AppToneStyle,
-        accessibilityLabel: String,
-        accessibilityValue: String,
-        accessibilityIdentifier: String,
-        action: @escaping () -> Void
-    ) -> some View {
-        Button(action: action) {
-            Image(systemName: systemImage)
-                .font(.body.weight(.bold))
-                .foregroundStyle(tone.accent)
-                .frame(width: 28, height: 28)
-        }
-        .buttonStyle(.plain)
-        .accessibilityLabel(accessibilityLabel)
-        .accessibilityValue(accessibilityValue)
-        .accessibilityIdentifier(accessibilityIdentifier)
     }
 
     private func syncMetricInputsIfNeeded() {

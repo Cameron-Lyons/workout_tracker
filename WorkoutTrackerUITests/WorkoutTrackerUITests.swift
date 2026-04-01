@@ -77,6 +77,32 @@ final class WorkoutTrackerUITests: XCTestCase {
     }
 
     @MainActor
+    func testQuickStartRowCanStartSessionFromFullRowBand() throws {
+        let app = launchAppForUITest()
+
+        let presetButton = app.buttons["onboarding.preset.generalGym"]
+        XCTAssertTrue(presetButton.waitForExistence(timeout: 8))
+        presetButton.tap()
+
+        let quickStartRow = app.firstButton(withIdentifierPrefix: "today.quickStart.")
+        XCTAssertTrue(quickStartRow.waitForExistence(timeout: 8))
+
+        let appFrame = app.frame
+        let quickStartFrame = quickStartRow.frame
+        XCTAssertGreaterThan(quickStartFrame.width, appFrame.width * 0.75)
+
+        let tapCoordinate = app.coordinate(
+            withNormalizedOffset: CGVector(
+                dx: 0.82,
+                dy: quickStartFrame.midY / appFrame.height
+            )
+        )
+        tapCoordinate.tap()
+
+        XCTAssertTrue(app.buttons["session.finishButton"].waitForExistence(timeout: 8))
+    }
+
+    @MainActor
     func testCreateCustomTemplateAndLaunchIt() throws {
         let app = launchAppForUITest(extraArguments: ["--uitesting-complete-onboarding"])
 
@@ -330,25 +356,18 @@ final class WorkoutTrackerUITests: XCTestCase {
         pinnedStart.tap()
         app.swipeUp()
 
-        let loadIncreaseButton = app.firstButton(
-            withIdentifierPrefix: "session.adjust.load.",
-            suffix: ".increase"
-        )
-        app.revealIfNeeded(loadIncreaseButton)
-        XCTAssertTrue(loadIncreaseButton.waitForExistence(timeout: 8))
-        for _ in 0..<8 {
-            loadIncreaseButton.tap()
-        }
+        let loadField = app.firstTextField(withIdentifierPrefix: "session.input.load.")
+        app.revealIfNeeded(loadField)
+        XCTAssertTrue(loadField.waitForExistence(timeout: 8))
+        loadField.replaceText(with: "175")
 
-        let repsIncreaseButton = app.firstButton(
-            withIdentifierPrefix: "session.adjust.reps.",
-            suffix: ".increase"
-        )
-        app.revealIfNeeded(repsIncreaseButton)
-        XCTAssertTrue(repsIncreaseButton.waitForExistence(timeout: 4))
-        for _ in 0..<4 {
-            repsIncreaseButton.tap()
-        }
+        let repsField = app.firstTextField(withIdentifierPrefix: "session.input.reps.")
+        XCTAssertTrue(repsField.waitForExistence(timeout: 4))
+        repsField.replaceText(with: "9")
+
+        let completeSetButton = app.firstButton(withIdentifierPrefix: "session.completeSet.")
+        XCTAssertTrue(completeSetButton.waitForExistence(timeout: 4))
+        completeSetButton.tap()
 
         let addSetButton = app.buttons["Add Set"].firstMatch
         XCTAssertTrue(addSetButton.waitForExistence(timeout: 4))
@@ -394,6 +413,12 @@ private extension XCUIApplication {
         buttons.matching(NSPredicate(format: "label == %@", label)).firstMatch
     }
 
+    func firstTextField(withIdentifierPrefix prefix: String) -> XCUIElement {
+        textFields
+            .matching(NSPredicate(format: "identifier BEGINSWITH %@", prefix))
+            .firstMatch
+    }
+
     func firstButton(withIdentifierPrefix prefix: String) -> XCUIElement {
         descendants(matching: .any)
             .matching(NSPredicate(format: "identifier BEGINSWITH %@", prefix))
@@ -418,5 +443,18 @@ private extension XCUIApplication {
             swipeUp()
             swipeCount += 1
         }
+    }
+}
+
+private extension XCUIElement {
+    func replaceText(with text: String) {
+        tap()
+
+        if let currentValue = value as? String, !currentValue.isEmpty {
+            let deleteText = String(repeating: XCUIKeyboardKey.delete.rawValue, count: currentValue.count)
+            typeText(deleteText)
+        }
+
+        typeText(text)
     }
 }

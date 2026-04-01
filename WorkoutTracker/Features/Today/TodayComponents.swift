@@ -63,25 +63,15 @@ struct TodayQuickStartRow: View {
             Spacer(minLength: 12)
 
             if let lastStartedAt = reference.lastStartedAt {
-                HStack(alignment: .top, spacing: 8) {
-                    Text(lastStartedAt.formatted(date: .abbreviated, time: .omitted))
-                        .font(.caption.weight(.medium))
-                        .foregroundStyle(AppColors.textSecondary)
-                        .multilineTextAlignment(.trailing)
-
-                    Image(systemName: "play.fill")
-                        .font(.caption.weight(.bold))
-                        .foregroundStyle(AppToneStyle.today.accent)
-                        .padding(.top, 2)
-                }
-            } else {
-                Image(systemName: "play.fill")
-                    .font(.caption.weight(.bold))
-                    .foregroundStyle(AppToneStyle.today.accent)
-                    .padding(.top, 2)
+                Text(lastStartedAt.formatted(date: .abbreviated, time: .omitted))
+                    .font(.caption.weight(.medium))
+                    .foregroundStyle(AppColors.textSecondary)
+                    .multilineTextAlignment(.trailing)
             }
         }
         .padding(.vertical, 14)
+        .frame(maxWidth: .infinity, alignment: .leading)
+        .contentShape(Rectangle())
     }
 }
 

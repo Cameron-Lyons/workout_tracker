@@ -9,16 +9,6 @@ struct ActiveSessionHeaderState: Equatable {
 
 struct ActiveSessionDisplaySettings: Equatable {
     var weightUnit: WeightUnit
-    var upperBodyIncrement: Double
-    var lowerBodyIncrement: Double
-
-    func weightStep(for block: SessionBlock) -> Double {
-        SettingsStore.preferredIncrement(
-            for: block.exerciseNameSnapshot,
-            upperBodyIncrement: upperBodyIncrement,
-            lowerBodyIncrement: lowerBodyIncrement
-        )
-    }
 }
 
 struct ActiveSessionActions {
@@ -26,8 +16,6 @@ struct ActiveSessionActions {
     var updateBlockNotes: (UUID, String) -> Void
     var addSet: (UUID) -> Void
     var copyLastSet: (UUID) -> Void
-    var adjustWeight: (UUID, UUID, Double) -> Void
-    var adjustReps: (UUID, UUID, Int) -> Void
     var updateWeight: (UUID, UUID, Double) -> Void
     var updateReps: (UUID, UUID, Int) -> Void
     var toggleSetCompletion: (UUID, UUID) -> Void
@@ -36,7 +24,6 @@ struct ActiveSessionActions {
 }
 
 enum ActiveSessionViewMetrics {
-    static let statControlHeight: CGFloat = 104
     static let detailedChromeRevealDelayNanoseconds: UInt64 = 120_000_000
 }
 
@@ -51,7 +38,7 @@ struct ActiveSessionRestTimerPresentation {
             tone = .today
             label = "Off"
             eyebrow = "Active Session"
-            subtitle = "Tap complete to auto-start rest timers, then use +/- controls to adjust each set."
+            subtitle = "Tap complete to auto-start rest timers, then edit each set directly."
             return
         }
 
@@ -110,9 +97,7 @@ struct ActiveSessionView: View {
 
     private var displaySettings: ActiveSessionDisplaySettings {
         ActiveSessionDisplaySettings(
-            weightUnit: settingsStore.weightUnit,
-            upperBodyIncrement: settingsStore.upperBodyIncrement,
-            lowerBodyIncrement: settingsStore.lowerBodyIncrement
+            weightUnit: settingsStore.weightUnit
         )
     }
 
@@ -124,12 +109,6 @@ struct ActiveSessionView: View {
             },
             addSet: { appStore.addSet(to: $0) },
             copyLastSet: { appStore.copyLastSet(in: $0) },
-            adjustWeight: { blockID, setID, delta in
-                appStore.adjustSetWeight(blockID: blockID, setID: setID, delta: delta)
-            },
-            adjustReps: { blockID, setID, delta in
-                appStore.adjustSetReps(blockID: blockID, setID: setID, delta: delta)
-            },
             updateWeight: { blockID, setID, weight in
                 appStore.updateSetWeight(blockID: blockID, setID: setID, weight: weight)
             },

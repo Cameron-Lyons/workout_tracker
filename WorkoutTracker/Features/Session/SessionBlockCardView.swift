@@ -89,7 +89,6 @@ struct SessionBlockCardView: View, Equatable {
                         blockID: block.id,
                         row: row,
                         weightUnit: displaySettings.weightUnit,
-                        weightStep: displaySettings.weightStep(for: block),
                         actions: actions,
                         showsDetailedChrome: showsDetailedChrome
                     )
