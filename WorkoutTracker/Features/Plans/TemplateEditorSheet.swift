@@ -4,7 +4,6 @@ struct TemplateDraftBlock: Identifiable, Equatable {
     var id: UUID
     var exerciseID: UUID?
     var exerciseName: String
-    var blockNote: String
     var restSeconds: Int
     var setCount: Int
     var repLower: Int
@@ -22,7 +21,6 @@ struct TemplateDraftBlock: Identifiable, Equatable {
         id: UUID = UUID(),
         exerciseID: UUID? = nil,
         exerciseName: String = "",
-        blockNote: String = "",
         restSeconds: Int = ExerciseBlockDefaults.restSeconds,
         setCount: Int = ExerciseBlockDefaults.setCount,
         repLower: Int = ExerciseBlockDefaults.repRange.lowerBound,
@@ -39,7 +37,6 @@ struct TemplateDraftBlock: Identifiable, Equatable {
         self.id = id
         self.exerciseID = exerciseID
         self.exerciseName = exerciseName
-        self.blockNote = blockNote
         self.restSeconds = restSeconds
         self.setCount = setCount
         self.repLower = repLower
@@ -314,7 +311,6 @@ struct TemplateEditorSheet: View {
                 id: block.id,
                 exerciseID: block.exerciseID,
                 exerciseName: block.exerciseNameSnapshot,
-                blockNote: block.blockNote,
                 restSeconds: block.restSeconds,
                 setCount: max(1, previewTargets.count),
                 repLower: repRange.lowerBound,
@@ -443,7 +439,6 @@ struct TemplateEditorSheet: View {
                 id: block.id,
                 exerciseID: exerciseID,
                 exerciseNameSnapshot: exerciseName,
-                blockNote: block.blockNote,
                 restSeconds: block.restSeconds,
                 supersetGroup: block.supersetGroup.nonEmptyTrimmed,
                 progressionRule: progressionRule,

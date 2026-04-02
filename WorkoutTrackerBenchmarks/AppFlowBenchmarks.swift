@@ -61,7 +61,7 @@ final class AppFlowBenchmarks: BenchmarkTestCase {
     private struct SessionMutationBenchmarkFixture {
         let sessionStore: SessionStore
         let mutationTargets: [(blockID: UUID, setID: UUID)]
-        let noteBlockID: UUID
+        let firstBlockID: UUID
         let expansionBlockID: UUID
     }
 
@@ -476,7 +476,7 @@ final class AppFlowBenchmarks: BenchmarkTestCase {
         return SessionMutationBenchmarkFixture(
             sessionStore: sessionStore,
             mutationTargets: mutationTargets,
-            noteBlockID: draft.blocks[0].id,
+            firstBlockID: draft.blocks[0].id,
             expansionBlockID: draft.blocks[draft.blocks.count - 1].id
         )
     }
@@ -567,13 +567,12 @@ final class AppFlowBenchmarks: BenchmarkTestCase {
         mutationCount += 1
 
         fixture.sessionStore.pushMutation(
-            blockID: fixture.noteBlockID,
-            undoStrategy: .block(fixture.noteBlockID),
+            blockID: fixture.firstBlockID,
+            undoStrategy: .block(fixture.firstBlockID),
             persistence: .deferred
         ) { draft, context in
-            SessionEngine.updateNotes(
-                in: fixture.noteBlockID,
-                note: "Benchmark note",
+            SessionEngine.addSet(
+                to: fixture.firstBlockID,
                 draft: &draft,
                 context: context,
                 now: WorkoutBenchmarkFixtures.referenceNow

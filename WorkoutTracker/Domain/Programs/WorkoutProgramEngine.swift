@@ -207,7 +207,6 @@ enum SessionEngine {
                 id: block.id,
                 exerciseID: block.exerciseID,
                 exerciseNameSnapshot: block.exerciseNameSnapshot,
-                blockNote: block.blockNote,
                 restSeconds: block.restSeconds,
                 supersetGroup: block.supersetGroup,
                 progressionRule: block.progressionRule,
@@ -398,27 +397,6 @@ enum SessionEngine {
         }
 
         draft.blocks[blockIndex].sets[setIndex].log.reps = updatedReps
-        draft.touch(now: now)
-        return .changed
-    }
-
-    @discardableResult
-    static func updateNotes(
-        in blockID: UUID,
-        note: String,
-        draft: inout SessionDraft,
-        context: SessionMutationContext = .empty,
-        now: Date = .now
-    ) -> SessionMutationResult {
-        guard let blockIndex = resolvedBlockIndex(in: draft, blockID: blockID, suggested: context.blockIndex) else {
-            return .unchanged
-        }
-
-        guard draft.blocks[blockIndex].blockNote != note else {
-            return .unchanged
-        }
-
-        draft.blocks[blockIndex].blockNote = note
         draft.touch(now: now)
         return .changed
     }

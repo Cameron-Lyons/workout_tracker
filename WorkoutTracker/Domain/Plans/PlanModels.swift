@@ -4,7 +4,6 @@ struct ExerciseBlock: Identifiable, Codable, Equatable, Sendable {
     var id: UUID
     var exerciseID: UUID
     var exerciseNameSnapshot: String
-    var blockNote: String
     var restSeconds: Int
     var supersetGroup: String?
     var progressionRule: ProgressionRule
@@ -15,7 +14,6 @@ struct ExerciseBlock: Identifiable, Codable, Equatable, Sendable {
         id: UUID = UUID(),
         exerciseID: UUID,
         exerciseNameSnapshot: String,
-        blockNote: String = "",
         restSeconds: Int = ExerciseBlockDefaults.restSeconds,
         supersetGroup: String? = nil,
         progressionRule: ProgressionRule = .manual,
@@ -25,7 +23,6 @@ struct ExerciseBlock: Identifiable, Codable, Equatable, Sendable {
         self.id = id
         self.exerciseID = exerciseID
         self.exerciseNameSnapshot = exerciseNameSnapshot
-        self.blockNote = blockNote
         self.restSeconds = restSeconds
         self.supersetGroup = supersetGroup
         self.progressionRule = progressionRule

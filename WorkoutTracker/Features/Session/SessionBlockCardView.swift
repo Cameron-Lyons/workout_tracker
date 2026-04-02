@@ -6,9 +6,6 @@ struct SessionBlockCardView: View, Equatable {
     let displaySettings: ActiveSessionDisplaySettings
     let actions: ActiveSessionActions
     let showsDetailedChrome: Bool
-    @State private var blockNoteText: String
-    @State private var blockNoteCommitTask: Task<Void, Never>?
-    @FocusState private var isBlockNoteFocused: Bool
 
     init(
         block: SessionBlock,
@@ -20,7 +17,6 @@ struct SessionBlockCardView: View, Equatable {
         self.displaySettings = displaySettings
         self.actions = actions
         self.showsDetailedChrome = showsDetailedChrome
-        _blockNoteText = State(initialValue: block.blockNote)
     }
 
     nonisolated static func == (lhs: SessionBlockCardView, rhs: SessionBlockCardView) -> Bool {
@@ -47,40 +43,6 @@ struct SessionBlockCardView: View, Equatable {
                 Text("\(completedSetCount)/\(block.sets.count) done")
                     .font(.caption.weight(.semibold))
                     .foregroundStyle(completedSetCount == block.sets.count ? AppToneStyle.success.accent : AppColors.textSecondary)
-            }
-
-            TextField(
-                "Block note",
-                text: $blockNoteText,
-                axis: .vertical
-            )
-            .foregroundStyle(AppColors.textPrimary)
-            .lineLimit(2...3)
-            .focused($isBlockNoteFocused)
-            .modifier(SessionUnderlineFieldModifier())
-            .onChange(of: block) { _, newValue in
-                guard !isBlockNoteFocused else {
-                    return
-                }
-
-                blockNoteText = newValue.blockNote
-            }
-            .onChange(of: blockNoteText) { _, newValue in
-                guard isBlockNoteFocused else {
-                    return
-                }
-
-                scheduleBlockNoteCommit(for: newValue)
-            }
-            .onChange(of: isBlockNoteFocused) { previousValue, newValue in
-                guard previousValue, !newValue else {
-                    return
-                }
-
-                commitBlockNoteImmediately()
-            }
-            .onDisappear {
-                commitBlockNoteImmediately()
             }
 
             VStack(spacing: 0) {
@@ -140,31 +102,5 @@ struct SessionBlockCardView: View, Equatable {
             parts.insert("Superset \(supersetGroup)", at: 2)
         }
         return parts.joined(separator: " • ")
-    }
-
-    private func scheduleBlockNoteCommit(for note: String) {
-        blockNoteCommitTask?.cancel()
-        blockNoteCommitTask = Task { @MainActor in
-            try? await Task.sleep(nanoseconds: SessionInputCommitDefaults.debounceNanoseconds)
-            guard !Task.isCancelled else {
-                return
-            }
-
-            commitBlockNote(note)
-        }
-    }
-
-    private func commitBlockNoteImmediately() {
-        blockNoteCommitTask?.cancel()
-        blockNoteCommitTask = nil
-        commitBlockNote(blockNoteText)
-    }
-
-    private func commitBlockNote(_ note: String) {
-        guard note != block.blockNote else {
-            return
-        }
-
-        actions.updateBlockNotes(block.id, note)
     }
 }

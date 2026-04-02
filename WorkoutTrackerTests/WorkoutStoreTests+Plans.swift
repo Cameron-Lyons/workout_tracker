@@ -93,7 +93,7 @@ extension WorkoutStoreTests {
         let gzclp = try XCTUnwrap(PresetPackBuilder.makePlans(for: .gzclp, settings: settings).first)
         XCTAssertEqual(gzclp.templates.count, 4)
         XCTAssertFalse(TemplateReferenceSelection.isAlternatingPlan(gzclp))
-        XCTAssertEqual(gzclp.templates.first?.blocks.map(\.blockNote), ["T1 Main Lift", "T2 Secondary Lift", "T3 Accessories"])
+        XCTAssertEqual(gzclp.templates.first?.blocks.count, 3)
     }
 
     @MainActor
@@ -277,7 +277,6 @@ extension WorkoutStoreTests {
         store.adjustSetReps(blockID: initialBlock.id, setID: initialRow.id, delta: 1)
         store.addSet(to: initialBlock.id)
         store.copyLastSet(in: initialBlock.id)
-        store.updateActiveBlockNotes(blockID: initialBlock.id, note: "Heavy top set")
         store.addExerciseToActiveSession(exerciseID: CatalogSeed.backSquat)
 
         let blockCountAfterCatalogExercise = try XCTUnwrap(store.sessionStore.activeDraft?.blocks.count)
@@ -292,7 +291,6 @@ extension WorkoutStoreTests {
 
         XCTAssertEqual(updatedDraft.blocks.count, blockCountAfterCatalogExercise)
         XCTAssertFalse(updatedDraft.blocks.contains(where: { $0.exerciseNameSnapshot == "Cable Row" }))
-        XCTAssertEqual(updatedPrimaryBlock.blockNote, "Heavy top set")
         XCTAssertEqual(updatedPrimaryBlock.sets.count, 5)
         XCTAssertEqual(updatedWorkingRows.count, 3)
         XCTAssertEqual(updatedWorkingRows[0].log.weight, 190)
@@ -313,7 +311,6 @@ extension WorkoutStoreTests {
         let persistedWorkingRows = persistedPrimaryBlock.sets.filter { $0.target.setKind == .working }
 
         XCTAssertEqual(persistedDraft.blocks.count, blockCountAfterCatalogExercise)
-        XCTAssertEqual(persistedPrimaryBlock.blockNote, "Heavy top set")
         XCTAssertEqual(persistedPrimaryBlock.sets.count, 5)
         XCTAssertEqual(persistedWorkingRows.count, 3)
         XCTAssertEqual(persistedWorkingRows[0].log.weight, 190)

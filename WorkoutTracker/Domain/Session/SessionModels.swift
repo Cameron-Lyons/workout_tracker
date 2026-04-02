@@ -81,7 +81,6 @@ struct SessionBlock: Identifiable, Codable, Equatable, Sendable {
     var id: UUID
     var exerciseID: UUID
     var exerciseNameSnapshot: String
-    var blockNote: String
     var restSeconds: Int
     var supersetGroup: String?
     var progressionRule: ProgressionRule
@@ -91,7 +90,6 @@ struct SessionBlock: Identifiable, Codable, Equatable, Sendable {
         id: UUID = UUID(),
         exerciseID: UUID,
         exerciseNameSnapshot: String,
-        blockNote: String = "",
         restSeconds: Int,
         supersetGroup: String? = nil,
         progressionRule: ProgressionRule,
@@ -100,7 +98,6 @@ struct SessionBlock: Identifiable, Codable, Equatable, Sendable {
         self.id = id
         self.exerciseID = exerciseID
         self.exerciseNameSnapshot = exerciseNameSnapshot
-        self.blockNote = blockNote
         self.restSeconds = restSeconds
         self.supersetGroup = supersetGroup
         self.progressionRule = progressionRule

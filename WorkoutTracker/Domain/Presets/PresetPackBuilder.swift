@@ -51,11 +51,6 @@ enum PresetPackBuilder {
     private enum PresetPackLabels {
         static let boringButBig = "BBB 5x10"
         static let greyskullAMRAP = "AMRAP+"
-        static let gzclTierOne = "T1 Main Lift"
-        static let gzclTierTwo = "T2 Secondary Lift"
-        static let gzclTierThree = "T3 Accessories"
-        static let madcowVolume = "Ramp across sets to one heavy top set."
-        static let madcowRecovery = "Recovery day. Keep the load lighter than Monday."
         static let madcowTopTriple = "Top triple"
         static let madcowBackoff = "Backoff set"
     }
@@ -750,24 +745,21 @@ enum PresetPackBuilder {
                     exerciseName: "Back Squat",
                     restSeconds: PresetPackRest.mainLift,
                     count: PresetPackSets.strongLifts,
-                    repRange: PresetPackRepRange.strength,
-                    blockNote: PresetPackLabels.madcowVolume
+                    repRange: PresetPackRepRange.strength
                 ),
                 manualBlock(
                     exerciseID: CatalogSeed.benchPress,
                     exerciseName: "Bench Press",
                     restSeconds: PresetPackRest.compound,
                     count: PresetPackSets.strongLifts,
-                    repRange: PresetPackRepRange.strength,
-                    blockNote: PresetPackLabels.madcowVolume
+                    repRange: PresetPackRepRange.strength
                 ),
                 manualBlock(
                     exerciseID: CatalogSeed.barbellRow,
                     exerciseName: "Barbell Row",
                     restSeconds: PresetPackRest.compound,
                     count: PresetPackSets.strongLifts,
-                    repRange: PresetPackRepRange.strength,
-                    blockNote: PresetPackLabels.madcowVolume
+                    repRange: PresetPackRepRange.strength
                 ),
             ]
         )
@@ -781,24 +773,21 @@ enum PresetPackBuilder {
                     exerciseName: "Back Squat",
                     restSeconds: PresetPackRest.compound,
                     count: PresetPackSets.madcowRecovery,
-                    repRange: PresetPackRepRange.strength,
-                    blockNote: PresetPackLabels.madcowRecovery
+                    repRange: PresetPackRepRange.strength
                 ),
                 manualBlock(
                     exerciseID: CatalogSeed.overheadPress,
                     exerciseName: "Overhead Press",
                     restSeconds: PresetPackRest.compound,
                     count: PresetPackSets.madcowRecovery,
-                    repRange: PresetPackRepRange.strength,
-                    blockNote: PresetPackLabels.madcowRecovery
+                    repRange: PresetPackRepRange.strength
                 ),
                 manualBlock(
                     exerciseID: CatalogSeed.deadlift,
                     exerciseName: "Deadlift",
                     restSeconds: PresetPackRest.mainLift,
                     count: PresetPackSets.madcowRecovery,
-                    repRange: PresetPackRepRange.strength,
-                    blockNote: PresetPackLabels.madcowRecovery
+                    repRange: PresetPackRepRange.strength
                 ),
             ]
         )
@@ -947,13 +936,11 @@ enum PresetPackBuilder {
         count: Int = PresetPackSets.standard,
         repRange: RepRange = DoubleProgressionDefaults.repRange,
         increment: Double,
-        blockNote: String = "",
         supersetGroup: String? = nil
     ) -> ExerciseBlock {
         ExerciseBlock(
             exerciseID: exerciseID,
             exerciseNameSnapshot: exerciseName,
-            blockNote: blockNote,
             restSeconds: restSeconds,
             supersetGroup: supersetGroup,
             progressionRule: doubleProgressionRule(repRange: repRange, increment: increment),
@@ -967,13 +954,11 @@ enum PresetPackBuilder {
         restSeconds: Int = ExerciseBlockDefaults.restSeconds,
         count: Int = PresetPackSets.standard,
         repRange: RepRange = ExerciseBlockDefaults.repRange,
-        blockNote: String = "",
         supersetGroup: String? = nil
     ) -> ExerciseBlock {
         ExerciseBlock(
             exerciseID: exerciseID,
             exerciseNameSnapshot: exerciseName,
-            blockNote: blockNote,
             restSeconds: restSeconds,
             supersetGroup: supersetGroup,
             progressionRule: .manual,
@@ -986,13 +971,11 @@ enum PresetPackBuilder {
         exerciseName: String,
         restSeconds: Int = ExerciseBlockDefaults.restSeconds,
         targets: [SetTarget],
-        blockNote: String = "",
         supersetGroup: String? = nil
     ) -> ExerciseBlock {
         ExerciseBlock(
             exerciseID: exerciseID,
             exerciseNameSnapshot: exerciseName,
-            blockNote: blockNote,
             restSeconds: restSeconds,
             supersetGroup: supersetGroup,
             progressionRule: .manual,
@@ -1058,8 +1041,7 @@ enum PresetPackBuilder {
             restSeconds: PresetPackRest.mainLift,
             count: PresetPackSets.gzclTierOne,
             repRange: PresetPackRepRange.powerStrength,
-            increment: increment,
-            blockNote: PresetPackLabels.gzclTierOne
+            increment: increment
         )
     }
 
@@ -1074,8 +1056,7 @@ enum PresetPackBuilder {
             restSeconds: PresetPackRest.compound,
             count: PresetPackSets.gzclTierTwo,
             repRange: PresetPackRepRange.gzclTierTwo,
-            increment: increment,
-            blockNote: PresetPackLabels.gzclTierTwo
+            increment: increment
         )
     }
 
@@ -1088,8 +1069,7 @@ enum PresetPackBuilder {
             exerciseName: exerciseName,
             restSeconds: PresetPackRest.standard,
             count: PresetPackSets.gzclTierThree,
-            repRange: PresetPackRepRange.gzclTierThree,
-            blockNote: PresetPackLabels.gzclTierThree
+            repRange: PresetPackRepRange.gzclTierThree
         )
     }
 

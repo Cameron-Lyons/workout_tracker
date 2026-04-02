@@ -12,7 +12,6 @@ struct ActiveSessionDisplaySettings: Equatable {
 }
 
 struct ActiveSessionActions {
-    var updateBlockNotes: (UUID, String) -> Void
     var addSet: (UUID) -> Void
     var copyLastSet: (UUID) -> Void
     var updateWeight: (UUID, UUID, Double) -> Void
@@ -102,9 +101,6 @@ struct ActiveSessionView: View {
 
     private var actions: ActiveSessionActions {
         ActiveSessionActions(
-            updateBlockNotes: { blockID, note in
-                appStore.updateActiveBlockNotes(blockID: blockID, note: note)
-            },
             addSet: { appStore.addSet(to: $0) },
             copyLastSet: { appStore.copyLastSet(in: $0) },
             updateWeight: { blockID, setID, weight in

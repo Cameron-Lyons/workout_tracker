@@ -65,9 +65,6 @@ struct TemplateDraftBlockEditorView: View {
         if !block.allowsAutoWarmups {
             labels.append("Warmups Off")
         }
-        if block.blockNote.nonEmptyTrimmed != nil {
-            labels.append("Notes")
-        }
 
         return labels.isEmpty ? "Optional" : labels.joined(separator: " • ")
     }
@@ -246,18 +243,13 @@ struct TemplateDraftBlockEditorView: View {
 
                     Toggle("Auto warmups", isOn: $block.allowsAutoWarmups)
                         .tint(AppToneStyle.plans.accent)
-
-                    TextField("Block note", text: $block.blockNote, axis: .vertical)
-                        .foregroundStyle(AppColors.textPrimary)
-                        .lineLimit(2...3)
-                        .appInputField()
                 }
                 .padding(.top, 10)
             } label: {
                 AppSectionHeader(
                     title: "Advanced Settings",
                     systemImage: "slider.horizontal.3",
-                    subtitle: "Superset, set type, notes, and progression overrides.",
+                    subtitle: "Superset, set type, and progression overrides.",
                     trailing: advancedSummary,
                     tone: .progress
                 )
@@ -277,7 +269,6 @@ struct TemplateDraftBlockEditorView: View {
             || block.supersetGroup.nonEmptyTrimmed != nil
             || block.setKind != .working
             || !block.allowsAutoWarmups
-            || block.blockNote.nonEmptyTrimmed != nil
     }
 }
 

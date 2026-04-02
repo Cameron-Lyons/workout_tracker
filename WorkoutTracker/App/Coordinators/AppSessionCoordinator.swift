@@ -163,16 +163,6 @@ final class AppSessionCoordinator {
         addExerciseToActiveSession(exerciseID: exercise.id)
     }
 
-    func updateActiveBlockNotes(blockID: UUID, note: String) {
-        sessionStore.pushMutation(
-            blockID: blockID,
-            undoStrategy: .block(blockID),
-            persistence: .deferred
-        ) { draft, context in
-            SessionEngine.updateNotes(in: blockID, note: note, draft: &draft, context: context)
-        }
-    }
-
     func clearRestTimer() {
         sessionStore.clearRestTimer()
     }

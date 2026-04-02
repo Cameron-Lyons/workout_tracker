@@ -231,10 +231,6 @@ final class AppStore {
         sessionCoordinator.addCustomExerciseToActiveSession(name: name)
     }
 
-    func updateActiveBlockNotes(blockID: UUID, note: String) {
-        sessionCoordinator.updateActiveBlockNotes(blockID: blockID, note: note)
-    }
-
     func clearRestTimer() {
         sessionCoordinator.clearRestTimer()
     }
