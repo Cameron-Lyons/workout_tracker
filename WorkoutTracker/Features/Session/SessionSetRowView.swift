@@ -12,6 +12,10 @@ struct SessionSetRowView: View, Equatable {
     let weightUnit: WeightUnit
     let actions: ActiveSessionActions
     let showsDetailedChrome: Bool
+    /// When false, column titles are shown once on the parent block (e.g. `SessionBlockCardView`).
+    let showsMetricColumnTitles: Bool
+    /// When `nil`, uses `row.target.note`. When non-nil, uses this string after trimming; an empty string suppresses the row note (e.g. shared text is hoisted to the block).
+    let noteLine: String?
     @State private var weightInputText: String
     @State private var repsInputText: String
     @State private var weightCommitTask: Task<Void, Never>?
@@ -23,13 +27,17 @@ struct SessionSetRowView: View, Equatable {
         row: SessionSetRow,
         weightUnit: WeightUnit,
         actions: ActiveSessionActions,
-        showsDetailedChrome: Bool
+        showsDetailedChrome: Bool,
+        showsMetricColumnTitles: Bool = true,
+        noteLine: String? = nil
     ) {
         self.blockID = blockID
         self.row = row
         self.weightUnit = weightUnit
         self.actions = actions
         self.showsDetailedChrome = showsDetailedChrome
+        self.showsMetricColumnTitles = showsMetricColumnTitles
+        self.noteLine = noteLine
         _weightInputText = State(initialValue: Self.weightInputText(for: row, unit: weightUnit))
         _repsInputText = State(initialValue: Self.repsInputText(for: row))
     }
@@ -39,6 +47,8 @@ struct SessionSetRowView: View, Equatable {
             && lhs.row == rhs.row
             && lhs.weightUnit == rhs.weightUnit
             && lhs.showsDetailedChrome == rhs.showsDetailedChrome
+            && lhs.showsMetricColumnTitles == rhs.showsMetricColumnTitles
+            && lhs.noteLine == rhs.noteLine
     }
 
     private var tone: AppToneStyle {
@@ -75,7 +85,7 @@ struct SessionSetRowView: View, Equatable {
 
             HStack(alignment: .top, spacing: 18) {
                 statControl(
-                    title: "Load",
+                    title: showsMetricColumnTitles ? "Load" : nil,
                     caption: loadCaption,
                     valueContent: {
                         metricInputField(
@@ -90,7 +100,7 @@ struct SessionSetRowView: View, Equatable {
                 )
 
                 statControl(
-                    title: "Reps",
+                    title: showsMetricColumnTitles ? "Reps" : nil,
                     caption: "Target \(repsLabel)",
                     valueContent: {
                         metricInputField(
@@ -104,7 +114,7 @@ struct SessionSetRowView: View, Equatable {
                 )
             }
 
-            if showsDetailedChrome, let note = row.target.note, !note.isEmpty {
+            if showsDetailedChrome, let note = displayedSetNote {
                 Text(note)
                     .font(.caption)
                     .foregroundStyle(AppToneStyle.progress.accent)
@@ -152,6 +162,17 @@ struct SessionSetRowView: View, Equatable {
         row.target.setKind.displayName
     }
 
+    private var displayedSetNote: String? {
+        if let noteLine {
+            let trimmed = noteLine.trimmingCharacters(in: .whitespacesAndNewlines)
+            return trimmed.isEmpty ? nil : trimmed
+        }
+        guard let raw = row.target.note?.trimmingCharacters(in: .whitespacesAndNewlines), !raw.isEmpty else {
+            return nil
+        }
+        return raw
+    }
+
     private var canonicalWeightText: String {
         Self.weightInputText(for: row, unit: weightUnit)
     }
@@ -173,15 +194,17 @@ struct SessionSetRowView: View, Equatable {
     }
 
     private func statControl<ValueContent: View>(
-        title: String,
+        title: String?,
         caption: String?,
         @ViewBuilder valueContent: () -> ValueContent
     ) -> some View {
         VStack(alignment: .leading, spacing: 8) {
-            Text(title.uppercased())
-                .font(.caption2.weight(.semibold))
-                .tracking(0.5)
-                .foregroundStyle(AppColors.textSecondary)
+            if let title, !title.isEmpty {
+                Text(title.uppercased())
+                    .font(.caption2.weight(.semibold))
+                    .tracking(0.5)
+                    .foregroundStyle(AppColors.textSecondary)
+            }
 
             valueContent()
 
@@ -206,21 +229,29 @@ struct SessionSetRowView: View, Equatable {
     ) -> some View {
         let isFocused = focusedField == field
 
+        let textField = TextField(placeholder, text: text)
+            .keyboardType(keyboardType)
+            .textFieldStyle(.plain)
+            .textInputAutocapitalization(.never)
+            .autocorrectionDisabled()
+            .submitLabel(.done)
+            .onSubmit {
+                submit(field)
+            }
+            .focused($focusedField, equals: field)
+            .font(.system(size: 24, weight: .black))
+            .monospacedDigit()
+            .foregroundStyle(AppColors.textPrimary)
+            .accessibilityIdentifier(accessibilityIdentifier)
+
         return HStack(alignment: .firstTextBaseline, spacing: 4) {
-            TextField(placeholder, text: text)
-                .keyboardType(keyboardType)
-                .textFieldStyle(.plain)
-                .textInputAutocapitalization(.never)
-                .autocorrectionDisabled()
-                .submitLabel(.done)
-                .onSubmit {
-                    submit(field)
+            Group {
+                if showsMetricColumnTitles {
+                    textField
+                } else {
+                    textField.accessibilityLabel(field == .weight ? "Load" : "Reps")
                 }
-                .focused($focusedField, equals: field)
-                .font(.system(size: 24, weight: .black))
-                .monospacedDigit()
-                .foregroundStyle(AppColors.textPrimary)
-                .accessibilityIdentifier(accessibilityIdentifier)
+            }
 
             if let suffix {
                 Text(suffix)
