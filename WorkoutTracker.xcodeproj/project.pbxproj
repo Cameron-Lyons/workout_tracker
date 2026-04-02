@@ -62,7 +62,6 @@
 		9786C143A7A35A0A2D836FA3 /* PlansHeroCardView.swift in Sources */ = {isa = PBXBuildFile; fileRef = C244A267FCCF210FC2C9021C /* PlansHeroCardView.swift */; };
 		9AF142BAB4CC8EFB50DF1898 /* AppFlowBenchmarks.swift in Sources */ = {isa = PBXBuildFile; fileRef = 213E1EC74A54C134324BEDCB /* AppFlowBenchmarks.swift */; };
 		9BB10AF0949889C5641D0EA8 /* ProgressCalendarSectionView.swift in Sources */ = {isa = PBXBuildFile; fileRef = FCB671BE27A4BB37B9F66760 /* ProgressCalendarSectionView.swift */; };
-		9D725B984E32F08E8E847FCE /* ActiveSessionNotesCardView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 6DBB8FBDCE1FDFBD357D6AB2 /* ActiveSessionNotesCardView.swift */; };
 		A5D6F1069F974D6166FA4E21 /* PlansView.swift in Sources */ = {isa = PBXBuildFile; fileRef = A6F551E96F1AB14C39A92F59 /* PlansView.swift */; };
 		A81D3F07D2C4CCBA717159A2 /* AnalyticsSelection.swift in Sources */ = {isa = PBXBuildFile; fileRef = 6560C72509AA21B84F3F6937 /* AnalyticsSelection.swift */; };
 		A8828D7A8B1D188313BE25B7 /* WorkoutRestLiveActivityAttributes.swift in Sources */ = {isa = PBXBuildFile; fileRef = 9112C55EE4EA76038C3BD9C1 /* WorkoutRestLiveActivityAttributes.swift */; };
@@ -204,7 +203,6 @@
 		67A98A641E20F4D61C3835DD /* WorkoutDefaults.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = WorkoutDefaults.swift; sourceTree = "<group>"; };
 		69558F6536C2F7246FF24D4C /* NumericInputField.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = NumericInputField.swift; sourceTree = "<group>"; };
 		6D2B674E812A8A78533CECF5 /* PlanEditorSheet.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = PlanEditorSheet.swift; sourceTree = "<group>"; };
-		6DBB8FBDCE1FDFBD357D6AB2 /* ActiveSessionNotesCardView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ActiveSessionNotesCardView.swift; sourceTree = "<group>"; };
 		734280B3C54183AC9B6D5CCB /* FlowAccentCard.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = FlowAccentCard.swift; sourceTree = "<group>"; };
 		75D361851536F1B9E2530F73 /* PresetPack.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = PresetPack.swift; sourceTree = "<group>"; };
 		79F4B6C8286C48332B92FE9B /* BenchmarkFixtures.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = BenchmarkFixtures.swift; sourceTree = "<group>"; };
@@ -372,7 +370,6 @@
 				620348E2386C747CA921ABD7 /* ActiveSessionContentView.swift */,
 				985844D8C0955E8BB5B691B0 /* ActiveSessionFooterView.swift */,
 				02CF02643EED7A11C3728037 /* ActiveSessionHeaderView.swift */,
-				6DBB8FBDCE1FDFBD357D6AB2 /* ActiveSessionNotesCardView.swift */,
 				83FEE8710421DBF9D383304B /* ActiveSessionSupportViews.swift */,
 				C87181B3A04494C45C051A16 /* ActiveSessionView.swift */,
 				4B71A65CCEC38D0EA65A693B /* RestTimerLiveActivityManager.swift */,
@@ -884,7 +881,6 @@
 				512AC9BB6235B75F0A287412 /* ActiveSessionContentView.swift in Sources */,
 				C873F1BF28BC4543E6C2E3B9 /* ActiveSessionFooterView.swift in Sources */,
 				D2285D9148B58B816073C8AF /* ActiveSessionHeaderView.swift in Sources */,
-				9D725B984E32F08E8E847FCE /* ActiveSessionNotesCardView.swift in Sources */,
 				8A3DDA1BBDF250378A8B71D9 /* ActiveSessionSupportViews.swift in Sources */,
 				4CAA40F74A67F20665C4B088 /* ActiveSessionView.swift in Sources */,
 				13F43772D61C439794F27472 /* AnalyticsRepository.swift in Sources */,

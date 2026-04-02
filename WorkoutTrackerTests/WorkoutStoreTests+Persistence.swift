@@ -270,12 +270,12 @@ extension WorkoutStoreTests {
         )
         repository.saveActiveDraft(draft)
 
-        draft.notes = "Felt strong"
+        draft.templateNameSnapshot = "Lower"
         repository.saveActiveDraft(draft)
 
         let records = try context.fetch(FetchDescriptor<StoredActiveSession>())
         XCTAssertEqual(records.count, 1)
-        XCTAssertEqual(repository.loadActiveDraft()?.notes, "Felt strong")
+        XCTAssertEqual(repository.loadActiveDraft()?.templateNameSnapshot, "Lower")
     }
 
     @MainActor

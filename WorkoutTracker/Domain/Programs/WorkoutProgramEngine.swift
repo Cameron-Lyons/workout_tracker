@@ -424,21 +424,6 @@ enum SessionEngine {
     }
 
     @discardableResult
-    static func updateSessionNotes(
-        _ notes: String,
-        draft: inout SessionDraft,
-        now: Date = .now
-    ) -> SessionMutationResult {
-        guard draft.notes != notes else {
-            return .unchanged
-        }
-
-        draft.notes = notes
-        draft.touch(now: now)
-        return .changed
-    }
-
-    @discardableResult
     static func addSet(
         to blockID: UUID,
         draft: inout SessionDraft,

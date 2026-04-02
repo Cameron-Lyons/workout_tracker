@@ -2,13 +2,11 @@ import SwiftUI
 
 struct ActiveSessionContentView: View {
     private enum Layout {
-        static let notesToBlocksSpacing: CGFloat = 24
         static let defaultBlockSpacing: CGFloat = 24
         static let repeatedExerciseBlockSpacing: CGFloat = 10
     }
 
     let headerState: ActiveSessionHeaderState
-    let notes: String
     let blocks: [SessionBlock]
     let displaySettings: ActiveSessionDisplaySettings
     let actions: ActiveSessionActions
@@ -21,14 +19,6 @@ struct ActiveSessionContentView: View {
 
             ScrollView {
                 LazyVStack(spacing: 0) {
-                    ActiveSessionNotesCardView(notes: notes, onUpdateNotes: actions.updateSessionNotes)
-                        .equatable()
-
-                    if !blocks.isEmpty {
-                        Color.clear
-                            .frame(height: Layout.notesToBlocksSpacing)
-                    }
-
                     ForEach(Array(blocks.enumerated()), id: \.element.id) { index, block in
                         SessionBlockCardView(
                             block: block,

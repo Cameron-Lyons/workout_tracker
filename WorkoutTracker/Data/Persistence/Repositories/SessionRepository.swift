@@ -42,7 +42,6 @@ final class SessionRepository: RepositoryBase {
                 templateNameSnapshot: draft.templateNameSnapshot,
                 startedAt: draft.startedAt,
                 lastUpdatedAt: draft.lastUpdatedAt,
-                notes: draft.notes,
                 restTimerEndsAt: draft.restTimerEndsAt,
                 payloadData: payloadData
             )
@@ -137,10 +136,6 @@ final class SessionRepository: RepositoryBase {
 
         if record.lastUpdatedAt != draft.lastUpdatedAt {
             record.lastUpdatedAt = draft.lastUpdatedAt
-        }
-
-        if record.notes != draft.notes {
-            record.notes = draft.notes
         }
 
         if record.restTimerEndsAt != draft.restTimerEndsAt {

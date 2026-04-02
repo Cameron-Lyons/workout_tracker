@@ -115,7 +115,6 @@ struct SessionDraft: Identifiable, Codable, Equatable, Sendable {
     var templateNameSnapshot: String
     var startedAt: Date
     var lastUpdatedAt: Date
-    var notes: String
     var blocks: [SessionBlock]
     var restTimerEndsAt: Date?
 
@@ -126,7 +125,6 @@ struct SessionDraft: Identifiable, Codable, Equatable, Sendable {
         templateNameSnapshot: String,
         startedAt: Date = .now,
         lastUpdatedAt: Date = .now,
-        notes: String = "",
         blocks: [SessionBlock],
         restTimerEndsAt: Date? = nil
     ) {
@@ -136,7 +134,6 @@ struct SessionDraft: Identifiable, Codable, Equatable, Sendable {
         self.templateNameSnapshot = templateNameSnapshot
         self.startedAt = startedAt
         self.lastUpdatedAt = lastUpdatedAt
-        self.notes = notes
         self.blocks = blocks
         self.restTimerEndsAt = restTimerEndsAt
     }

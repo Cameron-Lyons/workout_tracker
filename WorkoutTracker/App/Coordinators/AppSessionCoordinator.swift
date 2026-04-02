@@ -173,12 +173,6 @@ final class AppSessionCoordinator {
         }
     }
 
-    func updateActiveSessionNotes(_ notes: String) {
-        sessionStore.pushMutation(undoStrategy: .sessionMetadata, persistence: .deferred) { draft, _ in
-            SessionEngine.updateSessionNotes(notes, draft: &draft)
-        }
-    }
-
     func clearRestTimer() {
         sessionStore.clearRestTimer()
     }

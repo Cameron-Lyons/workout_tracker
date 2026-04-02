@@ -41,18 +41,15 @@ struct SessionMutationResult {
 }
 
 private struct SessionDraftMetadata {
-    var notes: String
     var restTimerEndsAt: Date?
     var lastUpdatedAt: Date
 
     init(draft: SessionDraft) {
-        notes = draft.notes
         restTimerEndsAt = draft.restTimerEndsAt
         lastUpdatedAt = draft.lastUpdatedAt
     }
 
     func applying(to draft: inout SessionDraft) {
-        draft.notes = notes
         draft.restTimerEndsAt = restTimerEndsAt
         draft.lastUpdatedAt = lastUpdatedAt
     }
@@ -60,7 +57,6 @@ private struct SessionDraftMetadata {
 
 enum SessionUndoStrategy {
     case fullDraft
-    case sessionMetadata
     case block(UUID)
 }
 
@@ -88,7 +84,6 @@ struct ActiveSessionProgress: Equatable, Sendable {
 
 private enum SessionUndoEntry {
     case fullDraft(SessionDraft)
-    case sessionMetadata(SessionDraftMetadata)
     case block(
         blockID: UUID,
         index: Int,
@@ -303,13 +298,6 @@ final class SessionStore {
         switch entry {
         case .fullDraft(let previousDraft):
             replaceActiveDraft(previousDraft)
-        case .sessionMetadata(let metadata):
-            guard var draft = activeDraft else {
-                return
-            }
-
-            metadata.applying(to: &draft)
-            replaceActiveDraft(draft)
         case .block(let blockID, let index, let block, let metadata):
             guard var draft = activeDraft else {
                 return
@@ -417,8 +405,6 @@ final class SessionStore {
         switch strategy {
         case .fullDraft:
             entry = .fullDraft(snapshot)
-        case .sessionMetadata:
-            entry = .sessionMetadata(SessionDraftMetadata(draft: snapshot))
         case .block(let blockID):
             guard let blockIndex = resolvedBlockIndex(in: snapshot, blockID: blockID, suggested: context.blockIndex) else {
                 entry = .fullDraft(snapshot)

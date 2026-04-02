@@ -12,7 +12,6 @@ struct ActiveSessionDisplaySettings: Equatable {
 }
 
 struct ActiveSessionActions {
-    var updateSessionNotes: (String) -> Void
     var updateBlockNotes: (UUID, String) -> Void
     var addSet: (UUID) -> Void
     var copyLastSet: (UUID) -> Void
@@ -103,7 +102,6 @@ struct ActiveSessionView: View {
 
     private var actions: ActiveSessionActions {
         ActiveSessionActions(
-            updateSessionNotes: { appStore.updateActiveSessionNotes($0) },
             updateBlockNotes: { blockID, note in
                 appStore.updateActiveBlockNotes(blockID: blockID, note: note)
             },
@@ -135,7 +133,6 @@ struct ActiveSessionView: View {
                 if let draft, let headerState {
                     ActiveSessionContentView(
                         headerState: headerState,
-                        notes: draft.notes,
                         blocks: draft.blocks,
                         displaySettings: displaySettings,
                         actions: actions,

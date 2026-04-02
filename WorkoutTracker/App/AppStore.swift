@@ -235,10 +235,6 @@ final class AppStore {
         sessionCoordinator.updateActiveBlockNotes(blockID: blockID, note: note)
     }
 
-    func updateActiveSessionNotes(_ notes: String) {
-        sessionCoordinator.updateActiveSessionNotes(notes)
-    }
-
     func clearRestTimer() {
         sessionCoordinator.clearRestTimer()
     }

@@ -3,7 +3,7 @@ import Foundation
 import SwiftData
 import os
 
-enum WorkoutSchema: VersionedSchema {
+enum WorkoutSchemaV5: VersionedSchema {
     static let versionIdentifier = Schema.Version(5, 0, 0)
 
     static var models: [any PersistentModel.Type] {
@@ -144,11 +144,164 @@ enum WorkoutSchema: VersionedSchema {
     }
 }
 
-typealias StoredCatalogItem = WorkoutSchema.StoredCatalogItem
-typealias StoredExerciseProfile = WorkoutSchema.StoredExerciseProfile
-typealias StoredPlan = WorkoutSchema.StoredPlan
-typealias StoredActiveSession = WorkoutSchema.StoredActiveSession
-typealias StoredCompletedSession = WorkoutSchema.StoredCompletedSession
+enum WorkoutSchemaV6: VersionedSchema {
+    static let versionIdentifier = Schema.Version(6, 0, 0)
+
+    static var models: [any PersistentModel.Type] {
+        [
+            StoredCatalogItem.self,
+            StoredExerciseProfile.self,
+            StoredPlan.self,
+            StoredActiveSession.self,
+            StoredCompletedSession.self,
+        ]
+    }
+
+    @Model
+    final class StoredCatalogItem {
+        @Attribute(.unique) var id: UUID
+        var name: String
+        var aliasesData: Data
+        var categoryRaw: String
+
+        init(
+            id: UUID,
+            name: String,
+            aliasesData: Data,
+            categoryRaw: String
+        ) {
+            self.id = id
+            self.name = name
+            self.aliasesData = aliasesData
+            self.categoryRaw = categoryRaw
+        }
+    }
+
+    @Model
+    final class StoredExerciseProfile {
+        @Attribute(.unique) var id: UUID
+        var exerciseID: UUID
+        var trainingMax: Double?
+        var preferredIncrement: Double?
+
+        init(
+            id: UUID,
+            exerciseID: UUID,
+            trainingMax: Double?,
+            preferredIncrement: Double?
+        ) {
+            self.id = id
+            self.exerciseID = exerciseID
+            self.trainingMax = trainingMax
+            self.preferredIncrement = preferredIncrement
+        }
+    }
+
+    @Model
+    final class StoredPlan {
+        @Attribute(.unique) var id: UUID
+        var name: String
+        var createdAt: Date
+        var pinnedTemplateID: UUID?
+        var payloadData: Data
+        var summaryData: Data
+
+        init(
+            id: UUID,
+            name: String,
+            createdAt: Date,
+            pinnedTemplateID: UUID?,
+            payloadData: Data,
+            summaryData: Data
+        ) {
+            self.id = id
+            self.name = name
+            self.createdAt = createdAt
+            self.pinnedTemplateID = pinnedTemplateID
+            self.payloadData = payloadData
+            self.summaryData = summaryData
+        }
+    }
+
+    @Model
+    final class StoredActiveSession {
+        @Attribute(.unique) var id: UUID
+        var planID: UUID?
+        var templateID: UUID
+        var templateNameSnapshot: String
+        var startedAt: Date
+        var lastUpdatedAt: Date
+        var restTimerEndsAt: Date?
+        var payloadData: Data
+
+        init(
+            id: UUID,
+            planID: UUID?,
+            templateID: UUID,
+            templateNameSnapshot: String,
+            startedAt: Date,
+            lastUpdatedAt: Date,
+            restTimerEndsAt: Date?,
+            payloadData: Data
+        ) {
+            self.id = id
+            self.planID = planID
+            self.templateID = templateID
+            self.templateNameSnapshot = templateNameSnapshot
+            self.startedAt = startedAt
+            self.lastUpdatedAt = lastUpdatedAt
+            self.restTimerEndsAt = restTimerEndsAt
+            self.payloadData = payloadData
+        }
+    }
+
+    @Model
+    final class StoredCompletedSession {
+        @Attribute(.unique) var id: UUID
+        var planID: UUID?
+        var templateID: UUID
+        var templateNameSnapshot: String
+        var completedAt: Date
+        var payloadData: Data
+
+        init(
+            id: UUID,
+            planID: UUID?,
+            templateID: UUID,
+            templateNameSnapshot: String,
+            completedAt: Date,
+            payloadData: Data
+        ) {
+            self.id = id
+            self.planID = planID
+            self.templateID = templateID
+            self.templateNameSnapshot = templateNameSnapshot
+            self.completedAt = completedAt
+            self.payloadData = payloadData
+        }
+    }
+}
+
+enum WorkoutModelsMigrationPlan: SchemaMigrationPlan {
+    static var schemas: [any VersionedSchema.Type] {
+        [WorkoutSchemaV5.self, WorkoutSchemaV6.self]
+    }
+
+    static var stages: [MigrationStage] {
+        [migrateV5toV6]
+    }
+
+    static let migrateV5toV6 = MigrationStage.lightweight(
+        fromVersion: WorkoutSchemaV5.self,
+        toVersion: WorkoutSchemaV6.self
+    )
+}
+
+typealias StoredCatalogItem = WorkoutSchemaV6.StoredCatalogItem
+typealias StoredExerciseProfile = WorkoutSchemaV6.StoredExerciseProfile
+typealias StoredPlan = WorkoutSchemaV6.StoredPlan
+typealias StoredActiveSession = WorkoutSchemaV6.StoredActiveSession
+typealias StoredCompletedSession = WorkoutSchemaV6.StoredCompletedSession
 
 struct PersistenceStartupIssue: Identifiable, Equatable {
     let id = UUID()
@@ -292,7 +445,7 @@ enum PersistenceRecoveryClassifier {
 }
 
 enum WorkoutModelContainerFactory {
-    private static let schema = Schema(versionedSchema: WorkoutSchema.self)
+    private static let schema = Schema(versionedSchema: WorkoutSchemaV6.self)
     private static let storeDirectoryName = "WorkoutTracker"
     private static let storeFilename = "WorkoutTracker.store"
     nonisolated(unsafe) private static var pendingStartupIssue: PersistenceStartupIssue?
@@ -382,6 +535,7 @@ enum WorkoutModelContainerFactory {
         let configuration = ModelConfiguration(schema: schema, url: url)
         return try ModelContainer(
             for: schema,
+            migrationPlan: WorkoutModelsMigrationPlan.self,
             configurations: configuration
         )
     }
@@ -390,6 +544,7 @@ enum WorkoutModelContainerFactory {
         let configuration = ModelConfiguration(isStoredInMemoryOnly: true)
         return try ModelContainer(
             for: schema,
+            migrationPlan: WorkoutModelsMigrationPlan.self,
             configurations: configuration
         )
     }

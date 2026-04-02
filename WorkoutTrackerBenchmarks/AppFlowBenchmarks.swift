@@ -581,18 +581,6 @@ final class AppFlowBenchmarks: BenchmarkTestCase {
         }
         mutationCount += 1
 
-        fixture.sessionStore.pushMutation(
-            undoStrategy: .sessionMetadata,
-            persistence: .deferred
-        ) { draft, _ in
-            SessionEngine.updateSessionNotes(
-                "Benchmark session note",
-                draft: &draft,
-                now: WorkoutBenchmarkFixtures.referenceNow
-            )
-        }
-        mutationCount += 1
-
         return mutationCount
     }
 

@@ -370,19 +370,16 @@ extension WorkoutStoreTests {
         let secondTemplateID = try XCTUnwrap(secondPlan.templates.first?.id)
 
         store.startSession(planID: firstPlan.id, templateID: firstTemplateID)
-        store.updateActiveSessionNotes("Keep me")
         store.startSession(planID: secondPlan.id, templateID: secondTemplateID)
 
         XCTAssertEqual(store.sessionStore.activeDraft?.templateID, firstTemplateID)
         XCTAssertEqual(store.sessionStore.activeDraft?.templateNameSnapshot, "Bench Day")
-        XCTAssertEqual(store.sessionStore.activeDraft?.notes, "Keep me")
         XCTAssertNil(store.plansStore.plan(for: secondPlan.id)?.templates.first?.lastStartedAt)
 
         store.replaceActiveSessionAndStart(planID: secondPlan.id, templateID: secondTemplateID)
 
         XCTAssertEqual(store.sessionStore.activeDraft?.templateID, secondTemplateID)
         XCTAssertEqual(store.sessionStore.activeDraft?.templateNameSnapshot, "Press Day")
-        XCTAssertEqual(store.sessionStore.activeDraft?.notes, "")
         XCTAssertNotNil(store.plansStore.plan(for: secondPlan.id)?.templates.first?.lastStartedAt)
     }
 }

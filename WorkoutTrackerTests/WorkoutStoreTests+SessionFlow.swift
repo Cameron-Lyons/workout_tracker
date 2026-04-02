@@ -70,15 +70,15 @@ extension WorkoutStoreTests {
         persistenceController.flush()
 
         store.pushMutation(persistence: .deferred) { updatedDraft in
-            SessionEngine.updateSessionNotes("Debounced note", draft: &updatedDraft)
+            updatedDraft.templateNameSnapshot = "Updated day"
         }
 
-        XCTAssertEqual(repository.loadActiveDraft()?.notes, "")
+        XCTAssertEqual(repository.loadActiveDraft()?.templateNameSnapshot, "Bench Day")
 
         try await Task.sleep(nanoseconds: 700_000_000)
         persistenceController.flush()
 
-        XCTAssertEqual(repository.loadActiveDraft()?.notes, "Debounced note")
+        XCTAssertEqual(repository.loadActiveDraft()?.templateNameSnapshot, "Updated day")
     }
 
     @MainActor
@@ -271,9 +271,6 @@ extension WorkoutStoreTests {
         ) { updatedDraft, context in
             SessionEngine.addSet(to: block.id, draft: &updatedDraft, context: context)
         }
-        store.pushMutation(undoStrategy: .sessionMetadata, persistence: .deferred) { updatedDraft, _ in
-            SessionEngine.updateSessionNotes("Focus cues", draft: &updatedDraft)
-        }
         store.pushMutation(persistence: .deferred) { updatedDraft, _ in
             SessionEngine.addExerciseBlock(
                 exercise: accessory,
@@ -285,22 +282,14 @@ extension WorkoutStoreTests {
         let mutatedDraft = try XCTUnwrap(store.activeDraft)
         XCTAssertTrue(store.canUndo)
         XCTAssertEqual(mutatedDraft.blocks.count, 2)
-        XCTAssertEqual(mutatedDraft.notes, "Focus cues")
         XCTAssertEqual(mutatedDraft.blocks.first?.sets.count, 2)
         XCTAssertEqual(mutatedDraft.blocks.first?.sets.first?.log.weight, 190)
 
         store.undoLastMutation()
         let afterFullDraftUndo = try XCTUnwrap(store.activeDraft)
         XCTAssertEqual(afterFullDraftUndo.blocks.count, 1)
-        XCTAssertEqual(afterFullDraftUndo.notes, "Focus cues")
         XCTAssertEqual(afterFullDraftUndo.blocks.first?.sets.count, 2)
         XCTAssertEqual(afterFullDraftUndo.blocks.first?.sets.first?.log.weight, 190)
-
-        store.undoLastMutation()
-        let afterSessionMetadataUndo = try XCTUnwrap(store.activeDraft)
-        XCTAssertEqual(afterSessionMetadataUndo.notes, "")
-        XCTAssertEqual(afterSessionMetadataUndo.blocks.first?.sets.count, 2)
-        XCTAssertEqual(afterSessionMetadataUndo.blocks.first?.sets.first?.log.weight, 190)
 
         store.undoLastMutation()
         let afterBlockStructureUndo = try XCTUnwrap(store.activeDraft)
@@ -331,7 +320,6 @@ extension WorkoutStoreTests {
 
         let persistedDraft = try XCTUnwrap(rehydratedStore.activeDraft)
         XCTAssertEqual(persistedDraft.blocks.count, 1)
-        XCTAssertEqual(persistedDraft.notes, "")
         XCTAssertEqual(persistedDraft.blocks.first?.sets.count, 1)
         XCTAssertEqual(persistedDraft.blocks.first?.sets.first?.log.weight, 185)
     }
