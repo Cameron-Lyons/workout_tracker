@@ -13,48 +13,45 @@ private extension Color {
     }
 }
 
-enum KanagawaPalette {
-    static let sumiInk0 = Color(hex: 0x16161D)
-    static let sumiInk1 = Color(hex: 0x181820)
-    static let sumiInk2 = Color(hex: 0x1A1A22)
-    static let sumiInk3 = Color(hex: 0x1F1F28)
-    static let sumiInk4 = Color(hex: 0x2A2A37)
-    static let sumiInk5 = Color(hex: 0x363646)
-    static let sumiInk6 = Color(hex: 0x54546D)
-    static let waveBlue1 = Color(hex: 0x223249)
-    static let oldWhite = Color(hex: 0xC8C093)
-    static let fujiWhite = Color(hex: 0xDCD7BA)
-    static let fujiGray = Color(hex: 0x727169)
-    static let crystalBlue = Color(hex: 0x7E9CD8)
-    static let lightBlue = Color(hex: 0xA3D4D5)
-    static let waveAqua2 = Color(hex: 0x7AA89F)
-    static let springGreen = Color(hex: 0x98BB6C)
-    static let carpYellow = Color(hex: 0xE6C384)
-    static let surimiOrange = Color(hex: 0xFFA066)
-    static let waveRed = Color(hex: 0xE46876)
+private enum TokyoNightPalette {
+    static let bgDark = Color(hex: 0x16161E)
+    static let bg = Color(hex: 0x1A1B26)
+    static let bgHighlight = Color(hex: 0x292E42)
+    static let terminalBlack = Color(hex: 0x414868)
+    static let comment = Color(hex: 0x565F89)
+    static let fgDark = Color(hex: 0xA9B1D6)
+    static let fg = Color(hex: 0xC0CAF5)
+    static let blue0 = Color(hex: 0x3D59A1)
+    static let blue = Color(hex: 0x7AA2F7)
+    static let cyan = Color(hex: 0x7DCFFF)
+    static let green1 = Color(hex: 0x73DACA)
+    static let green = Color(hex: 0x9ECE6A)
+    static let yellow = Color(hex: 0xE0AF68)
+    static let orange = Color(hex: 0xFF9E64)
+    static let red = Color(hex: 0xF7768E)
 }
 
 enum AppColors {
-    static let canvasTop = KanagawaPalette.sumiInk3
-    static let canvasMid = KanagawaPalette.sumiInk1
-    static let canvasBottom = KanagawaPalette.sumiInk0
-    static let chrome = KanagawaPalette.sumiInk2
-    static let surfaceStrong = KanagawaPalette.sumiInk5
-    static let surface = KanagawaPalette.sumiInk4
-    static let surfaceSoft = KanagawaPalette.sumiInk2
-    static let stroke = KanagawaPalette.sumiInk6
-    static let strokeStrong = KanagawaPalette.fujiGray
-    static let textPrimary = KanagawaPalette.fujiWhite
-    static let textSecondary = KanagawaPalette.oldWhite
-    static let accent = KanagawaPalette.crystalBlue
-    static let accentAlt = KanagawaPalette.lightBlue
-    static let accentPlans = KanagawaPalette.waveAqua2
-    static let accentProgress = KanagawaPalette.carpYellow
-    static let success = KanagawaPalette.springGreen
-    static let warning = KanagawaPalette.surimiOrange
-    static let danger = KanagawaPalette.waveRed
-    static let input = KanagawaPalette.sumiInk0
-    static let glassTint = KanagawaPalette.waveBlue1
+    static let canvasTop = TokyoNightPalette.bgHighlight
+    static let canvasMid = TokyoNightPalette.bg
+    static let canvasBottom = TokyoNightPalette.bgDark
+    static let chrome = TokyoNightPalette.bg
+    static let surfaceStrong = TokyoNightPalette.terminalBlack
+    static let surface = TokyoNightPalette.bgHighlight
+    static let surfaceSoft = TokyoNightPalette.bg
+    static let stroke = TokyoNightPalette.comment
+    static let strokeStrong = TokyoNightPalette.fgDark
+    static let textPrimary = TokyoNightPalette.fg
+    static let textSecondary = TokyoNightPalette.fgDark
+    static let accent = TokyoNightPalette.blue
+    static let accentAlt = TokyoNightPalette.cyan
+    static let accentPlans = TokyoNightPalette.green1
+    static let accentProgress = TokyoNightPalette.yellow
+    static let success = TokyoNightPalette.green
+    static let warning = TokyoNightPalette.orange
+    static let danger = TokyoNightPalette.red
+    static let input = TokyoNightPalette.bgDark
+    static let glassTint = TokyoNightPalette.blue0
 }
 
 enum AppCardMetrics {

@@ -15,9 +15,9 @@ private extension Color {
 }
 
 private enum RestActivityColors {
-    static let textPrimary = Color(hex: 0xDCD7BA)
-    static let textSecondary = Color(hex: 0xC8C093)
-    static let warning = Color(hex: 0xFFA066)
+    static let textPrimary = Color(hex: 0xC0CAF5)
+    static let textSecondary = Color(hex: 0xA9B1D6)
+    static let warning = Color(hex: 0xFF9E64)
 }
 
 struct WorkoutRestLiveActivityWidget: Widget {
