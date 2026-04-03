@@ -140,7 +140,6 @@ struct SessionExerciseCardView: View, Equatable {
         return parts.joined(separator: " • ")
     }
 
-    /// When every non-empty set note shares the same prefix (text before ` • `, or the whole note), return it once at the exercise level.
     private static func hoistedSharedNotePrefix(for sessionExercise: SessionExercise) -> String? {
         let trimmedNotes = sessionExercise.sets.compactMap { row -> String? in
             guard let raw = row.target.note?.trimmingCharacters(in: .whitespacesAndNewlines), !raw.isEmpty else {
@@ -164,7 +163,6 @@ struct SessionExerciseCardView: View, Equatable {
         return first
     }
 
-    /// `nil` = show `row.target.note` as before. Non-nil empty string = hide row note. Non-nil text = show that line only.
     private static func noteLineParameter(for row: SessionSetRow, hoistedPrefix: String?) -> String? {
         guard let prefix = hoistedPrefix else {
             return nil

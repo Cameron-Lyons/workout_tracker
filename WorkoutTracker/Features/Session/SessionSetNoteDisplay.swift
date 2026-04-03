@@ -1,15 +1,12 @@
 import Foundation
 
-/// Filters auto-generated set notes so the session UI only surfaces coaching cues (e.g. AMRAP), not scaffolding labels.
 enum SessionSetNoteDisplay {
-    /// Shared prefix line under the exercise title when every set agrees; omit week / warmup scaffolding only.
     static func shouldShowHoistedExerciseCaption(_ prefix: String) -> Bool {
         let trimmed = prefix.trimmingCharacters(in: .whitespacesAndNewlines)
         guard !trimmed.isEmpty else { return false }
         return !isStructuralScaffolding(trimmed)
     }
 
-    /// Yellow caption for a single set row (`noteLine` from the parent when notes were split for hoisting).
     static func rowCaption(noteLine: String?, fullNote: String?) -> String? {
         let resolved: String?
         if let noteLine {

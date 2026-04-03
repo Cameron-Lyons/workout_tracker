@@ -264,7 +264,6 @@ final class WorkoutTrackerUITests: XCTestCase {
         let pinMenus = app.buttons.matching(NSPredicate(format: "identifier BEGINSWITH %@", "plans.pinTemplate."))
         XCTAssertGreaterThanOrEqual(pinMenus.count, 2)
 
-        // General Gym seeds `Upper A` pinned first, then `Lower A`, `Upper B`, `Lower B`.
         let pinnedMenu = pinMenus.element(boundBy: 0)
         let unpinnedMenu = pinMenus.element(boundBy: 1)
         let repinnedMenuIdentifier = unpinnedMenu.identifier
