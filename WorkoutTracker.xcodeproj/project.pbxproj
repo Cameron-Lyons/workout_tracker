@@ -32,6 +32,7 @@
 		36EB126A428E146E604ECF9D /* BenchmarkHarness.swift in Sources */ = {isa = PBXBuildFile; fileRef = D4A4A066D5510BA622E8FC1F /* BenchmarkHarness.swift */; };
 		3A7BD9578552E124920A0683 /* SessionExerciseCardView.swift in Sources */ = {isa = PBXBuildFile; fileRef = FE69DCFE1275005B9B36F270 /* SessionExerciseCardView.swift */; };
 		41E49CB4326B20AB53E5F610 /* SessionSetRowView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 457CE5C0B9F5F4621DA2CA4E /* SessionSetRowView.swift */; };
+		6C7D8E9FA1B2C3D4E5F6070B /* SessionSetNoteDisplay.swift in Sources */ = {isa = PBXBuildFile; fileRef = 6C7D8E9FA1B2C3D4E5F6070A /* SessionSetNoteDisplay.swift */; };
 		49D54DCFA492441675AD8E0A /* OnboardingView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 2C82B255B050970A5F54F381 /* OnboardingView.swift */; };
 		4B407D1E87FDE516B32B51F6 /* BenchmarkFixtures.swift in Sources */ = {isa = PBXBuildFile; fileRef = 79F4B6C8286C48332B92FE9B /* BenchmarkFixtures.swift */; };
 		4BD85EE74FF16E7C39E0176D /* PresetPackBuilder.swift in Sources */ = {isa = PBXBuildFile; fileRef = 4DADCE1E6BEE5221EE1C9C78 /* PresetPackBuilder.swift */; };
@@ -179,6 +180,7 @@
 		435A665E1EE8F8F82EA527B3 /* WorkoutTracker.app */ = {isa = PBXFileReference; includeInIndex = 0; lastKnownFileType = wrapper.application; path = WorkoutTracker.app; sourceTree = BUILT_PRODUCTS_DIR; };
 		44EFD2411A395E1F75F04EF4 /* PerformanceSignpost.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = PerformanceSignpost.swift; sourceTree = "<group>"; };
 		457CE5C0B9F5F4621DA2CA4E /* SessionSetRowView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SessionSetRowView.swift; sourceTree = "<group>"; };
+		6C7D8E9FA1B2C3D4E5F6070A /* SessionSetNoteDisplay.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SessionSetNoteDisplay.swift; sourceTree = "<group>"; };
 		45AEC5243B4F982899183AC2 /* WorkoutTrackerUITests.xctest */ = {isa = PBXFileReference; includeInIndex = 0; lastKnownFileType = wrapper.cfbundle; path = WorkoutTrackerUITests.xctest; sourceTree = BUILT_PRODUCTS_DIR; };
 		47306DE023966E23A9B6289A /* PlanCardView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = PlanCardView.swift; sourceTree = "<group>"; };
 		4898B3F6FF4FC3D1FAE9B17B /* ProgressOverviewSectionView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ProgressOverviewSectionView.swift; sourceTree = "<group>"; };
@@ -375,6 +377,7 @@
 				4B71A65CCEC38D0EA65A693B /* RestTimerLiveActivityManager.swift */,
 				FE69DCFE1275005B9B36F270 /* SessionExerciseCardView.swift */,
 				457CE5C0B9F5F4621DA2CA4E /* SessionSetRowView.swift */,
+				6C7D8E9FA1B2C3D4E5F6070A /* SessionSetNoteDisplay.swift */,
 				A98E20B6ABA6793504EF2AE8 /* SessionStartSupport.swift */,
 				37C6D3E95AC8B122C4EE5956 /* SessionStore.swift */,
 				B0FD5BFD855ECADBEA29FC62 /* SessionSummaryViews.swift */,
@@ -929,6 +932,7 @@
 				C822746D5084BA11D902EDD6 /* SessionPersistenceController.swift in Sources */,
 				164093495161E97FE72FF940 /* SessionRepository.swift in Sources */,
 				41E49CB4326B20AB53E5F610 /* SessionSetRowView.swift in Sources */,
+				6C7D8E9FA1B2C3D4E5F6070B /* SessionSetNoteDisplay.swift in Sources */,
 				2ED4478AFB79F087B82FA36B /* SessionStartSupport.swift in Sources */,
 				D3CCA51510E57EB23EC2CADF /* SessionStore.swift in Sources */,
 				2B433F0FA045FD0C2BE06A54 /* SessionSummaryViews.swift in Sources */,

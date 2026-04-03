@@ -45,7 +45,10 @@ struct SessionExerciseCardView: View, Equatable {
                     .foregroundStyle(completedSetCount == sessionExercise.sets.count ? AppToneStyle.success.accent : AppColors.textSecondary)
             }
 
-            if showsDetailedChrome, let hoisted = hoistedSharedWaveNote {
+            if showsDetailedChrome,
+                let hoisted = hoistedSharedWaveNote,
+                SessionSetNoteDisplay.shouldShowHoistedExerciseCaption(hoisted)
+            {
                 Text(hoisted)
                     .font(.caption)
                     .foregroundStyle(AppToneStyle.progress.accent)

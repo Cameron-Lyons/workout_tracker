@@ -173,14 +173,7 @@ struct SessionSetRowView: View, Equatable {
     }
 
     private var displayedSetNote: String? {
-        if let noteLine {
-            let trimmed = noteLine.trimmingCharacters(in: .whitespacesAndNewlines)
-            return trimmed.isEmpty ? nil : trimmed
-        }
-        guard let raw = row.target.note?.trimmingCharacters(in: .whitespacesAndNewlines), !raw.isEmpty else {
-            return nil
-        }
-        return raw
+        SessionSetNoteDisplay.rowCaption(noteLine: noteLine, fullNote: row.target.note)
     }
 
     private var canonicalWeightText: String {

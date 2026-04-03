@@ -143,7 +143,8 @@ struct ActiveSessionView: View {
                     )
                 }
             }
-            .navigationTitle(draft?.templateNameSnapshot ?? "Session")
+            .navigationTitle(draft != nil ? "Active Session" : "Session")
+            .toolbarTitleDisplayMode(.inline)
             .toolbar {
                 ToolbarItem(placement: .topBarLeading) {
                     Button("Close") {
