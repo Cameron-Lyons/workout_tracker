@@ -131,6 +131,13 @@ struct PlansView: View {
         sessionStore.activeDraft
     }
 
+    private var addPresetPackConfirmationTitle: String {
+        guard let pack = selectedPresetPack else {
+            return ""
+        }
+        return "Add \(pack.displayName)?\n\n\(pack.description)"
+    }
+
     var body: some View {
         NavigationStack {
             ZStack {
@@ -218,7 +225,7 @@ struct PlansView: View {
                 }
             }
             .confirmationDialog(
-                "Add program",
+                addPresetPackConfirmationTitle,
                 isPresented: Binding(
                     get: { selectedPresetPack != nil },
                     set: { isPresented in
@@ -239,8 +246,6 @@ struct PlansView: View {
                 Button("Cancel", role: .cancel) {
                     selectedPresetPack = nil
                 }
-            } message: {
-                Text(selectedPresetPack?.description ?? "")
             }
             .sessionStartConfirmationDialog(
                 pendingStartRequest: $pendingStartRequest,

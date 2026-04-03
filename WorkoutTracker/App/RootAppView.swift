@@ -70,8 +70,7 @@ struct RootAppView: View {
             )
         ) { issue in
             Alert(
-                title: Text(issue.title),
-                message: Text(issue.message),
+                title: Text("\(issue.title)\n\n\(issue.message)"),
                 dismissButton: .default(Text("OK")) {
                     appStore.dismissPersistenceStartupIssue()
                 }

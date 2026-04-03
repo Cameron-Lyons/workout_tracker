@@ -59,6 +59,17 @@ func weekdaySummary(_ weekdays: [Weekday], emptyLabel: String) -> String {
     return weekdays.map { $0.shortLabel.uppercased() }.joined(separator: " • ")
 }
 
+private func sessionReplaceConfirmationTitle(
+    activeDraft: SessionDraft?,
+    pendingStartRequest: SessionStartRequest?
+) -> String {
+    guard let activeDraft, let pendingStartRequest else {
+        return "Replace current session?"
+    }
+    return "Replace current session?\n\n\(activeDraft.templateNameSnapshot) is still autosaved. "
+        + "Replacing it will discard that session and start \(pendingStartRequest.templateName) instead."
+}
+
 private struct SessionStartConfirmationDialogModifier: ViewModifier {
     @Binding var pendingStartRequest: SessionStartRequest?
     let activeDraft: SessionDraft?
@@ -67,7 +78,10 @@ private struct SessionStartConfirmationDialogModifier: ViewModifier {
 
     func body(content: Content) -> some View {
         content.confirmationDialog(
-            "Replace current session?",
+            sessionReplaceConfirmationTitle(
+                activeDraft: activeDraft,
+                pendingStartRequest: pendingStartRequest
+            ),
             isPresented: Binding(
                 get: { pendingStartRequest != nil },
                 set: { isPresented in
@@ -92,14 +106,6 @@ private struct SessionStartConfirmationDialogModifier: ViewModifier {
 
             Button("Cancel", role: .cancel) {
                 pendingStartRequest = nil
-            }
-        } message: {
-            if let activeDraft, let pendingStartRequest {
-                Text(
-                    "\(activeDraft.templateNameSnapshot) is still autosaved. "
-                        + "Replacing it will discard that session and start "
-                        + "\(pendingStartRequest.templateName) instead."
-                )
             }
         }
     }
