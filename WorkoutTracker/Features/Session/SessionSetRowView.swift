@@ -227,8 +227,6 @@ struct SessionSetRowView: View, Equatable {
         field: SessionSetMetricField,
         accessibilityIdentifier: String
     ) -> some View {
-        let isFocused = focusedField == field
-
         let textField = TextField(placeholder, text: text)
             .keyboardType(keyboardType)
             .textFieldStyle(.plain)
@@ -263,11 +261,6 @@ struct SessionSetRowView: View, Equatable {
         .lineLimit(1)
         .padding(.bottom, 8)
         .frame(maxWidth: .infinity, alignment: .leading)
-        .overlay(alignment: .bottom) {
-            Rectangle()
-                .fill(isFocused ? tone.softBorder : AppColors.strokeStrong.opacity(0.72))
-                .frame(height: 1)
-        }
     }
 
     private func syncMetricInputsIfNeeded() {

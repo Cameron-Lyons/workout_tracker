@@ -637,8 +637,7 @@ private struct CompletedSessionSetDetailRow: View {
         .padding(.vertical, 10)
         .appInsetCard(
             cornerRadius: 8,
-            fill: tone.softFill.opacity(0.48),
-            border: tone.softBorder.opacity(0.72)
+            fill: tone.softFill.opacity(0.48)
         )
     }
 }

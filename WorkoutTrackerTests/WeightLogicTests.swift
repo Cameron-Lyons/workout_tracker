@@ -18,7 +18,8 @@ final class WeightLogicTests: XCTestCase {
     func testFormatterProducesExpectedStrings() {
         XCTAssertEqual(WeightFormatter.displayString(displayValue: 100.0, unit: .pounds), "100")
         XCTAssertEqual(WeightFormatter.displayString(displayValue: 102.5, unit: .kilograms), "102.5")
-        XCTAssertEqual(WeightFormatter.displayString(225.0, unit: .kilograms), "102.5")
+        XCTAssertEqual(WeightFormatter.displayString(225.0, unit: .kilograms), "102.06")
+        XCTAssertEqual(WeightFormatter.displayString(183.0, unit: .pounds), "183")
     }
 
     func testConvertedDisplayStringBetweenUnits() {
@@ -28,7 +29,7 @@ final class WeightLogicTests: XCTestCase {
                 oldUnit: .pounds,
                 newUnit: .kilograms
             ),
-            "102.5"
+            "102.06"
         )
 
         XCTAssertNil(

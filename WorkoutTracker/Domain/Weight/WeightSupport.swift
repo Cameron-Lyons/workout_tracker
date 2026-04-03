@@ -83,10 +83,8 @@ enum WeightFormatter {
             return ""
         }
 
-        return displayString(
-            displayValue: unit.displayValue(fromStoredPounds: storedWeightInPounds),
-            unit: unit
-        )
+        let displayValue = unit.displayValue(fromStoredPounds: storedWeightInPounds, snapToGymIncrement: false)
+        return formatUnroundedDisplayValue(displayValue)
     }
 
     static func displayString(displayValue value: Double, unit: WeightUnit) -> String {
@@ -101,6 +99,26 @@ enum WeightFormatter {
         }
 
         return String(format: "%.2f", roundedValue)
+    }
+
+    /// Formats a value already in the user's display unit without gym-increment snapping.
+    private static func formatUnroundedDisplayValue(_ value: Double) -> String {
+        let whole = value.rounded()
+        if abs(value - whole) < 1e-6 {
+            return String(Int(whole))
+        }
+
+        let oneDecimal = (value * 10).rounded() / 10
+        if abs(value - oneDecimal) < 1e-5 {
+            return String(format: "%.1f", oneDecimal)
+        }
+
+        let twoDecimal = (value * 100).rounded() / 100
+        if abs(value - twoDecimal) < 1e-4 {
+            return String(format: "%.2f", twoDecimal)
+        }
+
+        return String(format: "%.2f", value)
     }
 }
 

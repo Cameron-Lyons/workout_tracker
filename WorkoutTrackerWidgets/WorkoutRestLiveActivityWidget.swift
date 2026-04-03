@@ -20,6 +20,32 @@ private enum RestActivityColors {
     static let warning = Color(hex: 0xFF9E64)
 }
 
+/// `Text(_:style: .timer)` counts up after the end date; we clamp at zero to match in-session rest UI.
+private struct RestTimerCountdownLabel: View {
+    let endDate: Date
+    let font: Font
+    let foreground: Color
+
+    var body: some View {
+        TimelineView(.periodic(from: .now, by: 1)) { timeline in
+            let remaining = max(0, Int(endDate.timeIntervalSince(timeline.date)))
+            Text(Self.displayString(remainingSeconds: remaining))
+                .font(font)
+                .monospacedDigit()
+                .foregroundStyle(foreground)
+        }
+    }
+
+    private static func displayString(remainingSeconds: Int) -> String {
+        guard remainingSeconds > 0 else {
+            return "Ready"
+        }
+        let minutes = remainingSeconds / 60
+        let seconds = remainingSeconds % 60
+        return "\(minutes):\(String(format: "%02d", seconds))"
+    }
+}
+
 struct WorkoutRestLiveActivityWidget: Widget {
     var body: some WidgetConfiguration {
         ActivityConfiguration(for: WorkoutRestLiveActivityAttributes.self) { context in
@@ -35,10 +61,11 @@ struct WorkoutRestLiveActivityWidget: Widget {
                 }
 
                 DynamicIslandExpandedRegion(.trailing) {
-                    Text(context.state.endDate, style: .timer)
-                        .font(.title3.weight(.bold))
-                        .monospacedDigit()
-                        .foregroundStyle(RestActivityColors.textPrimary)
+                    RestTimerCountdownLabel(
+                        endDate: context.state.endDate,
+                        font: .title3.weight(.bold),
+                        foreground: RestActivityColors.textPrimary
+                    )
                 }
 
                 DynamicIslandExpandedRegion(.bottom) {
@@ -52,10 +79,11 @@ struct WorkoutRestLiveActivityWidget: Widget {
                 Image(systemName: "timer")
                     .foregroundStyle(RestActivityColors.warning)
             } compactTrailing: {
-                Text(context.state.endDate, style: .timer)
-                    .font(.caption2.weight(.bold))
-                    .monospacedDigit()
-                    .foregroundStyle(RestActivityColors.textPrimary)
+                RestTimerCountdownLabel(
+                    endDate: context.state.endDate,
+                    font: .caption2.weight(.bold),
+                    foreground: RestActivityColors.textPrimary
+                )
             } minimal: {
                 Image(systemName: "timer")
                     .foregroundStyle(RestActivityColors.warning)
@@ -82,11 +110,12 @@ private struct WorkoutRestLiveActivityLockScreenView: View {
             .padding(.vertical, 4)
             .background(RestActivityColors.warning.opacity(0.16), in: Capsule())
 
-            Text(context.state.endDate, style: .timer)
-                .font(.system(size: 34, weight: .black, design: .rounded))
-                .monospacedDigit()
-                .foregroundStyle(RestActivityColors.textPrimary)
-                .frame(maxWidth: .infinity, alignment: .center)
+            RestTimerCountdownLabel(
+                endDate: context.state.endDate,
+                font: .system(size: 34, weight: .black, design: .rounded),
+                foreground: RestActivityColors.textPrimary
+            )
+            .frame(maxWidth: .infinity, alignment: .center)
 
             Text(context.attributes.workoutName)
                 .font(.caption2.weight(.medium))
