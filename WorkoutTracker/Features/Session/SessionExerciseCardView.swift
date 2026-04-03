@@ -71,6 +71,8 @@ struct SessionExerciseCardView: View, Equatable {
 
             VStack(spacing: 0) {
                 ForEach(Array(sessionExercise.sets.enumerated()), id: \.element.id) { index, row in
+                    let previousKind = index > 0 ? sessionExercise.sets[index - 1].target.setKind : nil
+                    let showSetKindHeading = previousKind.map { $0 != row.target.setKind } ?? true
                     SessionSetRowView(
                         blockID: sessionExercise.id,
                         row: row,
@@ -78,7 +80,8 @@ struct SessionExerciseCardView: View, Equatable {
                         actions: actions,
                         showsDetailedChrome: showsDetailedChrome,
                         showsMetricColumnTitles: false,
-                        noteLine: Self.noteLineParameter(for: row, hoistedPrefix: hoistedSharedWaveNote)
+                        noteLine: Self.noteLineParameter(for: row, hoistedPrefix: hoistedSharedWaveNote),
+                        showSetKindHeading: showSetKindHeading
                     )
                     .equatable()
 

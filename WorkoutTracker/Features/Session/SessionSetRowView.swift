@@ -16,6 +16,8 @@ struct SessionSetRowView: View, Equatable {
     let showsMetricColumnTitles: Bool
     /// When `nil`, uses `row.target.note`. When non-nil, uses this string after trimming; an empty string suppresses the row note (e.g. shared text is hoisted to the exercise).
     let noteLine: String?
+    /// When false, the warmup/working heading is omitted (same kind as the row above).
+    let showSetKindHeading: Bool
     @State private var weightInputText: String
     @State private var repsInputText: String
     @State private var weightCommitTask: Task<Void, Never>?
@@ -29,7 +31,8 @@ struct SessionSetRowView: View, Equatable {
         actions: ActiveSessionActions,
         showsDetailedChrome: Bool,
         showsMetricColumnTitles: Bool = true,
-        noteLine: String? = nil
+        noteLine: String? = nil,
+        showSetKindHeading: Bool = true
     ) {
         self.blockID = blockID
         self.row = row
@@ -38,6 +41,7 @@ struct SessionSetRowView: View, Equatable {
         self.showsDetailedChrome = showsDetailedChrome
         self.showsMetricColumnTitles = showsMetricColumnTitles
         self.noteLine = noteLine
+        self.showSetKindHeading = showSetKindHeading
         _weightInputText = State(initialValue: Self.weightInputText(for: row, unit: weightUnit))
         _repsInputText = State(initialValue: Self.repsInputText(for: row))
     }
@@ -49,6 +53,7 @@ struct SessionSetRowView: View, Equatable {
             && lhs.showsDetailedChrome == rhs.showsDetailedChrome
             && lhs.showsMetricColumnTitles == rhs.showsMetricColumnTitles
             && lhs.noteLine == rhs.noteLine
+            && lhs.showSetKindHeading == rhs.showSetKindHeading
     }
 
     private var tone: AppToneStyle {
@@ -58,12 +63,17 @@ struct SessionSetRowView: View, Equatable {
     var body: some View {
         VStack(alignment: .leading, spacing: 14) {
             HStack(alignment: .top, spacing: 12) {
-                VStack(alignment: .leading, spacing: 4) {
-                    Text(setKindTitle.uppercased())
-                        .font(.caption.weight(.black))
-                        .tracking(0.8)
-                        .foregroundStyle(row.log.isCompleted ? AppToneStyle.success.accent : AppColors.textSecondary)
+                Group {
+                    if showSetKindHeading {
+                        VStack(alignment: .leading, spacing: 4) {
+                            Text(setKindTitle.uppercased())
+                                .font(.caption.weight(.black))
+                                .tracking(0.8)
+                                .foregroundStyle(row.log.isCompleted ? AppToneStyle.success.accent : AppColors.textSecondary)
+                        }
+                    }
                 }
+                .frame(minWidth: 0, alignment: .leading)
 
                 Spacer()
 
