@@ -379,14 +379,14 @@ final class AppStore {
             startSession(planID: pinnedTemplate.planID, templateID: pinnedTemplate.templateID)
         }
 
-        guard let block = sessionStore.activeDraft?.blocks.first,
-            let workingRow = block.sets.first(where: { $0.target.setKind == .working })
+        guard let sessionExercise = sessionStore.activeDraft?.exercises.first,
+            let workingRow = sessionExercise.sets.first(where: { $0.target.setKind == .working })
         else {
             return
         }
 
         if workingRow.log.isCompleted == false {
-            toggleSetCompletion(blockID: block.id, setID: workingRow.id)
+            toggleSetCompletion(blockID: sessionExercise.id, setID: workingRow.id)
         }
         clearRestTimer()
     }

@@ -4,7 +4,7 @@ import XCTest
 
 final class WorkoutProgramEngineTests: XCTestCase {
     func testManualProgressionReturnsExistingTargets() {
-        let block = ExerciseBlock(
+        let block = TemplateExercise(
             exerciseID: CatalogSeed.benchPress,
             exerciseNameSnapshot: "Bench Press",
             progressionRule: .manual,
@@ -19,7 +19,7 @@ final class WorkoutProgramEngineTests: XCTestCase {
     }
 
     func testDoubleProgressionIncreasesWorkingTargetsAfterTopRepGoalIsMet() {
-        let block = ExerciseBlock(
+        let block = TemplateExercise(
             exerciseID: CatalogSeed.backSquat,
             exerciseNameSnapshot: "Back Squat",
             progressionRule: ProgressionRule(
@@ -67,7 +67,7 @@ final class WorkoutProgramEngineTests: XCTestCase {
     }
 
     func testDoubleProgressionSeedsMissingTargetWeightsFromCompletedWork() {
-        let block = ExerciseBlock(
+        let block = TemplateExercise(
             exerciseID: CatalogSeed.backSquat,
             exerciseNameSnapshot: "Back Squat",
             progressionRule: ProgressionRule(
@@ -116,7 +116,7 @@ final class WorkoutProgramEngineTests: XCTestCase {
 
     func testDoubleProgressionHandlesDuplicateTargetIDsInCompletedRows() {
         let target = SetTarget(repRange: RepRange(5, 5))
-        let block = ExerciseBlock(
+        let block = TemplateExercise(
             exerciseID: CatalogSeed.backSquat,
             exerciseNameSnapshot: "Back Squat",
             progressionRule: ProgressionRule(
@@ -151,7 +151,7 @@ final class WorkoutProgramEngineTests: XCTestCase {
     }
 
     func testPercentageWaveUsesTrainingMaxToResolveWorkingSets() {
-        let block = ExerciseBlock(
+        let block = TemplateExercise(
             exerciseID: CatalogSeed.benchPress,
             exerciseNameSnapshot: "Bench Press",
             progressionRule: ProgressionRule(
@@ -191,7 +191,7 @@ final class WorkoutProgramEngineTests: XCTestCase {
             cycle: 1,
             cycleIncrement: 10
         )
-        let block = ExerciseBlock(
+        let block = TemplateExercise(
             exerciseID: CatalogSeed.deadlift,
             exerciseNameSnapshot: "Deadlift",
             progressionRule: ProgressionRule(kind: .percentageWave, percentageWave: wave),
@@ -233,7 +233,7 @@ final class WorkoutProgramEngineTests: XCTestCase {
             cycle: 1,
             cycleIncrement: 10
         )
-        let block = ExerciseBlock(
+        let block = TemplateExercise(
             exerciseID: CatalogSeed.deadlift,
             exerciseNameSnapshot: "Deadlift",
             progressionRule: ProgressionRule(kind: .percentageWave, percentageWave: wave),
@@ -273,7 +273,7 @@ final class WorkoutProgramEngineTests: XCTestCase {
             cycle: 1,
             cycleIncrement: 5
         )
-        let block = ExerciseBlock(
+        let block = TemplateExercise(
             exerciseID: CatalogSeed.deadlift,
             exerciseNameSnapshot: "Deadlift",
             progressionRule: ProgressionRule(kind: .percentageWave, percentageWave: wave),
@@ -300,7 +300,7 @@ final class WorkoutProgramEngineTests: XCTestCase {
     }
 
     func testDoubleProgressionDoesNotAdvanceWithoutWorkingSets() {
-        let block = ExerciseBlock(
+        let block = TemplateExercise(
             exerciseID: CatalogSeed.backSquat,
             exerciseNameSnapshot: "Back Squat",
             progressionRule: ProgressionRule(
@@ -333,7 +333,7 @@ final class WorkoutProgramEngineTests: XCTestCase {
     }
 
     func testDoubleProgressionDoesNotAdvanceWhenWorkingSetsRemainIncomplete() {
-        let block = ExerciseBlock(
+        let block = TemplateExercise(
             exerciseID: CatalogSeed.backSquat,
             exerciseNameSnapshot: "Back Squat",
             progressionRule: ProgressionRule(
@@ -383,8 +383,8 @@ final class WorkoutProgramEngineTests: XCTestCase {
     func testStartingSessionInjectsWarmupsBeforeWorkingSets() {
         let template = WorkoutTemplate(
             name: "Test Template",
-            blocks: [
-                ExerciseBlock(
+            exercises: [
+                TemplateExercise(
                     exerciseID: CatalogSeed.benchPress,
                     exerciseNameSnapshot: "Bench Press",
                     progressionRule: .manual,
@@ -403,10 +403,10 @@ final class WorkoutProgramEngineTests: XCTestCase {
             warmupRamp: WarmupDefaults.ramp
         )
 
-        let setKinds = draft.blocks.first?.sets.map(\.target.setKind)
+        let setKinds = draft.exercises.first?.sets.map(\.target.setKind)
         XCTAssertEqual(setKinds, [.warmup, .warmup, .working])
-        XCTAssertEqual(draft.blocks.first?.sets.first?.target.targetWeight, 75)
-        XCTAssertEqual(draft.blocks.first?.sets.dropFirst().first?.target.targetWeight, 110)
+        XCTAssertEqual(draft.exercises.first?.sets.first?.target.targetWeight, 75)
+        XCTAssertEqual(draft.exercises.first?.sets.dropFirst().first?.target.targetWeight, 110)
     }
 
     func testToggleCompletionKeepsLoggedValuesWhenReopeningASet() throws {
@@ -423,7 +423,7 @@ final class WorkoutProgramEngineTests: XCTestCase {
                 completedAt: completedAt
             )
         )
-        let block = SessionBlock(
+        let block = SessionExercise(
             exerciseID: CatalogSeed.benchPress,
             exerciseNameSnapshot: "Bench Press",
             restSeconds: 90,
@@ -434,13 +434,13 @@ final class WorkoutProgramEngineTests: XCTestCase {
             planID: UUID(),
             templateID: UUID(),
             templateNameSnapshot: "Bench Day",
-            blocks: [block],
+            exercises: [block],
             restTimerEndsAt: completedAt.addingTimeInterval(90)
         )
 
         SessionEngine.toggleCompletion(of: row.id, in: block.id, draft: &draft, completedAt: reopenedAt)
 
-        let reopenedRow = try XCTUnwrap(draft.blocks.first?.sets.first)
+        let reopenedRow = try XCTUnwrap(draft.exercises.first?.sets.first)
         XCTAssertFalse(reopenedRow.log.isCompleted)
         XCTAssertEqual(reopenedRow.log.weight, 190)
         XCTAssertEqual(reopenedRow.log.reps, 6)
@@ -450,7 +450,7 @@ final class WorkoutProgramEngineTests: XCTestCase {
 
     func testAdjustWeightDoesNotMaterializeZeroWhenDecreasingUnsetWeight() throws {
         let row = SessionSetRow(target: SetTarget(repRange: RepRange(5, 5)))
-        let block = SessionBlock(
+        let block = SessionExercise(
             exerciseID: CatalogSeed.benchPress,
             exerciseNameSnapshot: "Bench Press",
             restSeconds: 90,
@@ -461,12 +461,12 @@ final class WorkoutProgramEngineTests: XCTestCase {
             planID: UUID(),
             templateID: UUID(),
             templateNameSnapshot: "Bench Day",
-            blocks: [block]
+            exercises: [block]
         )
 
         SessionEngine.adjustWeight(by: -5, setID: row.id, in: block.id, draft: &draft)
 
-        let updatedRow = try XCTUnwrap(draft.blocks.first?.sets.first)
+        let updatedRow = try XCTUnwrap(draft.exercises.first?.sets.first)
         XCTAssertNil(updatedRow.target.targetWeight)
         XCTAssertNil(updatedRow.log.weight)
     }
@@ -478,7 +478,7 @@ final class WorkoutProgramEngineTests: XCTestCase {
                 repRange: RepRange(5, 5)
             )
         )
-        let block = SessionBlock(
+        let block = SessionExercise(
             exerciseID: CatalogSeed.benchPress,
             exerciseNameSnapshot: "Bench Press",
             restSeconds: 90,
@@ -489,18 +489,18 @@ final class WorkoutProgramEngineTests: XCTestCase {
             planID: UUID(),
             templateID: UUID(),
             templateNameSnapshot: "Bench Day",
-            blocks: [block]
+            exercises: [block]
         )
 
         SessionEngine.updateWeight(to: 192.5, setID: row.id, in: block.id, draft: &draft)
 
-        let updatedRow = try XCTUnwrap(draft.blocks.first?.sets.first)
+        let updatedRow = try XCTUnwrap(draft.exercises.first?.sets.first)
         XCTAssertEqual(updatedRow.log.weight, 192.5)
     }
 
     func testUpdateRepsStoresExactLoggedReps() throws {
         let row = SessionSetRow(target: SetTarget(repRange: RepRange(8, 10)))
-        let block = SessionBlock(
+        let block = SessionExercise(
             exerciseID: CatalogSeed.benchPress,
             exerciseNameSnapshot: "Bench Press",
             restSeconds: 90,
@@ -511,12 +511,12 @@ final class WorkoutProgramEngineTests: XCTestCase {
             planID: UUID(),
             templateID: UUID(),
             templateNameSnapshot: "Bench Day",
-            blocks: [block]
+            exercises: [block]
         )
 
         SessionEngine.updateReps(to: 12, setID: row.id, in: block.id, draft: &draft)
 
-        let updatedRow = try XCTUnwrap(draft.blocks.first?.sets.first)
+        let updatedRow = try XCTUnwrap(draft.exercises.first?.sets.first)
         XCTAssertEqual(updatedRow.log.reps, 12)
     }
 
@@ -531,7 +531,7 @@ final class WorkoutProgramEngineTests: XCTestCase {
                 rir: 1
             )
         )
-        let block = SessionBlock(
+        let block = SessionExercise(
             exerciseID: CatalogSeed.benchPress,
             exerciseNameSnapshot: "Bench Press",
             restSeconds: 90,
@@ -542,12 +542,12 @@ final class WorkoutProgramEngineTests: XCTestCase {
             planID: UUID(),
             templateID: UUID(),
             templateNameSnapshot: "Bench Day",
-            blocks: [block]
+            exercises: [block]
         )
 
         SessionEngine.addSet(to: block.id, draft: &draft)
 
-        let rows = try XCTUnwrap(draft.blocks.first?.sets)
+        let rows = try XCTUnwrap(draft.exercises.first?.sets)
         XCTAssertEqual(rows.count, 2)
         XCTAssertNotEqual(rows[0].target.id, rows[1].target.id)
         XCTAssertEqual(rows[1].log.setTargetID, rows[1].target.id)

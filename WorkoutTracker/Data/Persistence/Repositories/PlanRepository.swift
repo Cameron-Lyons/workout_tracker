@@ -384,7 +384,7 @@ final class PlanRepository: RepositoryBase {
     }
 
     private func startupSummary(for plan: Plan) -> PlanSummary {
-        let includeBlockExerciseIDs = plan.templates.count == 2
+        let includeExerciseIDs = plan.templates.count == 2
 
         return PlanSummary(
             id: plan.id,
@@ -398,7 +398,7 @@ final class PlanRepository: RepositoryBase {
                     note: template.note,
                     scheduledWeekdays: template.scheduledWeekdays,
                     lastStartedAt: template.lastStartedAt,
-                    blockExerciseIDs: includeBlockExerciseIDs ? template.blocks.map(\.exerciseID) : []
+                    exerciseIDs: includeExerciseIDs ? template.exercises.map(\.exerciseID) : []
                 )
             }
         )

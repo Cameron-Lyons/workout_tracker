@@ -1,7 +1,7 @@
 import SwiftUI
 
-struct TemplateDraftBlockEditorView: View {
-    @Binding var block: TemplateDraftBlock
+struct TemplateDraftExerciseEditorView: View {
+    @Binding var draft: TemplateDraftExercise
 
     let weightUnit: WeightUnit
     let onPickExercise: (UUID) -> Void
@@ -10,40 +10,40 @@ struct TemplateDraftBlockEditorView: View {
     @State private var isShowingAdvancedSettings: Bool
 
     init(
-        block: Binding<TemplateDraftBlock>,
+        draft: Binding<TemplateDraftExercise>,
         weightUnit: WeightUnit,
         onPickExercise: @escaping (UUID) -> Void,
         onDelete: @escaping (UUID) -> Void
     ) {
-        _block = block
+        _draft = draft
         self.weightUnit = weightUnit
         self.onPickExercise = onPickExercise
         self.onDelete = onDelete
-        _isShowingAdvancedSettings = State(initialValue: Self.shouldStartExpanded(for: block.wrappedValue))
+        _isShowingAdvancedSettings = State(initialValue: Self.shouldStartExpanded(for: draft.wrappedValue))
     }
 
     private var exerciseTitle: String {
-        block.exerciseName.nonEmptyTrimmed ?? "Choose exercise"
+        draft.exerciseName.nonEmptyTrimmed ?? "Choose exercise"
     }
 
     private var tone: AppToneStyle {
-        block.exerciseID == nil ? .warning : .plans
+        draft.exerciseID == nil ? .warning : .plans
     }
 
     private var usesWavePrescription: Bool {
-        block.progressionKind == .percentageWave
+        draft.progressionKind == .percentageWave
     }
 
     private var prescriptionSummary: String {
         if usesWavePrescription {
-            return "\(block.setCount) working sets - 5/3/1 wave"
+            return "\(draft.setCount) working sets - 5/3/1 wave"
         }
 
-        return "\(block.setCount) set\(block.setCount == 1 ? "" : "s") • \(block.repLower)-\(block.repUpper) reps"
+        return "\(draft.setCount) set\(draft.setCount == 1 ? "" : "s") • \(draft.repLower)-\(draft.repUpper) reps"
     }
 
     private var wavePrescriptionDetail: String {
-        if block.trainingMaxText.isEmpty {
+        if draft.trainingMaxText.isEmpty {
             return "5/3/1 sets and reps are generated automatically. Add a TM below to unlock target weights."
         }
 
@@ -53,16 +53,16 @@ struct TemplateDraftBlockEditorView: View {
     private var advancedSummary: String {
         var labels: [String] = []
 
-        if block.progressionKind != .manual {
-            labels.append(block.progressionKind.displayLabel)
+        if draft.progressionKind != .manual {
+            labels.append(draft.progressionKind.displayLabel)
         }
-        if !usesWavePrescription && block.setKind != .working {
-            labels.append(block.setKind.rawValue.capitalized)
+        if !usesWavePrescription && draft.setKind != .working {
+            labels.append(draft.setKind.rawValue.capitalized)
         }
-        if block.supersetGroup.nonEmptyTrimmed != nil {
+        if draft.supersetGroup.nonEmptyTrimmed != nil {
             labels.append("Superset")
         }
-        if !block.allowsAutoWarmups {
+        if !draft.allowsAutoWarmups {
             labels.append("Warmups Off")
         }
 
@@ -74,8 +74,8 @@ struct TemplateDraftBlockEditorView: View {
             HStack(alignment: .top, spacing: 12) {
                 VStack(alignment: .leading, spacing: 8) {
                     AppStatePill(
-                        title: block.exerciseID == nil ? "Needs Exercise" : prescriptionSummary,
-                        systemImage: block.exerciseID == nil ? "exclamationmark.triangle.fill" : "dumbbell.fill",
+                        title: draft.exerciseID == nil ? "Needs Exercise" : prescriptionSummary,
+                        systemImage: draft.exerciseID == nil ? "exclamationmark.triangle.fill" : "dumbbell.fill",
                         tone: tone
                     )
 
@@ -84,7 +84,7 @@ struct TemplateDraftBlockEditorView: View {
                         .foregroundStyle(AppColors.textPrimary)
 
                     Text(
-                        block.exerciseID == nil
+                        draft.exerciseID == nil
                             ? "Pick the movement first, then set the working prescription."
                             : "Keep the core prescription visible and hide the extra tuning below."
                     )
@@ -96,7 +96,7 @@ struct TemplateDraftBlockEditorView: View {
 
                 VStack(spacing: 8) {
                     Button {
-                        onPickExercise(block.id)
+                        onPickExercise(draft.id)
                     } label: {
                         Text("Pick")
                     }
@@ -104,7 +104,7 @@ struct TemplateDraftBlockEditorView: View {
                     .accessibilityIdentifier("plans.template.pickExerciseButton")
 
                     Button(role: .destructive) {
-                        onDelete(block.id)
+                        onDelete(draft.id)
                     } label: {
                         Image(systemName: "trash")
                     }
@@ -112,7 +112,7 @@ struct TemplateDraftBlockEditorView: View {
                 }
             }
 
-            Picker("Progression", selection: $block.progressionKind) {
+            Picker("Progression", selection: $draft.progressionKind) {
                 Text("Manual").tag(ProgressionRuleKind.manual)
                 Text("Double").tag(ProgressionRuleKind.doubleProgression)
                 Text("Wave").tag(ProgressionRuleKind.percentageWave)
@@ -124,8 +124,8 @@ struct TemplateDraftBlockEditorView: View {
                     title: "Prescription",
                     systemImage: "figure.strengthtraining.traditional",
                     subtitle: usesWavePrescription
-                        ? "Wave blocks generate their working sets automatically from the current 5/3/1 week."
-                        : "Set the default workload you want this block to start with.",
+                        ? "Wave progression generates working sets automatically from the current 5/3/1 week."
+                        : "Set the default workload you want this exercise to start with.",
                     tone: .today
                 )
 
@@ -143,7 +143,7 @@ struct TemplateDraftBlockEditorView: View {
                         border: AppToneStyle.progress.softBorder
                     )
 
-                    NumericInputField(title: "Rest (sec)", text: $block.restSecondsTextBinding, keyboardType: .numberPad)
+                    NumericInputField(title: "Rest (sec)", text: $draft.restSecondsTextBinding, keyboardType: .numberPad)
                 } else {
                     LazyVGrid(
                         columns: [
@@ -153,9 +153,9 @@ struct TemplateDraftBlockEditorView: View {
                         ],
                         spacing: 10
                     ) {
-                        NumericInputField(title: "Sets", text: $block.setCountTextBinding, keyboardType: .numberPad)
-                        NumericInputField(title: "Rep Min", text: $block.repLowerTextBinding, keyboardType: .numberPad)
-                        NumericInputField(title: "Rep Max", text: $block.repUpperTextBinding, keyboardType: .numberPad)
+                        NumericInputField(title: "Sets", text: $draft.setCountTextBinding, keyboardType: .numberPad)
+                        NumericInputField(title: "Rep Min", text: $draft.repLowerTextBinding, keyboardType: .numberPad)
+                        NumericInputField(title: "Rep Max", text: $draft.repUpperTextBinding, keyboardType: .numberPad)
                     }
 
                     LazyVGrid(
@@ -165,20 +165,20 @@ struct TemplateDraftBlockEditorView: View {
                         ],
                         spacing: 10
                     ) {
-                        NumericInputField(title: "Target Weight (\(weightUnit.symbol))", text: $block.targetWeightText)
-                        NumericInputField(title: "Rest (sec)", text: $block.restSecondsTextBinding, keyboardType: .numberPad)
+                        NumericInputField(title: "Target Weight (\(weightUnit.symbol))", text: $draft.targetWeightText)
+                        NumericInputField(title: "Rest (sec)", text: $draft.restSecondsTextBinding, keyboardType: .numberPad)
                     }
                 }
             }
 
             DisclosureGroup(isExpanded: $isShowingAdvancedSettings) {
                 VStack(alignment: .leading, spacing: 12) {
-                    if block.progressionKind != .manual {
+                    if draft.progressionKind != .manual {
                         VStack(alignment: .leading, spacing: 10) {
                             AppSectionHeader(
                                 title: "Progression Details",
                                 systemImage: "arrow.up.right",
-                                subtitle: "Fine-tune increments and profile values for this block.",
+                                subtitle: "Fine-tune increments and profile values for this exercise.",
                                 tone: .progress
                             )
 
@@ -189,13 +189,13 @@ struct TemplateDraftBlockEditorView: View {
                                 ],
                                 spacing: 10
                             ) {
-                                NumericInputField(title: "Increment (\(weightUnit.symbol))", text: $block.incrementText)
-                                NumericInputField(title: "TM / Profile Weight (\(weightUnit.symbol))", text: $block.trainingMaxText)
+                                NumericInputField(title: "Increment (\(weightUnit.symbol))", text: $draft.incrementText)
+                                NumericInputField(title: "TM / Profile Weight (\(weightUnit.symbol))", text: $draft.trainingMaxText)
                             }
 
                             NumericInputField(
                                 title: "Preferred Increment Override (\(weightUnit.symbol))",
-                                text: $block.preferredIncrementText
+                                text: $draft.preferredIncrementText
                             )
                         }
                         .appInsetContentCard(
@@ -216,7 +216,7 @@ struct TemplateDraftBlockEditorView: View {
                                 .font(.caption.weight(.semibold))
                                 .foregroundStyle(AppColors.textSecondary)
 
-                            TextField("Superset group", text: $block.supersetGroup)
+                            TextField("Superset group", text: $draft.supersetGroup)
                                 .textInputAutocapitalization(.characters)
                                 .foregroundStyle(AppColors.textPrimary)
                                 .appInputField()
@@ -228,7 +228,7 @@ struct TemplateDraftBlockEditorView: View {
                                     .font(.caption.weight(.semibold))
                                     .foregroundStyle(AppColors.textSecondary)
 
-                                Picker("Set Type", selection: $block.setKind) {
+                                Picker("Set Type", selection: $draft.setKind) {
                                     Text("Working").tag(SetKind.working)
                                     Text("Dropset").tag(SetKind.dropSet)
                                     Text("Warmup").tag(SetKind.warmup)
@@ -241,7 +241,7 @@ struct TemplateDraftBlockEditorView: View {
                         }
                     }
 
-                    Toggle("Auto warmups", isOn: $block.allowsAutoWarmups)
+                    Toggle("Auto warmups", isOn: $draft.allowsAutoWarmups)
                         .tint(AppToneStyle.plans.accent)
                 }
                 .padding(.top, 10)
@@ -257,22 +257,22 @@ struct TemplateDraftBlockEditorView: View {
             .tint(AppToneStyle.progress.accent)
         }
         .appSectionFrame(tone: tone, topPadding: 16, bottomPadding: 8)
-        .onChange(of: block.progressionKind) { _, newValue in
+        .onChange(of: draft.progressionKind) { _, newValue in
             if newValue == .percentageWave {
-                block.setKind = .working
+                draft.setKind = .working
             }
         }
     }
 
-    private static func shouldStartExpanded(for block: TemplateDraftBlock) -> Bool {
-        block.progressionKind != .manual
-            || block.supersetGroup.nonEmptyTrimmed != nil
-            || block.setKind != .working
-            || !block.allowsAutoWarmups
+    private static func shouldStartExpanded(for draft: TemplateDraftExercise) -> Bool {
+        draft.progressionKind != .manual
+            || draft.supersetGroup.nonEmptyTrimmed != nil
+            || draft.setKind != .working
+            || !draft.allowsAutoWarmups
     }
 }
 
-private extension Binding where Value == TemplateDraftBlock {
+private extension Binding where Value == TemplateDraftExercise {
     var setCountTextBinding: Binding<String> {
         Binding<String>(
             get: { String(wrappedValue.setCount) },

@@ -100,8 +100,8 @@ final class AppFlowBenchmarks: BenchmarkTestCase {
             )
         }
 
-        XCTAssertEqual(draft?.blocks.count, template.blocks.count)
-        XCTAssertFalse(draft?.blocks.isEmpty ?? true)
+        XCTAssertEqual(draft?.exercises.count, template.exercises.count)
+        XCTAssertFalse(draft?.exercises.isEmpty ?? true)
     }
 
     func testAppStoreStartSessionAfterStartupHydrationLargeLibrary() async {
@@ -145,7 +145,7 @@ final class AppFlowBenchmarks: BenchmarkTestCase {
                 store.startSession(planID: progressivePlan.id, templateID: template.id)
                 store.flushPendingSessionPersistence()
 
-                XCTAssertEqual(store.sessionStore.activeDraft?.blocks.count, template.blocks.count)
+                XCTAssertEqual(store.sessionStore.activeDraft?.exercises.count, template.exercises.count)
                 XCTAssertEqual(store.plansStore.profiles.count, profiles.count)
             }
         )
@@ -282,7 +282,7 @@ final class AppFlowBenchmarks: BenchmarkTestCase {
                 XCTAssertEqual(snapshot.plans.planSummaries?.count, seededPlans.count)
                 XCTAssertFalse(snapshot.plans.includesFullPlanLibrary)
                 XCTAssertTrue(snapshot.plans.plans.isEmpty)
-                XCTAssertEqual(snapshot.sessions.activeDraft?.blocks.count, draft.blocks.count)
+                XCTAssertEqual(snapshot.sessions.activeDraft?.exercises.count, draft.exercises.count)
             }
         )
     }
@@ -469,15 +469,15 @@ final class AppFlowBenchmarks: BenchmarkTestCase {
         sessionStore.flushPendingDraftSave()
 
         let mutationTargets =
-            sessionStore.activeDraft?.blocks.prefix(4).compactMap { block in
+            sessionStore.activeDraft?.exercises.prefix(4).compactMap { block in
                 block.sets.first(where: { $0.target.setKind == .working }).map { (block.id, $0.id) }
             } ?? []
 
         return SessionMutationBenchmarkFixture(
             sessionStore: sessionStore,
             mutationTargets: mutationTargets,
-            firstBlockID: draft.blocks[0].id,
-            expansionBlockID: draft.blocks[draft.blocks.count - 1].id
+            firstBlockID: draft.exercises[0].id,
+            expansionBlockID: draft.exercises[draft.exercises.count - 1].id
         )
     }
 
@@ -490,7 +490,7 @@ final class AppFlowBenchmarks: BenchmarkTestCase {
             fixture.sessionStore.pushMutation(
                 blockID: target.blockID,
                 setID: target.setID,
-                undoStrategy: .block(target.blockID),
+                undoStrategy: .exercise(target.blockID),
                 persistence: .deferred
             ) { draft, context in
                 SessionEngine.adjustWeight(
@@ -507,7 +507,7 @@ final class AppFlowBenchmarks: BenchmarkTestCase {
             fixture.sessionStore.pushMutation(
                 blockID: target.blockID,
                 setID: target.setID,
-                undoStrategy: .block(target.blockID),
+                undoStrategy: .exercise(target.blockID),
                 persistence: .deferred
             ) { draft, context in
                 SessionEngine.adjustReps(
@@ -524,7 +524,7 @@ final class AppFlowBenchmarks: BenchmarkTestCase {
             fixture.sessionStore.pushMutation(
                 blockID: target.blockID,
                 setID: target.setID,
-                undoStrategy: .block(target.blockID),
+                undoStrategy: .exercise(target.blockID),
                 persistence: .deferred
             ) { draft, context in
                 SessionEngine.toggleCompletion(
@@ -540,7 +540,7 @@ final class AppFlowBenchmarks: BenchmarkTestCase {
 
         fixture.sessionStore.pushMutation(
             blockID: fixture.expansionBlockID,
-            undoStrategy: .block(fixture.expansionBlockID),
+            undoStrategy: .exercise(fixture.expansionBlockID),
             persistence: .deferred
         ) { draft, context in
             SessionEngine.addSet(
@@ -554,7 +554,7 @@ final class AppFlowBenchmarks: BenchmarkTestCase {
 
         fixture.sessionStore.pushMutation(
             blockID: fixture.expansionBlockID,
-            undoStrategy: .block(fixture.expansionBlockID),
+            undoStrategy: .exercise(fixture.expansionBlockID),
             persistence: .deferred
         ) { draft, context in
             SessionEngine.copyLastSet(
@@ -568,7 +568,7 @@ final class AppFlowBenchmarks: BenchmarkTestCase {
 
         fixture.sessionStore.pushMutation(
             blockID: fixture.firstBlockID,
-            undoStrategy: .block(fixture.firstBlockID),
+            undoStrategy: .exercise(fixture.firstBlockID),
             persistence: .deferred
         ) { draft, context in
             SessionEngine.addSet(

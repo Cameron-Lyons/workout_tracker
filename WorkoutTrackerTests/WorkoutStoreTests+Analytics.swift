@@ -146,13 +146,13 @@ extension WorkoutStoreTests {
             templateID: UUID(),
             templateNameSnapshot: "BBB Bench Day",
             completedAt: completedAt,
-            blocks: [
-                CompletedSessionBlock(
+            exercises: [
+                CompletedSessionExercise(
                     exerciseID: CatalogSeed.benchPress,
                     exerciseNameSnapshot: "Bench Press",
                     sets: [makeRow(kind: .working, weight: 225, reps: 5)]
                 ),
-                CompletedSessionBlock(
+                CompletedSessionExercise(
                     exerciseID: CatalogSeed.benchPress,
                     exerciseNameSnapshot: "Bench Press",
                     sets: [makeRow(kind: .working, weight: 185, reps: 10)]
@@ -195,13 +195,13 @@ extension WorkoutStoreTests {
             templateID: UUID(),
             templateNameSnapshot: "Bench Focus",
             completedAt: completedAt,
-            blocks: [
-                CompletedSessionBlock(
+            exercises: [
+                CompletedSessionExercise(
                     exerciseID: CatalogSeed.benchPress,
                     exerciseNameSnapshot: "Bench Press",
                     sets: [makeRow(kind: .working, weight: 225, reps: 5)]
                 ),
-                CompletedSessionBlock(
+                CompletedSessionExercise(
                     exerciseID: CatalogSeed.benchPress,
                     exerciseNameSnapshot: "Bench Press",
                     sets: [makeRow(kind: .working, weight: 230, reps: 5)]
@@ -245,14 +245,14 @@ extension WorkoutStoreTests {
                     id: benchTemplateID,
                     name: "Bench Day",
                     scheduledWeekdays: [.monday],
-                    blocks: [],
+                    exercises: [],
                     lastStartedAt: now.addingTimeInterval(-86_400)
                 ),
                 WorkoutTemplate(
                     id: squatTemplateID,
                     name: "Squat Day",
                     scheduledWeekdays: [.thursday],
-                    blocks: [],
+                    exercises: [],
                     lastStartedAt: now.addingTimeInterval(-172_800)
                 ),
             ]
@@ -281,8 +281,8 @@ extension WorkoutStoreTests {
                 templateID: benchTemplateID,
                 templateNameSnapshot: "Bench Day",
                 completedAt: now.addingTimeInterval(-172_800),
-                blocks: [
-                    CompletedSessionBlock(
+                exercises: [
+                    CompletedSessionExercise(
                         exerciseID: CatalogSeed.benchPress,
                         exerciseNameSnapshot: "Bench Press",
                         sets: [
@@ -297,8 +297,8 @@ extension WorkoutStoreTests {
                 templateID: squatTemplateID,
                 templateNameSnapshot: "Squat Day",
                 completedAt: now.addingTimeInterval(-86_400),
-                blocks: [
-                    CompletedSessionBlock(
+                exercises: [
+                    CompletedSessionExercise(
                         exerciseID: CatalogSeed.backSquat,
                         exerciseNameSnapshot: "Back Squat",
                         sets: [

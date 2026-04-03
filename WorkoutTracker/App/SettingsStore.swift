@@ -69,7 +69,7 @@ final class SettingsStore {
             ?? weightUnit.defaultLowerBodyIncrement
         self.defaultRestSeconds =
             defaults.object(forKey: Keys.defaultRestSeconds) as? Int
-            ?? ExerciseBlockDefaults.restSeconds
+            ?? TemplateExerciseDefaults.restSeconds
         self.hasCompletedOnboarding = defaults.bool(forKey: Keys.completedOnboarding)
         if let data = defaults.data(forKey: Keys.warmupRamp) {
             do {

@@ -272,7 +272,7 @@ struct CompletedSessionSummaryCardView: View, Equatable {
     }
 
     private var detailText: String {
-        "\(session.blocks.count) exercise block\(session.blocks.count == 1 ? "" : "s")\(detailSuffix)"
+        "\(session.exercises.count) exercise\(session.exercises.count == 1 ? "" : "s")\(detailSuffix)"
     }
 
     var body: some View {
@@ -334,15 +334,15 @@ struct CompletedSessionDetailView: View {
     var highlightedExerciseID: UUID?
 
     private var totalCompletedSetCount: Int {
-        session.blocks.reduce(0) { count, block in
-            count + block.sets.filter(\.isCompleted).count
+        session.exercises.reduce(0) { count, completedExercise in
+            count + completedExercise.sets.filter(\.isCompleted).count
         }
     }
 
     private var totalVolume: Double {
-        session.blocks.reduce(0) { total, block in
+        session.exercises.reduce(0) { total, completedExercise in
             total
-                + block.sets.reduce(0) { subtotal, set in
+                + completedExercise.sets.reduce(0) { subtotal, set in
                     guard let weight = set.weight, let reps = set.reps, set.isCompleted else {
                         return subtotal
                     }
@@ -367,7 +367,7 @@ struct CompletedSessionDetailView: View {
                             AppHeroMetric(
                                 id: "exercises",
                                 label: "Exercises",
-                                value: "\(session.blocks.count)",
+                                value: "\(session.exercises.count)",
                                 systemImage: "dumbbell"
                             ),
                             AppHeroMetric(
@@ -396,19 +396,19 @@ struct CompletedSessionDetailView: View {
                         AppSectionHeader(
                             title: "Exercises",
                             systemImage: "list.bullet",
-                            trailing: "\(session.blocks.count)",
+                            trailing: "\(session.exercises.count)",
                             tone: .progress
                         )
 
                         VStack(spacing: 0) {
-                            ForEach(Array(session.blocks.enumerated()), id: \.element.id) { index, block in
-                                CompletedSessionBlockDetailView(
-                                    block: block,
+                            ForEach(Array(session.exercises.enumerated()), id: \.element.id) { index, completedExercise in
+                                CompletedSessionExerciseDetailView(
+                                    completedExercise: completedExercise,
                                     weightUnit: settingsStore.weightUnit,
-                                    isHighlighted: highlightedExerciseID == block.exerciseID
+                                    isHighlighted: highlightedExerciseID == completedExercise.exerciseID
                                 )
 
-                                if index < session.blocks.count - 1 {
+                                if index < session.exercises.count - 1 {
                                     SectionSurfaceDivider()
                                 }
                             }
@@ -534,8 +534,8 @@ struct PersonalRecordDetailView: View {
     }
 }
 
-private struct CompletedSessionBlockDetailView: View {
-    let block: CompletedSessionBlock
+private struct CompletedSessionExerciseDetailView: View {
+    let completedExercise: CompletedSessionExercise
     let weightUnit: WeightUnit
     let isHighlighted: Bool
 
@@ -544,14 +544,14 @@ private struct CompletedSessionBlockDetailView: View {
     }
 
     private var completedSetCount: Int {
-        block.sets.filter(\.isCompleted).count
+        completedExercise.sets.filter(\.isCompleted).count
     }
 
     var body: some View {
         VStack(alignment: .leading, spacing: 12) {
             HStack(alignment: .top, spacing: 12) {
                 VStack(alignment: .leading, spacing: 6) {
-                    Text(block.exerciseNameSnapshot)
+                    Text(completedExercise.exerciseNameSnapshot)
                         .font(.headline.weight(.semibold))
                         .foregroundStyle(AppColors.textPrimary)
 
@@ -568,7 +568,7 @@ private struct CompletedSessionBlockDetailView: View {
             }
 
             VStack(spacing: 8) {
-                ForEach(Array(block.sets.enumerated()), id: \.element.id) { index, set in
+                ForEach(Array(completedExercise.sets.enumerated()), id: \.element.id) { index, set in
                     CompletedSessionSetDetailRow(
                         setNumber: index + 1,
                         set: set,

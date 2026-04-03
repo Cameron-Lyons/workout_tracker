@@ -12,9 +12,9 @@ struct SessionSetRowView: View, Equatable {
     let weightUnit: WeightUnit
     let actions: ActiveSessionActions
     let showsDetailedChrome: Bool
-    /// When false, column titles are shown once on the parent block (e.g. `SessionBlockCardView`).
+    /// When false, column titles are shown once on the parent exercise (e.g. `SessionExerciseCardView`).
     let showsMetricColumnTitles: Bool
-    /// When `nil`, uses `row.target.note`. When non-nil, uses this string after trimming; an empty string suppresses the row note (e.g. shared text is hoisted to the block).
+    /// When `nil`, uses `row.target.note`. When non-nil, uses this string after trimming; an empty string suppresses the row note (e.g. shared text is hoisted to the exercise).
     let noteLine: String?
     @State private var weightInputText: String
     @State private var repsInputText: String

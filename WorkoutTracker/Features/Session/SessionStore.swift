@@ -2,9 +2,9 @@ import Foundation
 import Observation
 
 struct SessionMutationContext {
-    static let empty = SessionMutationContext(blockIndex: nil, setIndex: nil)
+    static let empty = SessionMutationContext(exerciseIndex: nil, setIndex: nil)
 
-    let blockIndex: Int?
+    let exerciseIndex: Int?
     let setIndex: Int?
 }
 
@@ -57,11 +57,11 @@ private struct SessionDraftMetadata {
 
 enum SessionUndoStrategy {
     case fullDraft
-    case block(UUID)
+    case exercise(UUID)
 }
 
 struct ActiveSessionProgress: Equatable, Sendable {
-    var blockCount = 0
+    var exerciseCount = 0
     var completedSetCount = 0
     var canFinishWorkout = false
 
@@ -70,9 +70,9 @@ struct ActiveSessionProgress: Equatable, Sendable {
             return
         }
 
-        blockCount = draft.blocks.count
-        for block in draft.blocks {
-            for row in block.sets where row.log.isCompleted {
+        exerciseCount = draft.exercises.count
+        for exercise in draft.exercises {
+            for row in exercise.sets where row.log.isCompleted {
                 completedSetCount += 1
                 if row.target.setKind == .working {
                     canFinishWorkout = true
@@ -84,30 +84,30 @@ struct ActiveSessionProgress: Equatable, Sendable {
 
 private enum SessionUndoEntry {
     case fullDraft(SessionDraft)
-    case block(
-        blockID: UUID,
+    case exercise(
+        sessionExerciseID: UUID,
         index: Int,
-        block: SessionBlock,
+        exercise: SessionExercise,
         metadata: SessionDraftMetadata
     )
 }
 
 private struct ActiveDraftIndexCache {
-    private var blockIndicesByID: [UUID: Int] = [:]
-    private var setIndicesByBlockID: [UUID: [UUID: Int]] = [:]
+    private var exerciseIndicesByID: [UUID: Int] = [:]
+    private var setIndicesBySessionExerciseID: [UUID: [UUID: Int]] = [:]
 
     init(draft: SessionDraft?) {
         guard let draft else {
             return
         }
 
-        blockIndicesByID.reserveCapacity(draft.blocks.count)
-        setIndicesByBlockID.reserveCapacity(draft.blocks.count)
+        exerciseIndicesByID.reserveCapacity(draft.exercises.count)
+        setIndicesBySessionExerciseID.reserveCapacity(draft.exercises.count)
 
-        for (blockIndex, block) in draft.blocks.enumerated() {
-            blockIndicesByID[block.id] = blockIndex
-            setIndicesByBlockID[block.id] = Dictionary(
-                uniqueKeysWithValues: block.sets.enumerated().map { ($0.element.id, $0.offset) }
+        for (exerciseIndex, exercise) in draft.exercises.enumerated() {
+            exerciseIndicesByID[exercise.id] = exerciseIndex
+            setIndicesBySessionExerciseID[exercise.id] = Dictionary(
+                uniqueKeysWithValues: exercise.sets.enumerated().map { ($0.element.id, $0.offset) }
             )
         }
     }
@@ -117,9 +117,9 @@ private struct ActiveDraftIndexCache {
             return .empty
         }
 
-        let blockIndex = blockIndicesByID[blockID]
-        let setIndex = setID.flatMap { setIndicesByBlockID[blockID]?[$0] }
-        return SessionMutationContext(blockIndex: blockIndex, setIndex: setIndex)
+        let exerciseIndex = exerciseIndicesByID[blockID]
+        let setIndex = setID.flatMap { setIndicesBySessionExerciseID[blockID]?[$0] }
+        return SessionMutationContext(exerciseIndex: exerciseIndex, setIndex: setIndex)
     }
 }
 
@@ -298,15 +298,15 @@ final class SessionStore {
         switch entry {
         case .fullDraft(let previousDraft):
             replaceActiveDraft(previousDraft)
-        case .block(let blockID, let index, let block, let metadata):
+        case .exercise(let sessionExerciseID, let index, let exercise, let metadata):
             guard var draft = activeDraft else {
                 return
             }
 
-            if let currentIndex = resolvedBlockIndex(in: draft, blockID: blockID, suggested: index) {
-                draft.blocks[currentIndex] = block
+            if let currentIndex = resolvedExerciseIndex(in: draft, blockID: sessionExerciseID, suggested: index) {
+                draft.exercises[currentIndex] = exercise
             } else {
-                draft.blocks.insert(block, at: min(index, draft.blocks.count))
+                draft.exercises.insert(exercise, at: min(index, draft.exercises.count))
             }
             metadata.applying(to: &draft)
             replaceActiveDraft(draft)
@@ -344,7 +344,7 @@ final class SessionStore {
         }
 
         guard
-            activeDraft.blocks.contains(where: { block in
+            activeDraft.exercises.contains(where: { block in
                 block.sets.contains(where: { row in
                     row.target.setKind == .working && row.log.isCompleted
                 })
@@ -378,12 +378,12 @@ final class SessionStore {
         }
 
         var didUpdate = false
-        for index in activeDraft.blocks.indices where activeDraft.blocks[index].exerciseID == exerciseID {
-            guard activeDraft.blocks[index].exerciseNameSnapshot != name else {
+        for index in activeDraft.exercises.indices where activeDraft.exercises[index].exerciseID == exerciseID {
+            guard activeDraft.exercises[index].exerciseNameSnapshot != name else {
                 continue
             }
 
-            activeDraft.blocks[index].exerciseNameSnapshot = name
+            activeDraft.exercises[index].exerciseNameSnapshot = name
             didUpdate = true
         }
 
@@ -405,16 +405,16 @@ final class SessionStore {
         switch strategy {
         case .fullDraft:
             entry = .fullDraft(snapshot)
-        case .block(let blockID):
-            guard let blockIndex = resolvedBlockIndex(in: snapshot, blockID: blockID, suggested: context.blockIndex) else {
+        case .exercise(let sessionExerciseID):
+            guard let exerciseIndex = resolvedExerciseIndex(in: snapshot, blockID: sessionExerciseID, suggested: context.exerciseIndex) else {
                 entry = .fullDraft(snapshot)
                 break
             }
 
-            entry = .block(
-                blockID: blockID,
-                index: blockIndex,
-                block: snapshot.blocks[blockIndex],
+            entry = .exercise(
+                sessionExerciseID: sessionExerciseID,
+                index: exerciseIndex,
+                exercise: snapshot.exercises[exerciseIndex],
                 metadata: SessionDraftMetadata(draft: snapshot)
             )
         }
@@ -467,16 +467,16 @@ final class SessionStore {
         )
     }
 
-    private func resolvedBlockIndex(
+    private func resolvedExerciseIndex(
         in draft: SessionDraft,
         blockID: UUID,
         suggested: Int?
     ) -> Int? {
-        if let suggested, draft.blocks.indices.contains(suggested), draft.blocks[suggested].id == blockID {
+        if let suggested, draft.exercises.indices.contains(suggested), draft.exercises[suggested].id == blockID {
             return suggested
         }
 
-        return draft.blocks.firstIndex(where: { $0.id == blockID })
+        return draft.exercises.firstIndex(where: { $0.id == blockID })
     }
 
     private func insertCompletedSession(_ session: CompletedSession) {

@@ -96,7 +96,7 @@ struct AnalyticsRepository: Sendable {
                 sessionsLast30Days += 1
             }
 
-            for block in session.blocks {
+            for block in session.exercises {
                 totalVolume += block.sets.reduce(0) { partialResult, row in
                     guard row.isCompleted else {
                         return partialResult
@@ -371,12 +371,12 @@ struct AnalyticsRepository: Sendable {
 
     private func analyzeSession(
         _ session: CompletedSession,
-        displayNameForBlock: (CompletedSessionBlock) -> String,
+        displayNameForBlock: (CompletedSessionExercise) -> String,
         bestOneRepMaxByExerciseID: inout [UUID: Double]
     ) -> SessionAnalysis {
         var sessionAnalysis = SessionAnalysis()
 
-        for block in session.blocks {
+        for block in session.exercises {
             let displayName = displayNameForBlock(block)
             let blockAnalysis = analyze(
                 block,
@@ -411,7 +411,7 @@ struct AnalyticsRepository: Sendable {
     }
 
     private func analyze(
-        _ block: CompletedSessionBlock,
+        _ block: CompletedSessionExercise,
         in session: CompletedSession,
         displayName: String,
         bestOneRepMaxByExerciseID: inout [UUID: Double]

@@ -129,7 +129,7 @@ struct ActiveSessionView: View {
                 if let draft, let headerState {
                     ActiveSessionContentView(
                         headerState: headerState,
-                        blocks: draft.blocks,
+                        exercises: draft.exercises,
                         displaySettings: displaySettings,
                         actions: actions,
                         showsDetailedChrome: showsDetailedChrome

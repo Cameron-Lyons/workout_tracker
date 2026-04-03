@@ -161,10 +161,10 @@ final class PersistenceBenchmarks: BenchmarkTestCase {
             }
         )
 
-        XCTAssertEqual(loadedDraft?.blocks.count, draft.blocks.count)
+        XCTAssertEqual(loadedDraft?.exercises.count, draft.exercises.count)
         XCTAssertEqual(
-            loadedDraft?.blocks.reduce(0) { partialResult, block in partialResult + block.sets.count },
-            draft.blocks.reduce(0) { partialResult, block in partialResult + block.sets.count }
+            loadedDraft?.exercises.reduce(0) { partialResult, block in partialResult + block.sets.count },
+            draft.exercises.reduce(0) { partialResult, block in partialResult + block.sets.count }
         )
     }
 

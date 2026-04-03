@@ -21,7 +21,7 @@ extension WorkoutStoreTests {
                 repRange: RepRange(5, 5)
             )
         )
-        let block = SessionBlock(
+        let block = SessionExercise(
             exerciseID: CatalogSeed.benchPress,
             exerciseNameSnapshot: "Bench Press",
             restSeconds: 90,
@@ -32,7 +32,7 @@ extension WorkoutStoreTests {
             planID: nil,
             templateID: UUID(),
             templateNameSnapshot: "Bench Day",
-            blocks: [block]
+            exercises: [block]
         )
 
         store.beginSession(draft)
@@ -40,12 +40,12 @@ extension WorkoutStoreTests {
             SessionEngine.adjustWeight(by: 5, setID: row.id, in: block.id, draft: &updatedDraft)
         }
 
-        XCTAssertEqual(store.activeDraft?.blocks.first?.sets.first?.log.weight, 190)
-        XCTAssertNil(repository.loadActiveDraft()?.blocks.first?.sets.first?.log.weight)
+        XCTAssertEqual(store.activeDraft?.exercises.first?.sets.first?.log.weight, 190)
+        XCTAssertNil(repository.loadActiveDraft()?.exercises.first?.sets.first?.log.weight)
 
         store.flushPendingDraftSave()
 
-        XCTAssertEqual(repository.loadActiveDraft()?.blocks.first?.sets.first?.log.weight, 190)
+        XCTAssertEqual(repository.loadActiveDraft()?.exercises.first?.sets.first?.log.weight, 190)
     }
 
     @MainActor
@@ -63,7 +63,7 @@ extension WorkoutStoreTests {
             planID: nil,
             templateID: UUID(),
             templateNameSnapshot: "Bench Day",
-            blocks: []
+            exercises: []
         )
 
         store.beginSession(draft)
@@ -98,7 +98,7 @@ extension WorkoutStoreTests {
             repRange: RepRange(5, 5)
         )
         let row = SessionSetRow(target: target)
-        let block = SessionBlock(
+        let block = SessionExercise(
             exerciseID: CatalogSeed.benchPress,
             exerciseNameSnapshot: "Bench Press",
             restSeconds: 90,
@@ -109,7 +109,7 @@ extension WorkoutStoreTests {
             planID: nil,
             templateID: UUID(),
             templateNameSnapshot: "Bench Day",
-            blocks: [block]
+            exercises: [block]
         )
 
         var observedDrafts: [SessionDraft?] = []
@@ -127,7 +127,7 @@ extension WorkoutStoreTests {
         store.pushMutation(
             blockID: block.id,
             setID: row.id,
-            undoStrategy: .block(block.id),
+            undoStrategy: .exercise(block.id),
             persistence: .deferred
         ) { updatedDraft, context in
             SessionEngine.toggleCompletion(
@@ -234,7 +234,7 @@ extension WorkoutStoreTests {
             target: target,
             log: SetLog(setTargetID: target.id, weight: 185, reps: 5)
         )
-        let block = SessionBlock(
+        let block = SessionExercise(
             exerciseID: CatalogSeed.benchPress,
             exerciseNameSnapshot: "Bench Press",
             restSeconds: 90,
@@ -245,7 +245,7 @@ extension WorkoutStoreTests {
             planID: nil,
             templateID: UUID(),
             templateNameSnapshot: "Bench Day",
-            blocks: [block]
+            exercises: [block]
         )
         let accessory = ExerciseCatalogItem(
             id: CatalogSeed.backSquat,
@@ -259,20 +259,20 @@ extension WorkoutStoreTests {
         store.pushMutation(
             blockID: block.id,
             setID: row.id,
-            undoStrategy: .block(block.id),
+            undoStrategy: .exercise(block.id),
             persistence: .deferred
         ) { updatedDraft, context in
             SessionEngine.adjustWeight(by: 5, setID: row.id, in: block.id, draft: &updatedDraft, context: context)
         }
         store.pushMutation(
             blockID: block.id,
-            undoStrategy: .block(block.id),
+            undoStrategy: .exercise(block.id),
             persistence: .deferred
         ) { updatedDraft, context in
             SessionEngine.addSet(to: block.id, draft: &updatedDraft, context: context)
         }
         store.pushMutation(persistence: .deferred) { updatedDraft, _ in
-            SessionEngine.addExerciseBlock(
+            SessionEngine.addSessionExercise(
                 exercise: accessory,
                 draft: &updatedDraft,
                 defaultRestSeconds: 120
@@ -281,25 +281,25 @@ extension WorkoutStoreTests {
 
         let mutatedDraft = try XCTUnwrap(store.activeDraft)
         XCTAssertTrue(store.canUndo)
-        XCTAssertEqual(mutatedDraft.blocks.count, 2)
-        XCTAssertEqual(mutatedDraft.blocks.first?.sets.count, 2)
-        XCTAssertEqual(mutatedDraft.blocks.first?.sets.first?.log.weight, 190)
+        XCTAssertEqual(mutatedDraft.exercises.count, 2)
+        XCTAssertEqual(mutatedDraft.exercises.first?.sets.count, 2)
+        XCTAssertEqual(mutatedDraft.exercises.first?.sets.first?.log.weight, 190)
 
         store.undoLastMutation()
         let afterFullDraftUndo = try XCTUnwrap(store.activeDraft)
-        XCTAssertEqual(afterFullDraftUndo.blocks.count, 1)
-        XCTAssertEqual(afterFullDraftUndo.blocks.first?.sets.count, 2)
-        XCTAssertEqual(afterFullDraftUndo.blocks.first?.sets.first?.log.weight, 190)
+        XCTAssertEqual(afterFullDraftUndo.exercises.count, 1)
+        XCTAssertEqual(afterFullDraftUndo.exercises.first?.sets.count, 2)
+        XCTAssertEqual(afterFullDraftUndo.exercises.first?.sets.first?.log.weight, 190)
 
         store.undoLastMutation()
         let afterBlockStructureUndo = try XCTUnwrap(store.activeDraft)
-        XCTAssertEqual(afterBlockStructureUndo.blocks.first?.sets.count, 1)
-        XCTAssertEqual(afterBlockStructureUndo.blocks.first?.sets.first?.log.weight, 190)
+        XCTAssertEqual(afterBlockStructureUndo.exercises.first?.sets.count, 1)
+        XCTAssertEqual(afterBlockStructureUndo.exercises.first?.sets.first?.log.weight, 190)
 
         store.undoLastMutation()
         let afterBlockValueUndo = try XCTUnwrap(store.activeDraft)
-        XCTAssertEqual(afterBlockValueUndo.blocks.first?.sets.count, 1)
-        XCTAssertEqual(afterBlockValueUndo.blocks.first?.sets.first?.log.weight, 185)
+        XCTAssertEqual(afterBlockValueUndo.exercises.first?.sets.count, 1)
+        XCTAssertEqual(afterBlockValueUndo.exercises.first?.sets.first?.log.weight, 185)
         XCTAssertFalse(store.canUndo)
 
         store.flushPendingDraftSave()
@@ -319,8 +319,8 @@ extension WorkoutStoreTests {
         )
 
         let persistedDraft = try XCTUnwrap(rehydratedStore.activeDraft)
-        XCTAssertEqual(persistedDraft.blocks.count, 1)
-        XCTAssertEqual(persistedDraft.blocks.first?.sets.count, 1)
-        XCTAssertEqual(persistedDraft.blocks.first?.sets.first?.log.weight, 185)
+        XCTAssertEqual(persistedDraft.exercises.count, 1)
+        XCTAssertEqual(persistedDraft.exercises.first?.sets.count, 1)
+        XCTAssertEqual(persistedDraft.exercises.first?.sets.first?.log.weight, 185)
     }
 }

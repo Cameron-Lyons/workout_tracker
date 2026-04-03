@@ -188,6 +188,7 @@ private struct TemplateCardView: View {
                     Image(systemName: "ellipsis.circle")
                         .foregroundStyle(AppColors.textSecondary)
                 }
+                .accessibilityLabel(isPinned ? "Pinned to Today" : "Pin to Today")
                 .accessibilityIdentifier("plans.pinTemplate.\(template.id.uuidString)")
             }
         }

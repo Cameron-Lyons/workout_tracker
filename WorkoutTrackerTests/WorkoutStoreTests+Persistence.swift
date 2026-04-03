@@ -28,7 +28,7 @@ extension WorkoutStoreTests {
                 templateID: try XCTUnwrap(plan.templates.first(where: { $0.name == "Workout A" })?.id),
                 templateNameSnapshot: "Workout A",
                 completedAt: completedAt,
-                blocks: []
+                exercises: []
             )
         ]
 
@@ -65,7 +65,7 @@ extension WorkoutStoreTests {
                 templateID: try XCTUnwrap(plan.templates.first(where: { $0.name == "Workout A" })?.id),
                 templateNameSnapshot: "Workout A",
                 completedAt: completedAt,
-                blocks: []
+                exercises: []
             )
         ]
 
@@ -112,7 +112,7 @@ extension WorkoutStoreTests {
                 templateID: try XCTUnwrap(plan.templates.first(where: { $0.name == "Workout A" })?.id),
                 templateNameSnapshot: "Workout A",
                 completedAt: completedAt,
-                blocks: []
+                exercises: []
             )
         ]
 
@@ -159,7 +159,7 @@ extension WorkoutStoreTests {
                 templateID: try XCTUnwrap(plan.templates.first(where: { $0.name == "Workout A" })?.id),
                 templateNameSnapshot: "Workout A",
                 completedAt: completedAt,
-                blocks: []
+                exercises: []
             )
         ]
 
@@ -186,15 +186,15 @@ extension WorkoutStoreTests {
 
         let firstTemplate = WorkoutTemplate(
             name: "Day 1",
-            blocks: [makeStartingStrengthBlock(id: CatalogSeed.backSquat, name: "Back Squat")]
+            exercises: [makeStartingStrengthBlock(id: CatalogSeed.backSquat, name: "Back Squat")]
         )
         let secondTemplate = WorkoutTemplate(
             name: "Day 2",
-            blocks: [makeStartingStrengthBlock(id: CatalogSeed.benchPress, name: "Bench Press")]
+            exercises: [makeStartingStrengthBlock(id: CatalogSeed.benchPress, name: "Bench Press")]
         )
         let thirdTemplate = WorkoutTemplate(
             name: "Day 3",
-            blocks: [makeStartingStrengthBlock(id: CatalogSeed.deadlift, name: "Deadlift")]
+            exercises: [makeStartingStrengthBlock(id: CatalogSeed.deadlift, name: "Deadlift")]
         )
         let plan = Plan(
             name: "Three Day Split",
@@ -205,7 +205,7 @@ extension WorkoutStoreTests {
         XCTAssertTrue(repository.savePlans([plan]))
 
         let summary = try XCTUnwrap(repository.loadPlanSummaries().first)
-        XCTAssertTrue(summary.templates.allSatisfy { $0.blockExerciseIDs.isEmpty })
+        XCTAssertTrue(summary.templates.allSatisfy { $0.exerciseIDs.isEmpty })
     }
 
     @MainActor
@@ -266,7 +266,7 @@ extension WorkoutStoreTests {
             planID: nil,
             templateID: UUID(),
             templateNameSnapshot: "Upper",
-            blocks: []
+            exercises: []
         )
         repository.saveActiveDraft(draft)
 

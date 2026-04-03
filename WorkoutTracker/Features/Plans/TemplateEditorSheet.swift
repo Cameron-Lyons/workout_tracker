@@ -1,6 +1,6 @@
 import SwiftUI
 
-struct TemplateDraftBlock: Identifiable, Equatable {
+struct TemplateDraftExercise: Identifiable, Equatable {
     var id: UUID
     var exerciseID: UUID?
     var exerciseName: String
@@ -21,10 +21,10 @@ struct TemplateDraftBlock: Identifiable, Equatable {
         id: UUID = UUID(),
         exerciseID: UUID? = nil,
         exerciseName: String = "",
-        restSeconds: Int = ExerciseBlockDefaults.restSeconds,
-        setCount: Int = ExerciseBlockDefaults.setCount,
-        repLower: Int = ExerciseBlockDefaults.repRange.lowerBound,
-        repUpper: Int = ExerciseBlockDefaults.repRange.upperBound,
+        restSeconds: Int = TemplateExerciseDefaults.restSeconds,
+        setCount: Int = TemplateExerciseDefaults.setCount,
+        repLower: Int = TemplateExerciseDefaults.repRange.lowerBound,
+        repUpper: Int = TemplateExerciseDefaults.repRange.upperBound,
         targetWeightText: String = "",
         supersetGroup: String = "",
         progressionKind: ProgressionRuleKind = .manual,
@@ -152,7 +152,7 @@ struct TemplateEditorSheet: View {
     @State private var templateName = ""
     @State private var templateNote = ""
     @State private var selectedWeekdays: Set<Weekday> = []
-    @State private var blocks: [TemplateDraftBlock] = []
+    @State private var draftExercises: [TemplateDraftExercise] = []
     @State private var showingExercisePickerForBlockID: UUID?
 
     private var weightUnit: WeightUnit {
@@ -163,20 +163,20 @@ struct TemplateEditorSheet: View {
         templateName.nonEmptyTrimmed ?? existingTemplate?.name ?? "Build a template"
     }
 
-    private var hasInvalidBlocks: Bool {
-        blocks.contains(where: { $0.exerciseID == nil })
+    private var hasInvalidExercises: Bool {
+        draftExercises.contains(where: { $0.exerciseID == nil })
     }
 
-    private var unresolvedBlockCount: Int {
-        blocks.filter { $0.exerciseID == nil }.count
+    private var unresolvedExerciseCount: Int {
+        draftExercises.filter { $0.exerciseID == nil }.count
     }
 
     private var heroMetrics: [AppHeroMetric] {
         [
             AppHeroMetric(
-                id: "blocks",
-                label: "Blocks",
-                value: "\(blocks.count)",
+                id: "exercises",
+                label: "Exercises",
+                value: "\(draftExercises.count)",
                 systemImage: "square.grid.2x2"
             ),
             AppHeroMetric(
@@ -188,7 +188,7 @@ struct TemplateEditorSheet: View {
             AppHeroMetric(
                 id: "ready",
                 label: "Needs Setup",
-                value: "\(unresolvedBlockCount)",
+                value: "\(unresolvedExerciseCount)",
                 systemImage: "exclamationmark.circle"
             ),
             AppHeroMetric(
@@ -201,9 +201,9 @@ struct TemplateEditorSheet: View {
     }
 
     private var heroSubtitle: String {
-        blocks.isEmpty
-            ? "Start with the basics first, then open advanced settings only for the blocks that need them."
-            : "Keep the main prescription up front and tuck progression details into each block as needed."
+        draftExercises.isEmpty
+            ? "Start with the basics first, then open advanced settings only for the exercises that need them."
+            : "Keep the main prescription up front and tuck progression details into each exercise as needed."
     }
 
     var body: some View {
@@ -229,8 +229,8 @@ struct TemplateEditorSheet: View {
 
                             TemplateEditorScheduleSectionView(selectedWeekdays: $selectedWeekdays)
 
-                            TemplateEditorBlocksSectionView(
-                                blocks: $blocks,
+                            TemplateEditorExercisesSectionView(
+                                draftExercises: $draftExercises,
                                 weightUnit: weightUnit,
                                 scrollProxy: scrollProxy,
                                 showingExercisePickerForBlockID: $showingExercisePickerForBlockID
@@ -254,7 +254,7 @@ struct TemplateEditorSheet: View {
                     Button("Save") {
                         saveTemplate()
                     }
-                    .disabled(templateName.nonEmptyTrimmed == nil || hasInvalidBlocks)
+                    .disabled(templateName.nonEmptyTrimmed == nil || hasInvalidExercises)
                     .accessibilityIdentifier("plans.template.saveButton")
                 }
             }
@@ -294,20 +294,20 @@ struct TemplateEditorSheet: View {
         selectedWeekdays = Set(existingTemplate?.scheduledWeekdays ?? [])
 
         guard let existingTemplate else {
-            blocks = []
+            draftExercises = []
             return
         }
 
-        blocks = existingTemplate.blocks.map { block in
+        draftExercises = existingTemplate.exercises.map { block in
             let profile = appStore.plansStore.profile(for: block.exerciseID)
             let previewTargets =
                 block.progressionRule.kind == .percentageWave
                 ? ProgressionEngine.resolvedTargets(for: block, profile: profile)
                 : block.targets
             let targetWeight = previewTargets.first?.targetWeight
-            let repRange = previewTargets.first?.repRange ?? ExerciseBlockDefaults.repRange
+            let repRange = previewTargets.first?.repRange ?? TemplateExerciseDefaults.repRange
 
-            return TemplateDraftBlock(
+            return TemplateDraftExercise(
                 id: block.id,
                 exerciseID: block.exerciseID,
                 exerciseName: block.exerciseNameSnapshot,
@@ -335,31 +335,31 @@ struct TemplateEditorSheet: View {
     }
 
     private func assignExercise(_ exercise: ExerciseCatalogItem, to blockID: UUID) {
-        guard let index = blocks.firstIndex(where: { $0.id == blockID }) else {
+        guard let index = draftExercises.firstIndex(where: { $0.id == blockID }) else {
             return
         }
 
-        let previousExerciseID = blocks[index].exerciseID
+        let previousExerciseID = draftExercises[index].exerciseID
         let existingProfile = appStore.plansStore.profile(for: exercise.id)
         let defaultIncrement = appStore.settingsStore.preferredIncrement(for: exercise.name)
         let resolvedFields = TemplateExerciseSelectionResolver.resolvedFields(
             previousExerciseID: previousExerciseID,
             newExerciseID: exercise.id,
             newExerciseName: exercise.name,
-            currentTrainingMaxText: blocks[index].trainingMaxText,
-            currentPreferredIncrementText: blocks[index].preferredIncrementText,
-            currentIncrementText: blocks[index].incrementText,
-            progressionKind: blocks[index].progressionKind,
+            currentTrainingMaxText: draftExercises[index].trainingMaxText,
+            currentPreferredIncrementText: draftExercises[index].preferredIncrementText,
+            currentIncrementText: draftExercises[index].incrementText,
+            progressionKind: draftExercises[index].progressionKind,
             existingProfile: existingProfile,
             defaultIncrement: defaultIncrement,
             weightUnit: weightUnit
         )
 
-        blocks[index].exerciseID = exercise.id
-        blocks[index].exerciseName = exercise.name
-        blocks[index].trainingMaxText = resolvedFields.trainingMaxText
-        blocks[index].preferredIncrementText = resolvedFields.preferredIncrementText
-        blocks[index].incrementText = resolvedFields.incrementText
+        draftExercises[index].exerciseID = exercise.id
+        draftExercises[index].exerciseName = exercise.name
+        draftExercises[index].trainingMaxText = resolvedFields.trainingMaxText
+        draftExercises[index].preferredIncrementText = resolvedFields.preferredIncrementText
+        draftExercises[index].incrementText = resolvedFields.incrementText
     }
 
     private func saveTemplate() {
@@ -369,7 +369,7 @@ struct TemplateEditorSheet: View {
         }
 
         var savedProfiles: [ExerciseProfile] = []
-        let exerciseBlocks: [ExerciseBlock] = blocks.compactMap { block in
+        let templateExercises: [TemplateExercise] = draftExercises.compactMap { block in
             guard let exerciseID = block.exerciseID else {
                 return nil
             }
@@ -427,15 +427,15 @@ struct TemplateEditorSheet: View {
                     kind: .percentageWave,
                     percentageWave: PercentageWaveRule.fiveThreeOne(
                         trainingMax: profile?.trainingMax,
-                        currentWeekIndex: existingTemplate?.blocks.first(where: { $0.id == block.id })?.progressionRule.percentageWave?
+                        currentWeekIndex: existingTemplate?.exercises.first(where: { $0.id == block.id })?.progressionRule.percentageWave?
                             .currentWeekIndex ?? 0,
-                        cycle: existingTemplate?.blocks.first(where: { $0.id == block.id })?.progressionRule.percentageWave?.cycle ?? 1,
+                        cycle: existingTemplate?.exercises.first(where: { $0.id == block.id })?.progressionRule.percentageWave?.cycle ?? 1,
                         cycleIncrement: increment ?? appStore.settingsStore.preferredIncrement(for: exerciseName)
                     )
                 )
             }
 
-            var exerciseBlock = ExerciseBlock(
+            var exerciseBlock = TemplateExercise(
                 id: block.id,
                 exerciseID: exerciseID,
                 exerciseNameSnapshot: exerciseName,
@@ -467,7 +467,7 @@ struct TemplateEditorSheet: View {
             name: trimmedName,
             note: templateNote,
             scheduledWeekdays: Weekday.allCases.filter { selectedWeekdays.contains($0) },
-            blocks: exerciseBlocks,
+            exercises: templateExercises,
             lastStartedAt: existingTemplate?.lastStartedAt
         )
         onSave(template, savedProfiles)

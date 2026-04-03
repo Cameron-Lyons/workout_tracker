@@ -77,7 +77,7 @@ struct CompletedSetRow: Identifiable, Codable, Equatable, Sendable {
     }
 }
 
-struct SessionBlock: Identifiable, Codable, Equatable, Sendable {
+struct SessionExercise: Identifiable, Codable, Equatable, Sendable {
     var id: UUID
     var exerciseID: UUID
     var exerciseNameSnapshot: String
@@ -112,8 +112,13 @@ struct SessionDraft: Identifiable, Codable, Equatable, Sendable {
     var templateNameSnapshot: String
     var startedAt: Date
     var lastUpdatedAt: Date
-    var blocks: [SessionBlock]
+    var exercises: [SessionExercise]
     var restTimerEndsAt: Date?
+
+    enum CodingKeys: String, CodingKey {
+        case id, planID, templateID, templateNameSnapshot, startedAt, lastUpdatedAt, exercises, restTimerEndsAt
+        case legacyBlocks = "blocks"
+    }
 
     init(
         id: UUID = UUID(),
@@ -122,7 +127,7 @@ struct SessionDraft: Identifiable, Codable, Equatable, Sendable {
         templateNameSnapshot: String,
         startedAt: Date = .now,
         lastUpdatedAt: Date = .now,
-        blocks: [SessionBlock],
+        exercises: [SessionExercise],
         restTimerEndsAt: Date? = nil
     ) {
         self.id = id
@@ -131,12 +136,40 @@ struct SessionDraft: Identifiable, Codable, Equatable, Sendable {
         self.templateNameSnapshot = templateNameSnapshot
         self.startedAt = startedAt
         self.lastUpdatedAt = lastUpdatedAt
-        self.blocks = blocks
+        self.exercises = exercises
         self.restTimerEndsAt = restTimerEndsAt
+    }
+
+    init(from decoder: Decoder) throws {
+        let container = try decoder.container(keyedBy: CodingKeys.self)
+        id = try container.decode(UUID.self, forKey: .id)
+        planID = try container.decodeIfPresent(UUID.self, forKey: .planID)
+        templateID = try container.decode(UUID.self, forKey: .templateID)
+        templateNameSnapshot = try container.decode(String.self, forKey: .templateNameSnapshot)
+        startedAt = try container.decode(Date.self, forKey: .startedAt)
+        lastUpdatedAt = try container.decode(Date.self, forKey: .lastUpdatedAt)
+        if container.contains(.exercises) {
+            exercises = try container.decode([SessionExercise].self, forKey: .exercises)
+        } else {
+            exercises = try container.decode([SessionExercise].self, forKey: .legacyBlocks)
+        }
+        restTimerEndsAt = try container.decodeIfPresent(Date.self, forKey: .restTimerEndsAt)
+    }
+
+    func encode(to encoder: Encoder) throws {
+        var container = encoder.container(keyedBy: CodingKeys.self)
+        try container.encode(id, forKey: .id)
+        try container.encodeIfPresent(planID, forKey: .planID)
+        try container.encode(templateID, forKey: .templateID)
+        try container.encode(templateNameSnapshot, forKey: .templateNameSnapshot)
+        try container.encode(startedAt, forKey: .startedAt)
+        try container.encode(lastUpdatedAt, forKey: .lastUpdatedAt)
+        try container.encode(exercises, forKey: .exercises)
+        try container.encodeIfPresent(restTimerEndsAt, forKey: .restTimerEndsAt)
     }
 }
 
-struct CompletedSessionBlock: Identifiable, Codable, Equatable, Sendable {
+struct CompletedSessionExercise: Identifiable, Codable, Equatable, Sendable {
     var id: UUID
     var exerciseID: UUID
     var exerciseNameSnapshot: String
@@ -175,7 +208,12 @@ struct CompletedSession: Identifiable, Codable, Equatable, Sendable {
     var templateID: UUID
     var templateNameSnapshot: String
     var completedAt: Date
-    var blocks: [CompletedSessionBlock]
+    var exercises: [CompletedSessionExercise]
+
+    enum CodingKeys: String, CodingKey {
+        case id, planID, templateID, templateNameSnapshot, completedAt, exercises
+        case legacyBlocks = "blocks"
+    }
 
     init(
         id: UUID = UUID(),
@@ -183,13 +221,37 @@ struct CompletedSession: Identifiable, Codable, Equatable, Sendable {
         templateID: UUID,
         templateNameSnapshot: String,
         completedAt: Date = .now,
-        blocks: [CompletedSessionBlock]
+        exercises: [CompletedSessionExercise]
     ) {
         self.id = id
         self.planID = planID
         self.templateID = templateID
         self.templateNameSnapshot = templateNameSnapshot
         self.completedAt = completedAt
-        self.blocks = blocks
+        self.exercises = exercises
+    }
+
+    init(from decoder: Decoder) throws {
+        let container = try decoder.container(keyedBy: CodingKeys.self)
+        id = try container.decode(UUID.self, forKey: .id)
+        planID = try container.decodeIfPresent(UUID.self, forKey: .planID)
+        templateID = try container.decode(UUID.self, forKey: .templateID)
+        templateNameSnapshot = try container.decode(String.self, forKey: .templateNameSnapshot)
+        completedAt = try container.decode(Date.self, forKey: .completedAt)
+        if container.contains(.exercises) {
+            exercises = try container.decode([CompletedSessionExercise].self, forKey: .exercises)
+        } else {
+            exercises = try container.decode([CompletedSessionExercise].self, forKey: .legacyBlocks)
+        }
+    }
+
+    func encode(to encoder: Encoder) throws {
+        var container = encoder.container(keyedBy: CodingKeys.self)
+        try container.encode(id, forKey: .id)
+        try container.encodeIfPresent(planID, forKey: .planID)
+        try container.encode(templateID, forKey: .templateID)
+        try container.encode(templateNameSnapshot, forKey: .templateNameSnapshot)
+        try container.encode(completedAt, forKey: .completedAt)
+        try container.encode(exercises, forKey: .exercises)
     }
 }

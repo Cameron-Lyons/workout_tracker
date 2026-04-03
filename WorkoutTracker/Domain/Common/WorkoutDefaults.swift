@@ -28,7 +28,7 @@ enum ExerciseRecommendationDefaults {
     }
 }
 
-enum ExerciseBlockDefaults {
+enum TemplateExerciseDefaults {
     static let restSeconds = 90
     static let setCount = 3
     static let repRange = RepRange(8, 12)

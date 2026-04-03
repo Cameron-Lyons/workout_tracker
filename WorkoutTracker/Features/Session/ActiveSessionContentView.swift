@@ -7,7 +7,7 @@ struct ActiveSessionContentView: View {
     }
 
     let headerState: ActiveSessionHeaderState
-    let blocks: [SessionBlock]
+    let exercises: [SessionExercise]
     let displaySettings: ActiveSessionDisplaySettings
     let actions: ActiveSessionActions
     let showsDetailedChrome: Bool
@@ -19,16 +19,16 @@ struct ActiveSessionContentView: View {
 
             ScrollView {
                 LazyVStack(spacing: 0) {
-                    ForEach(Array(blocks.enumerated()), id: \.element.id) { index, block in
-                        SessionBlockCardView(
-                            block: block,
+                    ForEach(Array(exercises.enumerated()), id: \.element.id) { index, sessionExercise in
+                        SessionExerciseCardView(
+                            sessionExercise: sessionExercise,
                             displaySettings: displaySettings,
                             actions: actions,
                             showsDetailedChrome: showsDetailedChrome
                         )
                         .equatable()
 
-                        if index < blocks.count - 1 {
+                        if index < exercises.count - 1 {
                             Color.clear
                                 .frame(height: spacing(after: index))
                         }
@@ -49,11 +49,11 @@ struct ActiveSessionContentView: View {
     }
 
     private func spacing(after index: Int) -> CGFloat {
-        guard index < blocks.count - 1 else {
+        guard index < exercises.count - 1 else {
             return 0
         }
 
-        return blocks[index].exerciseID == blocks[index + 1].exerciseID
+        return exercises[index].exerciseID == exercises[index + 1].exerciseID
             ? Layout.repeatedExerciseBlockSpacing
             : Layout.defaultBlockSpacing
     }

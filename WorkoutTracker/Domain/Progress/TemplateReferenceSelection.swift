@@ -431,25 +431,25 @@ enum TemplateReferenceSelection {
     }
 
     private static func isStartingStrengthStyleDayA(_ template: WorkoutTemplate) -> Bool {
-        let exerciseIDs = Set(template.blocks.map(\.exerciseID))
+        let exerciseIDs = Set(template.exercises.map(\.exerciseID))
         let requiredExerciseIDs: Set<UUID> = [CatalogSeed.backSquat, CatalogSeed.benchPress, CatalogSeed.deadlift]
         return requiredExerciseIDs.isSubset(of: exerciseIDs)
     }
 
     private static func isStartingStrengthStyleDayB(_ template: WorkoutTemplate) -> Bool {
-        let exerciseIDs = Set(template.blocks.map(\.exerciseID))
+        let exerciseIDs = Set(template.exercises.map(\.exerciseID))
         let requiredExerciseIDs: Set<UUID> = [CatalogSeed.backSquat, CatalogSeed.overheadPress, CatalogSeed.powerClean]
         return requiredExerciseIDs.isSubset(of: exerciseIDs)
     }
 
     private static func isClassicLinearProgressionDayA(_ template: WorkoutTemplate) -> Bool {
-        let exerciseIDs = Set(template.blocks.map(\.exerciseID))
+        let exerciseIDs = Set(template.exercises.map(\.exerciseID))
         let requiredExerciseIDs: Set<UUID> = [CatalogSeed.backSquat, CatalogSeed.benchPress, CatalogSeed.barbellRow]
         return requiredExerciseIDs.isSubset(of: exerciseIDs)
     }
 
     private static func isClassicLinearProgressionDayB(_ template: WorkoutTemplate) -> Bool {
-        let exerciseIDs = Set(template.blocks.map(\.exerciseID))
+        let exerciseIDs = Set(template.exercises.map(\.exerciseID))
         let requiredExerciseIDs: Set<UUID> = [CatalogSeed.backSquat, CatalogSeed.overheadPress, CatalogSeed.deadlift]
         return requiredExerciseIDs.isSubset(of: exerciseIDs)
     }
@@ -463,25 +463,25 @@ enum TemplateReferenceSelection {
     }
 
     private static func isStartingStrengthStyleDayA(_ template: TemplateSummary) -> Bool {
-        let exerciseIDs = Set(template.blockExerciseIDs)
+        let exerciseIDs = Set(template.exerciseIDs)
         let requiredExerciseIDs: Set<UUID> = [CatalogSeed.backSquat, CatalogSeed.benchPress, CatalogSeed.deadlift]
         return requiredExerciseIDs.isSubset(of: exerciseIDs)
     }
 
     private static func isStartingStrengthStyleDayB(_ template: TemplateSummary) -> Bool {
-        let exerciseIDs = Set(template.blockExerciseIDs)
+        let exerciseIDs = Set(template.exerciseIDs)
         let requiredExerciseIDs: Set<UUID> = [CatalogSeed.backSquat, CatalogSeed.overheadPress, CatalogSeed.powerClean]
         return requiredExerciseIDs.isSubset(of: exerciseIDs)
     }
 
     private static func isClassicLinearProgressionDayA(_ template: TemplateSummary) -> Bool {
-        let exerciseIDs = Set(template.blockExerciseIDs)
+        let exerciseIDs = Set(template.exerciseIDs)
         let requiredExerciseIDs: Set<UUID> = [CatalogSeed.backSquat, CatalogSeed.benchPress, CatalogSeed.barbellRow]
         return requiredExerciseIDs.isSubset(of: exerciseIDs)
     }
 
     private static func isClassicLinearProgressionDayB(_ template: TemplateSummary) -> Bool {
-        let exerciseIDs = Set(template.blockExerciseIDs)
+        let exerciseIDs = Set(template.exerciseIDs)
         let requiredExerciseIDs: Set<UUID> = [CatalogSeed.backSquat, CatalogSeed.overheadPress, CatalogSeed.deadlift]
         return requiredExerciseIDs.isSubset(of: exerciseIDs)
     }

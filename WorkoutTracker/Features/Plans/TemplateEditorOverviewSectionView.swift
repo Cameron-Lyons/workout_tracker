@@ -14,6 +14,7 @@ struct TemplateEditorOverviewSectionView: View {
             )
 
             TextField("Template name", text: $templateName)
+                .accessibilityIdentifier("plans.editor.templateNameField")
                 .textInputAutocapitalization(.words)
                 .foregroundStyle(AppColors.textPrimary)
                 .appInputField()

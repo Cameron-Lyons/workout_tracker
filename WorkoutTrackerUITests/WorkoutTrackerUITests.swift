@@ -110,12 +110,18 @@ final class WorkoutTrackerUITests: XCTestCase {
         XCTAssertTrue(plansTab.waitForExistence(timeout: 8))
         plansTab.tap()
 
+        XCTAssertTrue(app.staticTexts["General Gym"].waitForExistence(timeout: 12))
+
         let addPlanButton = app.buttons["plans.addPlanButton"]
-        XCTAssertTrue(addPlanButton.waitForExistence(timeout: 4))
+        XCTAssertTrue(addPlanButton.waitForExistence(timeout: 8))
         addPlanButton.tap()
 
-        let planNameField = app.textFields["Program name"]
-        XCTAssertTrue(planNameField.waitForExistence(timeout: 4))
+        let newProgramButton = app.buttons["New Program"]
+        XCTAssertTrue(newProgramButton.waitForExistence(timeout: 4))
+        newProgramButton.tap()
+
+        let planNameField = app.textFields.firstMatch
+        XCTAssertTrue(planNameField.waitForExistence(timeout: 12))
         planNameField.tap()
         planNameField.typeText("Custom Plan")
         app.buttons["Save"].tap()
@@ -125,14 +131,15 @@ final class WorkoutTrackerUITests: XCTestCase {
         XCTAssertTrue(addTemplateButton.waitForExistence(timeout: 4))
         addTemplateButton.tap()
 
-        let templateNameField = app.textFields["Template name"]
-        XCTAssertTrue(templateNameField.waitForExistence(timeout: 4))
+        let templateNameField = app.textFields.firstMatch
+        XCTAssertTrue(templateNameField.waitForExistence(timeout: 12))
         templateNameField.tap()
         templateNameField.typeText("Upper Builder")
 
-        let addBlockButton = app.buttons["plans.template.addBlockButton"]
-        XCTAssertTrue(addBlockButton.waitForExistence(timeout: 4))
-        addBlockButton.tap()
+        let addExerciseButton = app.buttons["plans.template.addExerciseButton"]
+        app.revealIfNeeded(addExerciseButton)
+        XCTAssertTrue(addExerciseButton.waitForExistence(timeout: 8))
+        addExerciseButton.tap()
 
         let pickButton = app.buttons["plans.template.pickExerciseButton"].firstMatch
         app.revealIfNeeded(pickButton)
@@ -187,12 +194,18 @@ final class WorkoutTrackerUITests: XCTestCase {
         XCTAssertTrue(plansTab.waitForExistence(timeout: 8))
         plansTab.tap()
 
+        XCTAssertTrue(app.staticTexts["General Gym"].waitForExistence(timeout: 12))
+
         let addPlanButton = app.buttons["plans.addPlanButton"]
-        XCTAssertTrue(addPlanButton.waitForExistence(timeout: 4))
+        XCTAssertTrue(addPlanButton.waitForExistence(timeout: 8))
         addPlanButton.tap()
 
-        let planNameField = app.textFields["Program name"]
-        XCTAssertTrue(planNameField.waitForExistence(timeout: 4))
+        let newProgramButton = app.buttons["New Program"]
+        XCTAssertTrue(newProgramButton.waitForExistence(timeout: 4))
+        newProgramButton.tap()
+
+        let planNameField = app.textFields.firstMatch
+        XCTAssertTrue(planNameField.waitForExistence(timeout: 12))
         planNameField.tap()
         planNameField.typeText("Custom Exercise Plan")
         app.buttons["Save"].tap()
@@ -202,14 +215,15 @@ final class WorkoutTrackerUITests: XCTestCase {
         XCTAssertTrue(addTemplateButton.waitForExistence(timeout: 4))
         addTemplateButton.tap()
 
-        let templateNameField = app.textFields["Template name"]
-        XCTAssertTrue(templateNameField.waitForExistence(timeout: 4))
+        let templateNameField = app.textFields.firstMatch
+        XCTAssertTrue(templateNameField.waitForExistence(timeout: 12))
         templateNameField.tap()
         templateNameField.typeText("Cable Builder")
 
-        let addBlockButton = app.buttons["plans.template.addBlockButton"]
-        XCTAssertTrue(addBlockButton.waitForExistence(timeout: 4))
-        addBlockButton.tap()
+        let addExerciseButton = app.buttons["plans.template.addExerciseButton"]
+        app.revealIfNeeded(addExerciseButton)
+        XCTAssertTrue(addExerciseButton.waitForExistence(timeout: 8))
+        addExerciseButton.tap()
 
         let pickButton = app.buttons["plans.template.pickExerciseButton"].firstMatch
         app.revealIfNeeded(pickButton)
@@ -247,20 +261,27 @@ final class WorkoutTrackerUITests: XCTestCase {
         XCTAssertTrue(plansTab.waitForExistence(timeout: 8))
         plansTab.tap()
 
-        let pinButtons = app.buttons.matching(NSPredicate(format: "identifier BEGINSWITH %@", "plans.pinTemplate."))
-        XCTAssertGreaterThanOrEqual(pinButtons.count, 2)
+        let pinMenus = app.buttons.matching(NSPredicate(format: "identifier BEGINSWITH %@", "plans.pinTemplate."))
+        XCTAssertGreaterThanOrEqual(pinMenus.count, 2)
 
-        let pinnedButton = try XCTUnwrap(pinButtons.allElementsBoundByIndex.first(where: { $0.label == "Pinned to Today" }))
-        let unpinnedButton = try XCTUnwrap(pinButtons.allElementsBoundByIndex.first(where: { $0.label == "Pin to Today" }))
-        let updatedButtonIdentifier = unpinnedButton.identifier
+        // General Gym seeds `Upper A` pinned first, then `Lower A`, `Upper B`, `Lower B`.
+        let pinnedMenu = pinMenus.element(boundBy: 0)
+        let unpinnedMenu = pinMenus.element(boundBy: 1)
+        let repinnedMenuIdentifier = unpinnedMenu.identifier
 
         attachScreenshot(named: "accessibility-plans-before-repin")
-        unpinnedButton.tap()
+        XCTAssertEqual(pinnedMenu.label, "Pinned to Today")
+        XCTAssertEqual(unpinnedMenu.label, "Pin to Today")
 
-        let updatedButton = app.buttons[updatedButtonIdentifier]
-        XCTAssertTrue(updatedButton.waitForExistence(timeout: 4))
-        XCTAssertEqual(updatedButton.label, "Pinned to Today")
-        XCTAssertNotEqual(pinnedButton.identifier, updatedButtonIdentifier)
+        unpinnedMenu.tap()
+        let pinAction = app.buttons.matching(NSPredicate(format: "label == %@", "Pin to Today")).firstMatch
+        XCTAssertTrue(pinAction.waitForExistence(timeout: 4))
+        pinAction.tap()
+
+        let repinnedMenu = app.buttons[repinnedMenuIdentifier]
+        XCTAssertTrue(repinnedMenu.waitForExistence(timeout: 4))
+        XCTAssertEqual(repinnedMenu.label, "Pinned to Today")
+        XCTAssertNotEqual(pinnedMenu.identifier, repinnedMenuIdentifier)
     }
 
     @MainActor

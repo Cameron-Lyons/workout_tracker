@@ -5,7 +5,7 @@ enum PresetPackBuilder {
     private enum PresetPackRest {
         static let accessory = 60
         static let unilateralAccessory = 75
-        static let standard = ExerciseBlockDefaults.restSeconds
+        static let standard = TemplateExerciseDefaults.restSeconds
         static let compound = 120
         static let mainLift = 150
         static let waveMainLift = 180
@@ -13,7 +13,7 @@ enum PresetPackBuilder {
     }
 
     private enum PresetPackSets {
-        static let standard = ExerciseBlockDefaults.setCount
+        static let standard = TemplateExerciseDefaults.setCount
         static let powerMainSets = 4
         static let strongLifts = 5
         static let greyskull = 3
@@ -91,22 +91,22 @@ enum PresetPackBuilder {
         let upperA = WorkoutTemplate(
             name: "Upper A",
             scheduledWeekdays: [.monday, .thursday],
-            blocks: [
-                ExerciseBlock(
+            exercises: [
+                TemplateExercise(
                     exerciseID: CatalogSeed.benchPress,
                     exerciseNameSnapshot: "Bench Press",
                     restSeconds: PresetPackRest.compound,
                     progressionRule: upperRule,
                     targets: repeatedTargets(repRange: PresetPackRepRange.upperMain)
                 ),
-                ExerciseBlock(
+                TemplateExercise(
                     exerciseID: CatalogSeed.barbellRow,
                     exerciseNameSnapshot: "Barbell Row",
                     restSeconds: PresetPackRest.compound,
                     progressionRule: upperRule,
                     targets: repeatedTargets(repRange: PresetPackRepRange.row)
                 ),
-                ExerciseBlock(
+                TemplateExercise(
                     exerciseID: CatalogSeed.lateralRaise,
                     exerciseNameSnapshot: "Lateral Raise",
                     restSeconds: PresetPackRest.accessory,
@@ -114,7 +114,7 @@ enum PresetPackBuilder {
                     progressionRule: .manual,
                     targets: repeatedTargets(repRange: PresetPackRepRange.shoulders)
                 ),
-                ExerciseBlock(
+                TemplateExercise(
                     exerciseID: CatalogSeed.tricepsPushdown,
                     exerciseNameSnapshot: "Triceps Pushdown",
                     restSeconds: PresetPackRest.accessory,
@@ -128,29 +128,29 @@ enum PresetPackBuilder {
         let lowerA = WorkoutTemplate(
             name: "Lower A",
             scheduledWeekdays: [.tuesday, .friday],
-            blocks: [
-                ExerciseBlock(
+            exercises: [
+                TemplateExercise(
                     exerciseID: CatalogSeed.backSquat,
                     exerciseNameSnapshot: "Back Squat",
                     restSeconds: PresetPackRest.mainLift,
                     progressionRule: lowerRule,
                     targets: repeatedTargets(repRange: PresetPackRepRange.squatVolume)
                 ),
-                ExerciseBlock(
+                TemplateExercise(
                     exerciseID: CatalogSeed.romanianDeadlift,
                     exerciseNameSnapshot: "Romanian Deadlift",
                     restSeconds: PresetPackRest.compound,
                     progressionRule: lowerRule,
                     targets: repeatedTargets(repRange: PresetPackRepRange.posteriorChain)
                 ),
-                ExerciseBlock(
+                TemplateExercise(
                     exerciseID: CatalogSeed.legPress,
                     exerciseNameSnapshot: "Leg Press",
                     restSeconds: PresetPackRest.standard,
                     progressionRule: .manual,
                     targets: repeatedTargets(repRange: PresetPackRepRange.accessory)
                 ),
-                ExerciseBlock(
+                TemplateExercise(
                     exerciseID: CatalogSeed.standingCalfRaise,
                     exerciseNameSnapshot: "Standing Calf Raise",
                     restSeconds: PresetPackRest.accessory,
@@ -162,30 +162,30 @@ enum PresetPackBuilder {
 
         let upperB = WorkoutTemplate(
             name: "Upper B",
-            blocks: [
-                ExerciseBlock(
+            exercises: [
+                TemplateExercise(
                     exerciseID: CatalogSeed.overheadPress,
                     exerciseNameSnapshot: "Overhead Press",
                     restSeconds: PresetPackRest.compound,
                     progressionRule: upperRule,
                     targets: repeatedTargets(repRange: PresetPackRepRange.upperMain)
                 ),
-                ExerciseBlock(
+                TemplateExercise(
                     exerciseID: CatalogSeed.pullUp,
                     exerciseNameSnapshot: "Pull Up",
                     restSeconds: PresetPackRest.compound,
                     progressionRule: .manual,
                     targets: repeatedTargets(repRange: PresetPackRepRange.posteriorChain)
                 ),
-                ExerciseBlock(
+                TemplateExercise(
                     exerciseID: CatalogSeed.inclineBenchPress,
                     exerciseNameSnapshot: "Incline Bench Press",
                     restSeconds: PresetPackRest.standard,
                     supersetGroup: "B",
                     progressionRule: .manual,
-                    targets: repeatedTargets(repRange: ExerciseBlockDefaults.repRange)
+                    targets: repeatedTargets(repRange: TemplateExerciseDefaults.repRange)
                 ),
-                ExerciseBlock(
+                TemplateExercise(
                     exerciseID: CatalogSeed.hammerCurl,
                     exerciseNameSnapshot: "Hammer Curl",
                     restSeconds: PresetPackRest.accessory,
@@ -198,8 +198,8 @@ enum PresetPackBuilder {
 
         let lowerB = WorkoutTemplate(
             name: "Lower B",
-            blocks: [
-                ExerciseBlock(
+            exercises: [
+                TemplateExercise(
                     exerciseID: CatalogSeed.deadlift,
                     exerciseNameSnapshot: "Deadlift",
                     restSeconds: PresetPackRest.mainLift,
@@ -209,22 +209,22 @@ enum PresetPackBuilder {
                         repRange: PresetPackRepRange.heavyPull
                     )
                 ),
-                ExerciseBlock(
+                TemplateExercise(
                     exerciseID: CatalogSeed.frontSquat,
                     exerciseNameSnapshot: "Front Squat",
                     restSeconds: PresetPackRest.compound,
                     progressionRule: lowerRule,
                     targets: repeatedTargets(repRange: PresetPackRepRange.upperMain)
                 ),
-                ExerciseBlock(
+                TemplateExercise(
                     exerciseID: CatalogSeed.bulgarianSplitSquat,
                     exerciseNameSnapshot: "Bulgarian Split Squat",
                     restSeconds: PresetPackRest.unilateralAccessory,
                     supersetGroup: "C",
                     progressionRule: .manual,
-                    targets: repeatedTargets(repRange: ExerciseBlockDefaults.repRange)
+                    targets: repeatedTargets(repRange: TemplateExerciseDefaults.repRange)
                 ),
-                ExerciseBlock(
+                TemplateExercise(
                     exerciseID: CatalogSeed.legCurl,
                     exerciseNameSnapshot: "Leg Curl",
                     restSeconds: PresetPackRest.accessory,
@@ -246,7 +246,7 @@ enum PresetPackBuilder {
         let upperPower = WorkoutTemplate(
             name: "Upper Power",
             scheduledWeekdays: [.monday],
-            blocks: [
+            exercises: [
                 doubleProgressionBlock(
                     exerciseID: CatalogSeed.benchPress,
                     exerciseName: "Bench Press",
@@ -294,7 +294,7 @@ enum PresetPackBuilder {
         let lowerPower = WorkoutTemplate(
             name: "Lower Power",
             scheduledWeekdays: [.tuesday],
-            blocks: [
+            exercises: [
                 doubleProgressionBlock(
                     exerciseID: CatalogSeed.backSquat,
                     exerciseName: "Back Squat",
@@ -333,7 +333,7 @@ enum PresetPackBuilder {
         let upperHypertrophy = WorkoutTemplate(
             name: "Upper Hypertrophy",
             scheduledWeekdays: [.thursday],
-            blocks: [
+            exercises: [
                 doubleProgressionBlock(
                     exerciseID: CatalogSeed.inclineBenchPress,
                     exerciseName: "Incline Bench Press",
@@ -386,7 +386,7 @@ enum PresetPackBuilder {
         let lowerHypertrophy = WorkoutTemplate(
             name: "Lower Hypertrophy",
             scheduledWeekdays: [.friday],
-            blocks: [
+            exercises: [
                 doubleProgressionBlock(
                     exerciseID: CatalogSeed.frontSquat,
                     exerciseName: "Front Squat",
@@ -439,7 +439,7 @@ enum PresetPackBuilder {
         let workoutA = WorkoutTemplate(
             name: "Workout A",
             scheduledWeekdays: [.monday, .friday],
-            blocks: [
+            exercises: [
                 doubleProgressionBlock(
                     exerciseID: CatalogSeed.backSquat,
                     exerciseName: "Back Squat",
@@ -470,7 +470,7 @@ enum PresetPackBuilder {
         let workoutB = WorkoutTemplate(
             name: "Workout B",
             scheduledWeekdays: [.wednesday],
-            blocks: [
+            exercises: [
                 doubleProgressionBlock(
                     exerciseID: CatalogSeed.backSquat,
                     exerciseName: "Back Squat",
@@ -509,7 +509,7 @@ enum PresetPackBuilder {
         let workoutA = WorkoutTemplate(
             name: "Workout A",
             scheduledWeekdays: [.monday, .friday],
-            blocks: [
+            exercises: [
                 greyskullBlock(
                     exerciseID: CatalogSeed.backSquat,
                     exerciseName: "Back Squat",
@@ -534,7 +534,7 @@ enum PresetPackBuilder {
         let workoutB = WorkoutTemplate(
             name: "Workout B",
             scheduledWeekdays: [.wednesday],
-            blocks: [
+            exercises: [
                 greyskullBlock(
                     exerciseID: CatalogSeed.backSquat,
                     exerciseName: "Back Squat",
@@ -576,22 +576,22 @@ enum PresetPackBuilder {
         let dayA = WorkoutTemplate(
             name: "Workout A",
             scheduledWeekdays: [.monday, .friday],
-            blocks: [
-                ExerciseBlock(
+            exercises: [
+                TemplateExercise(
                     exerciseID: CatalogSeed.backSquat,
                     exerciseNameSnapshot: "Back Squat",
                     restSeconds: PresetPackRest.mainLift,
                     progressionRule: squatRule,
                     targets: repeatedTargets(repRange: PresetPackRepRange.strength)
                 ),
-                ExerciseBlock(
+                TemplateExercise(
                     exerciseID: CatalogSeed.benchPress,
                     exerciseNameSnapshot: "Bench Press",
                     restSeconds: PresetPackRest.compound,
                     progressionRule: upperRule,
                     targets: repeatedTargets(repRange: PresetPackRepRange.strength)
                 ),
-                ExerciseBlock(
+                TemplateExercise(
                     exerciseID: CatalogSeed.deadlift,
                     exerciseNameSnapshot: "Deadlift",
                     restSeconds: PresetPackRest.waveMainLift,
@@ -610,22 +610,22 @@ enum PresetPackBuilder {
         let dayB = WorkoutTemplate(
             name: "Workout B",
             scheduledWeekdays: [.wednesday],
-            blocks: [
-                ExerciseBlock(
+            exercises: [
+                TemplateExercise(
                     exerciseID: CatalogSeed.backSquat,
                     exerciseNameSnapshot: "Back Squat",
                     restSeconds: PresetPackRest.mainLift,
                     progressionRule: squatRule,
                     targets: repeatedTargets(repRange: PresetPackRepRange.strength)
                 ),
-                ExerciseBlock(
+                TemplateExercise(
                     exerciseID: CatalogSeed.overheadPress,
                     exerciseNameSnapshot: "Overhead Press",
                     restSeconds: PresetPackRest.compound,
                     progressionRule: upperRule,
                     targets: repeatedTargets(repRange: PresetPackRepRange.strength)
                 ),
-                ExerciseBlock(
+                TemplateExercise(
                     exerciseID: CatalogSeed.powerClean,
                     exerciseNameSnapshot: "Power Clean",
                     restSeconds: PresetPackRest.compound,
@@ -739,7 +739,7 @@ enum PresetPackBuilder {
         let volumeDay = WorkoutTemplate(
             name: "Volume Day",
             scheduledWeekdays: [.monday],
-            blocks: [
+            exercises: [
                 manualBlock(
                     exerciseID: CatalogSeed.backSquat,
                     exerciseName: "Back Squat",
@@ -767,7 +767,7 @@ enum PresetPackBuilder {
         let recoveryDay = WorkoutTemplate(
             name: "Recovery Day",
             scheduledWeekdays: [.wednesday],
-            blocks: [
+            exercises: [
                 manualBlock(
                     exerciseID: CatalogSeed.backSquat,
                     exerciseName: "Back Squat",
@@ -795,7 +795,7 @@ enum PresetPackBuilder {
         let intensityDay = WorkoutTemplate(
             name: "Intensity Day",
             scheduledWeekdays: [.friday],
-            blocks: [
+            exercises: [
                 manualBlock(
                     exerciseID: CatalogSeed.backSquat,
                     exerciseName: "Back Squat",
@@ -828,7 +828,7 @@ enum PresetPackBuilder {
         let workoutA = WorkoutTemplate(
             name: "Workout A",
             scheduledWeekdays: [.monday],
-            blocks: [
+            exercises: [
                 gzclTierOneBlock(
                     exerciseID: CatalogSeed.backSquat,
                     exerciseName: "Back Squat",
@@ -849,7 +849,7 @@ enum PresetPackBuilder {
         let workoutB = WorkoutTemplate(
             name: "Workout B",
             scheduledWeekdays: [.tuesday],
-            blocks: [
+            exercises: [
                 gzclTierOneBlock(
                     exerciseID: CatalogSeed.overheadPress,
                     exerciseName: "Overhead Press",
@@ -870,7 +870,7 @@ enum PresetPackBuilder {
         let workoutC = WorkoutTemplate(
             name: "Workout C",
             scheduledWeekdays: [.thursday],
-            blocks: [
+            exercises: [
                 gzclTierOneBlock(
                     exerciseID: CatalogSeed.benchPress,
                     exerciseName: "Bench Press",
@@ -891,7 +891,7 @@ enum PresetPackBuilder {
         let workoutD = WorkoutTemplate(
             name: "Workout D",
             scheduledWeekdays: [.friday],
-            blocks: [
+            exercises: [
                 gzclTierOneBlock(
                     exerciseID: CatalogSeed.deadlift,
                     exerciseName: "Deadlift",
@@ -932,13 +932,13 @@ enum PresetPackBuilder {
     private static func doubleProgressionBlock(
         exerciseID: UUID,
         exerciseName: String,
-        restSeconds: Int = ExerciseBlockDefaults.restSeconds,
+        restSeconds: Int = TemplateExerciseDefaults.restSeconds,
         count: Int = PresetPackSets.standard,
         repRange: RepRange = DoubleProgressionDefaults.repRange,
         increment: Double,
         supersetGroup: String? = nil
-    ) -> ExerciseBlock {
-        ExerciseBlock(
+    ) -> TemplateExercise {
+        TemplateExercise(
             exerciseID: exerciseID,
             exerciseNameSnapshot: exerciseName,
             restSeconds: restSeconds,
@@ -951,12 +951,12 @@ enum PresetPackBuilder {
     private static func manualBlock(
         exerciseID: UUID,
         exerciseName: String,
-        restSeconds: Int = ExerciseBlockDefaults.restSeconds,
+        restSeconds: Int = TemplateExerciseDefaults.restSeconds,
         count: Int = PresetPackSets.standard,
-        repRange: RepRange = ExerciseBlockDefaults.repRange,
+        repRange: RepRange = TemplateExerciseDefaults.repRange,
         supersetGroup: String? = nil
-    ) -> ExerciseBlock {
-        ExerciseBlock(
+    ) -> TemplateExercise {
+        TemplateExercise(
             exerciseID: exerciseID,
             exerciseNameSnapshot: exerciseName,
             restSeconds: restSeconds,
@@ -969,11 +969,11 @@ enum PresetPackBuilder {
     private static func manualBlock(
         exerciseID: UUID,
         exerciseName: String,
-        restSeconds: Int = ExerciseBlockDefaults.restSeconds,
+        restSeconds: Int = TemplateExerciseDefaults.restSeconds,
         targets: [SetTarget],
         supersetGroup: String? = nil
-    ) -> ExerciseBlock {
-        ExerciseBlock(
+    ) -> TemplateExercise {
+        TemplateExercise(
             exerciseID: exerciseID,
             exerciseNameSnapshot: exerciseName,
             restSeconds: restSeconds,
@@ -986,10 +986,10 @@ enum PresetPackBuilder {
     private static func greyskullBlock(
         exerciseID: UUID,
         exerciseName: String,
-        restSeconds: Int = ExerciseBlockDefaults.restSeconds,
+        restSeconds: Int = TemplateExerciseDefaults.restSeconds,
         increment: Double
-    ) -> ExerciseBlock {
-        ExerciseBlock(
+    ) -> TemplateExercise {
+        TemplateExercise(
             exerciseID: exerciseID,
             exerciseNameSnapshot: exerciseName,
             restSeconds: restSeconds,
@@ -1034,7 +1034,7 @@ enum PresetPackBuilder {
         exerciseID: UUID,
         exerciseName: String,
         increment: Double
-    ) -> ExerciseBlock {
+    ) -> TemplateExercise {
         doubleProgressionBlock(
             exerciseID: exerciseID,
             exerciseName: exerciseName,
@@ -1049,7 +1049,7 @@ enum PresetPackBuilder {
         exerciseID: UUID,
         exerciseName: String,
         increment: Double
-    ) -> ExerciseBlock {
+    ) -> TemplateExercise {
         doubleProgressionBlock(
             exerciseID: exerciseID,
             exerciseName: exerciseName,
@@ -1063,7 +1063,7 @@ enum PresetPackBuilder {
     private static func gzclTierThreeBlock(
         exerciseID: UUID,
         exerciseName: String
-    ) -> ExerciseBlock {
+    ) -> TemplateExercise {
         manualBlock(
             exerciseID: exerciseID,
             exerciseName: exerciseName,
@@ -1083,15 +1083,15 @@ enum PresetPackBuilder {
         }
     }
 
-    private static func accessoryBlock(id: UUID, name: String) -> ExerciseBlock {
-        ExerciseBlock(
+    private static func accessoryBlock(id: UUID, name: String) -> TemplateExercise {
+        TemplateExercise(
             exerciseID: id,
             exerciseNameSnapshot: name,
-            restSeconds: ExerciseBlockDefaults.restSeconds,
+            restSeconds: TemplateExerciseDefaults.restSeconds,
             progressionRule: .manual,
             targets: repeatedTargets(
-                count: ExerciseBlockDefaults.setCount,
-                repRange: ExerciseBlockDefaults.repRange
+                count: TemplateExerciseDefaults.setCount,
+                repRange: TemplateExerciseDefaults.repRange
             )
         )
     }
@@ -1113,8 +1113,8 @@ enum PresetPackBuilder {
         exerciseID: UUID,
         exerciseName: String,
         settings: SettingsStore
-    ) -> ExerciseBlock {
-        var block = ExerciseBlock(
+    ) -> TemplateExercise {
+        var block = TemplateExercise(
             exerciseID: exerciseID,
             exerciseNameSnapshot: exerciseName,
             restSeconds: PresetPackRest.waveMainLift,
@@ -1131,11 +1131,11 @@ enum PresetPackBuilder {
         mainExerciseID: UUID,
         mainExerciseName: String,
         settings: SettingsStore,
-        accessories: [ExerciseBlock]
+        accessories: [TemplateExercise]
     ) -> WorkoutTemplate {
         WorkoutTemplate(
             name: name,
-            blocks: [
+            exercises: [
                 waveMainBlock(
                     exerciseID: mainExerciseID,
                     exerciseName: mainExerciseName,
@@ -1155,13 +1155,13 @@ enum PresetPackBuilder {
     ) -> WorkoutTemplate {
         WorkoutTemplate(
             name: name,
-            blocks: [
+            exercises: [
                 waveMainBlock(
                     exerciseID: mainExerciseID,
                     exerciseName: mainExerciseName,
                     settings: settings
                 ),
-                ExerciseBlock(
+                TemplateExercise(
                     exerciseID: bbbExerciseID,
                     exerciseNameSnapshot: bbbExerciseName,
                     restSeconds: PresetPackRest.compound,

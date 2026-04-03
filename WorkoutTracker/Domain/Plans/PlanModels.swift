@@ -1,6 +1,6 @@
 import Foundation
 
-struct ExerciseBlock: Identifiable, Codable, Equatable, Sendable {
+struct TemplateExercise: Identifiable, Codable, Equatable, Sendable {
     var id: UUID
     var exerciseID: UUID
     var exerciseNameSnapshot: String
@@ -14,7 +14,7 @@ struct ExerciseBlock: Identifiable, Codable, Equatable, Sendable {
         id: UUID = UUID(),
         exerciseID: UUID,
         exerciseNameSnapshot: String,
-        restSeconds: Int = ExerciseBlockDefaults.restSeconds,
+        restSeconds: Int = TemplateExerciseDefaults.restSeconds,
         supersetGroup: String? = nil,
         progressionRule: ProgressionRule = .manual,
         targets: [SetTarget],
@@ -36,23 +36,52 @@ struct WorkoutTemplate: Identifiable, Codable, Equatable, Sendable {
     var name: String
     var note: String
     var scheduledWeekdays: [Weekday]
-    var blocks: [ExerciseBlock]
+    var exercises: [TemplateExercise]
     var lastStartedAt: Date?
+
+    enum CodingKeys: String, CodingKey {
+        case id, name, note, scheduledWeekdays, exercises, lastStartedAt
+        case legacyBlocks = "blocks"
+    }
 
     init(
         id: UUID = UUID(),
         name: String,
         note: String = "",
         scheduledWeekdays: [Weekday] = [],
-        blocks: [ExerciseBlock],
+        exercises: [TemplateExercise],
         lastStartedAt: Date? = nil
     ) {
         self.id = id
         self.name = name
         self.note = note
         self.scheduledWeekdays = scheduledWeekdays
-        self.blocks = blocks
+        self.exercises = exercises
         self.lastStartedAt = lastStartedAt
+    }
+
+    init(from decoder: Decoder) throws {
+        let container = try decoder.container(keyedBy: CodingKeys.self)
+        id = try container.decode(UUID.self, forKey: .id)
+        name = try container.decode(String.self, forKey: .name)
+        note = try container.decodeIfPresent(String.self, forKey: .note) ?? ""
+        scheduledWeekdays = try container.decodeIfPresent([Weekday].self, forKey: .scheduledWeekdays) ?? []
+        if container.contains(.exercises) {
+            exercises = try container.decode([TemplateExercise].self, forKey: .exercises)
+        } else {
+            exercises = try container.decode([TemplateExercise].self, forKey: .legacyBlocks)
+        }
+        lastStartedAt = try container.decodeIfPresent(Date.self, forKey: .lastStartedAt)
+    }
+
+    func encode(to encoder: Encoder) throws {
+        var container = encoder.container(keyedBy: CodingKeys.self)
+        try container.encode(id, forKey: .id)
+        try container.encode(name, forKey: .name)
+        try container.encode(note, forKey: .note)
+        try container.encode(scheduledWeekdays, forKey: .scheduledWeekdays)
+        try container.encode(exercises, forKey: .exercises)
+        try container.encodeIfPresent(lastStartedAt, forKey: .lastStartedAt)
     }
 }
 
@@ -84,7 +113,12 @@ struct TemplateSummary: Identifiable, Codable, Equatable, Sendable {
     var note: String
     var scheduledWeekdays: [Weekday]
     var lastStartedAt: Date?
-    var blockExerciseIDs: [UUID]
+    var exerciseIDs: [UUID]
+
+    enum CodingKeys: String, CodingKey {
+        case id, name, note, scheduledWeekdays, lastStartedAt, exerciseIDs
+        case legacyBlockExerciseIDs = "blockExerciseIDs"
+    }
 
     init(
         id: UUID,
@@ -92,14 +126,14 @@ struct TemplateSummary: Identifiable, Codable, Equatable, Sendable {
         note: String,
         scheduledWeekdays: [Weekday],
         lastStartedAt: Date?,
-        blockExerciseIDs: [UUID]
+        exerciseIDs: [UUID]
     ) {
         self.id = id
         self.name = name
         self.note = note
         self.scheduledWeekdays = scheduledWeekdays
         self.lastStartedAt = lastStartedAt
-        self.blockExerciseIDs = blockExerciseIDs
+        self.exerciseIDs = exerciseIDs
     }
 
     init(template: WorkoutTemplate) {
@@ -109,8 +143,32 @@ struct TemplateSummary: Identifiable, Codable, Equatable, Sendable {
             note: template.note,
             scheduledWeekdays: template.scheduledWeekdays,
             lastStartedAt: template.lastStartedAt,
-            blockExerciseIDs: template.blocks.map(\.exerciseID)
+            exerciseIDs: template.exercises.map(\.exerciseID)
         )
+    }
+
+    init(from decoder: Decoder) throws {
+        let container = try decoder.container(keyedBy: CodingKeys.self)
+        id = try container.decode(UUID.self, forKey: .id)
+        name = try container.decode(String.self, forKey: .name)
+        note = try container.decodeIfPresent(String.self, forKey: .note) ?? ""
+        scheduledWeekdays = try container.decodeIfPresent([Weekday].self, forKey: .scheduledWeekdays) ?? []
+        lastStartedAt = try container.decodeIfPresent(Date.self, forKey: .lastStartedAt)
+        if container.contains(.exerciseIDs) {
+            exerciseIDs = try container.decode([UUID].self, forKey: .exerciseIDs)
+        } else {
+            exerciseIDs = try container.decode([UUID].self, forKey: .legacyBlockExerciseIDs)
+        }
+    }
+
+    func encode(to encoder: Encoder) throws {
+        var container = encoder.container(keyedBy: CodingKeys.self)
+        try container.encode(id, forKey: .id)
+        try container.encode(name, forKey: .name)
+        try container.encode(note, forKey: .note)
+        try container.encode(scheduledWeekdays, forKey: .scheduledWeekdays)
+        try container.encodeIfPresent(lastStartedAt, forKey: .lastStartedAt)
+        try container.encode(exerciseIDs, forKey: .exerciseIDs)
     }
 }
 

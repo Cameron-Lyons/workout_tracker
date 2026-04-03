@@ -24,7 +24,7 @@ extension WorkoutStoreTests {
         await rehydratedStore.hydrateIfNeeded()
 
         XCTAssertEqual(rehydratedStore.sessionStore.activeDraft?.templateNameSnapshot, "Upper 1")
-        XCTAssertEqual(rehydratedStore.sessionStore.activeDraft?.blocks.count, 1)
+        XCTAssertEqual(rehydratedStore.sessionStore.activeDraft?.exercises.count, 1)
     }
 
     @MainActor
@@ -43,7 +43,7 @@ extension WorkoutStoreTests {
         seededStore.savePlan(plan)
         seededStore.startSession(planID: plan.id, templateID: try XCTUnwrap(plan.templates.first?.id))
 
-        let block = try XCTUnwrap(seededStore.sessionStore.activeDraft?.blocks.first)
+        let block = try XCTUnwrap(seededStore.sessionStore.activeDraft?.exercises.first)
         let workingRow = try XCTUnwrap(block.sets.first(where: { $0.target.setKind == .working }))
         seededStore.toggleSetCompletion(blockID: block.id, setID: workingRow.id)
         XCTAssertTrue(seededStore.finishActiveSession())
@@ -81,7 +81,7 @@ extension WorkoutStoreTests {
         seededStore.savePlan(plan)
         seededStore.startSession(planID: plan.id, templateID: try XCTUnwrap(plan.templates.first?.id))
 
-        let block = try XCTUnwrap(seededStore.sessionStore.activeDraft?.blocks.first)
+        let block = try XCTUnwrap(seededStore.sessionStore.activeDraft?.exercises.first)
         let workingRow = try XCTUnwrap(block.sets.first(where: { $0.target.setKind == .working }))
         seededStore.toggleSetCompletion(blockID: block.id, setID: workingRow.id)
         XCTAssertTrue(seededStore.finishActiveSession())
@@ -173,8 +173,8 @@ extension WorkoutStoreTests {
         var plan = seededStore.makePlan(name: "Wave Bench")
         let template = WorkoutTemplate(
             name: "Bench Day",
-            blocks: [
-                ExerciseBlock(
+            exercises: [
+                TemplateExercise(
                     exerciseID: CatalogSeed.benchPress,
                     exerciseNameSnapshot: seededStore.plansStore.exerciseName(for: CatalogSeed.benchPress),
                     progressionRule: ProgressionRule(
@@ -206,7 +206,7 @@ extension WorkoutStoreTests {
 
         rehydratedStore.startSession(planID: plan.id, templateID: template.id)
 
-        let startedBlock = try XCTUnwrap(rehydratedStore.sessionStore.activeDraft?.blocks.first)
+        let startedBlock = try XCTUnwrap(rehydratedStore.sessionStore.activeDraft?.exercises.first)
         let workingTargets = startedBlock.sets
             .filter { $0.target.setKind == .working }
             .compactMap(\.target.targetWeight)
@@ -254,7 +254,7 @@ extension WorkoutStoreTests {
 
         store.startSession(planID: plan.id, templateID: templateID)
 
-        let block = try XCTUnwrap(store.sessionStore.activeDraft?.blocks.first)
+        let block = try XCTUnwrap(store.sessionStore.activeDraft?.exercises.first)
         let warmupRow = try XCTUnwrap(block.sets.first(where: { $0.target.setKind == .warmup }))
         store.toggleSetCompletion(blockID: block.id, setID: warmupRow.id)
 
@@ -279,7 +279,7 @@ extension WorkoutStoreTests {
         store.startSession(planID: plan.id, templateID: try XCTUnwrap(plan.templates.first?.id))
 
         let draft = try XCTUnwrap(store.sessionStore.activeDraft)
-        let block = try XCTUnwrap(draft.blocks.first)
+        let block = try XCTUnwrap(draft.exercises.first)
         let row = try XCTUnwrap(block.sets.first(where: { $0.target.setKind == .working }))
 
         store.toggleSetCompletion(blockID: block.id, setID: row.id)
@@ -299,7 +299,7 @@ extension WorkoutStoreTests {
 
         XCTAssertEqual(summary.displayName, "Competition Bench Press")
         XCTAssertEqual(summary.pointCount, 1)
-        XCTAssertEqual(store.sessionStore.completedSessions.first?.blocks.first?.exerciseNameSnapshot, "Bench Press")
+        XCTAssertEqual(store.sessionStore.completedSessions.first?.exercises.first?.exerciseNameSnapshot, "Bench Press")
         XCTAssertTrue(store.plansStore.exerciseItem(for: CatalogSeed.benchPress)?.aliases.contains("Bench Press") == true)
     }
 
@@ -328,8 +328,8 @@ extension WorkoutStoreTests {
 
         let updatedPlan = try XCTUnwrap(store.plansStore.plan(for: plan.id))
 
-        XCTAssertEqual(updatedPlan.templates.first?.blocks.first?.exerciseNameSnapshot, "Competition Bench Press")
-        XCTAssertEqual(store.sessionStore.activeDraft?.blocks.first?.exerciseNameSnapshot, "Competition Bench Press")
+        XCTAssertEqual(updatedPlan.templates.first?.exercises.first?.exerciseNameSnapshot, "Competition Bench Press")
+        XCTAssertEqual(store.sessionStore.activeDraft?.exercises.first?.exerciseNameSnapshot, "Competition Bench Press")
     }
 
     @MainActor

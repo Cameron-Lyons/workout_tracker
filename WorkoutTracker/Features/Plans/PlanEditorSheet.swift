@@ -52,6 +52,7 @@ struct PlanEditorSheet: View {
                                 .textInputAutocapitalization(.words)
                                 .foregroundStyle(AppColors.textPrimary)
                                 .appInputField()
+                                .accessibilityIdentifier("plans.editor.planNameField")
 
                             Text("Examples: Upper / Lower, Garage Gym, Travel Split.")
                                 .font(.caption)

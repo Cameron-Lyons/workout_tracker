@@ -352,7 +352,7 @@ final class PlansStore {
     func updatePlanProgression(
         planID: UUID,
         templateID: UUID,
-        finishedBlocks: [SessionBlock],
+        finishedBlocks: [SessionExercise],
         settings: SettingsStore
     ) {
         guard var plan = plan(for: planID),
@@ -369,7 +369,7 @@ final class PlansStore {
                 continue
             }
 
-            let block = template.blocks[blockIndex]
+            let block = template.exercises[blockIndex]
             let increment = settings.preferredIncrement(for: finishedBlock.exerciseNameSnapshot)
             let updated = ProgressionEngine.applyCompletion(
                 to: block,
@@ -377,7 +377,7 @@ final class PlansStore {
                 profile: profile(for: finishedBlock.exerciseID),
                 fallbackIncrement: increment
             )
-            template.blocks[blockIndex] = updated.block
+            template.exercises[blockIndex] = updated.block
 
             if let updatedProfile = updated.profile,
                 updatedProfiles.contains(where: { $0.id == updatedProfile.id }) == false
@@ -514,13 +514,13 @@ final class PlansStore {
 
         for planIndex in plans.indices {
             for templateIndex in plans[planIndex].templates.indices {
-                for blockIndex in plans[planIndex].templates[templateIndex].blocks.indices
-                where plans[planIndex].templates[templateIndex].blocks[blockIndex].exerciseID == exerciseID {
-                    guard plans[planIndex].templates[templateIndex].blocks[blockIndex].exerciseNameSnapshot != name else {
+                for blockIndex in plans[planIndex].templates[templateIndex].exercises.indices
+                where plans[planIndex].templates[templateIndex].exercises[blockIndex].exerciseID == exerciseID {
+                    guard plans[planIndex].templates[templateIndex].exercises[blockIndex].exerciseNameSnapshot != name else {
                         continue
                     }
 
-                    plans[planIndex].templates[templateIndex].blocks[blockIndex].exerciseNameSnapshot = name
+                    plans[planIndex].templates[templateIndex].exercises[blockIndex].exerciseNameSnapshot = name
                     changedPlanIDs.insert(plans[planIndex].id)
                 }
             }
@@ -538,8 +538,8 @@ final class PlansStore {
         return plans.filter { changedPlanIDs.contains($0.id) }
     }
 
-    private func templateBlockIndex(in template: WorkoutTemplate, matching finishedBlock: SessionBlock) -> Int? {
-        template.blocks.firstIndex(where: { $0.id == finishedBlock.id })
+    private func templateBlockIndex(in template: WorkoutTemplate, matching finishedBlock: SessionExercise) -> Int? {
+        template.exercises.firstIndex(where: { $0.id == finishedBlock.id })
     }
 
     private func mergeProfilesInMemory(_ updatedProfiles: [ExerciseProfile]) {

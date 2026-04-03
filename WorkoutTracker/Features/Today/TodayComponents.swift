@@ -129,7 +129,7 @@ struct TodayCompletedSessionRow: View {
                     .multilineTextAlignment(.leading)
                     .fixedSize(horizontal: false, vertical: true)
 
-                Text("\(session.blocks.count) exercise block\(session.blocks.count == 1 ? "" : "s")")
+                Text("\(session.exercises.count) exercise\(session.exercises.count == 1 ? "" : "s")")
                     .font(.subheadline)
                     .foregroundStyle(AppColors.textSecondary)
             }

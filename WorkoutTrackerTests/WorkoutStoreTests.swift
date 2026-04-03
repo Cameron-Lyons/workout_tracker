@@ -43,7 +43,7 @@ final class WorkoutStoreTests: XCTestCase {
         weight: Double
     ) -> Plan {
         var plan = store.makePlan(name: name)
-        let block = ExerciseBlock(
+        let block = TemplateExercise(
             exerciseID: CatalogSeed.benchPress,
             exerciseNameSnapshot: store.plansStore.exerciseName(for: CatalogSeed.benchPress),
             restSeconds: 90,
@@ -57,7 +57,7 @@ final class WorkoutStoreTests: XCTestCase {
                 )
             ]
         )
-        let template = WorkoutTemplate(name: templateName, blocks: [block])
+        let template = WorkoutTemplate(name: templateName, exercises: [block])
         plan.templates = [template]
         plan.pinnedTemplateID = template.id
         return plan
@@ -67,7 +67,7 @@ final class WorkoutStoreTests: XCTestCase {
         let dayA = WorkoutTemplate(
             name: "Workout A",
             scheduledWeekdays: [.monday, .friday],
-            blocks: [
+            exercises: [
                 makeStartingStrengthBlock(id: CatalogSeed.backSquat, name: "Back Squat"),
                 makeStartingStrengthBlock(id: CatalogSeed.benchPress, name: "Bench Press"),
                 makeStartingStrengthBlock(id: CatalogSeed.deadlift, name: "Deadlift"),
@@ -76,7 +76,7 @@ final class WorkoutStoreTests: XCTestCase {
         let dayB = WorkoutTemplate(
             name: "Workout B",
             scheduledWeekdays: [.wednesday],
-            blocks: [
+            exercises: [
                 makeStartingStrengthBlock(id: CatalogSeed.backSquat, name: "Back Squat"),
                 makeStartingStrengthBlock(id: CatalogSeed.overheadPress, name: "Overhead Press"),
                 makeStartingStrengthBlock(id: CatalogSeed.powerClean, name: "Power Clean"),
@@ -94,8 +94,8 @@ final class WorkoutStoreTests: XCTestCase {
         let dayA = WorkoutTemplate(
             name: "Workout A",
             scheduledWeekdays: [.monday, .friday],
-            blocks: [
-                ExerciseBlock(
+            exercises: [
+                TemplateExercise(
                     exerciseID: CatalogSeed.pullUp,
                     exerciseNameSnapshot: "Pull Up",
                     restSeconds: 90,
@@ -107,8 +107,8 @@ final class WorkoutStoreTests: XCTestCase {
         let dayB = WorkoutTemplate(
             name: "Workout B",
             scheduledWeekdays: [.wednesday],
-            blocks: [
-                ExerciseBlock(
+            exercises: [
+                TemplateExercise(
                     exerciseID: CatalogSeed.dips,
                     exerciseNameSnapshot: "Dips",
                     restSeconds: 90,
@@ -125,8 +125,8 @@ final class WorkoutStoreTests: XCTestCase {
         )
     }
 
-    func makeStartingStrengthBlock(id: UUID, name: String) -> ExerciseBlock {
-        ExerciseBlock(
+    func makeStartingStrengthBlock(id: UUID, name: String) -> TemplateExercise {
+        TemplateExercise(
             exerciseID: id,
             exerciseNameSnapshot: name,
             restSeconds: 90,
@@ -157,8 +157,8 @@ final class WorkoutStoreTests: XCTestCase {
             templateID: UUID(),
             templateNameSnapshot: "Template",
             completedAt: date,
-            blocks: [
-                CompletedSessionBlock(
+            exercises: [
+                CompletedSessionExercise(
                     exerciseID: exerciseID,
                     exerciseNameSnapshot: exerciseName,
                     sets: rows
@@ -173,7 +173,7 @@ final class WorkoutStoreTests: XCTestCase {
         templateID: UUID,
         templateNameSnapshot: String,
         date: Date,
-        blocks: [CompletedSessionBlock] = []
+        exercises: [CompletedSessionExercise] = []
     ) -> CompletedSession {
         CompletedSession(
             id: id,
@@ -181,7 +181,7 @@ final class WorkoutStoreTests: XCTestCase {
             templateID: templateID,
             templateNameSnapshot: templateNameSnapshot,
             completedAt: date,
-            blocks: blocks
+            exercises: exercises
         )
     }
 

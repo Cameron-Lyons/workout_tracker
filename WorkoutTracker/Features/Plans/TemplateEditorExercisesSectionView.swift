@@ -1,7 +1,7 @@
 import SwiftUI
 
-struct TemplateEditorBlocksSectionView: View {
-    @Binding var blocks: [TemplateDraftBlock]
+struct TemplateEditorExercisesSectionView: View {
+    @Binding var draftExercises: [TemplateDraftExercise]
     let weightUnit: WeightUnit
     let scrollProxy: ScrollViewProxy
     @Binding var showingExercisePickerForBlockID: UUID?
@@ -10,32 +10,32 @@ struct TemplateEditorBlocksSectionView: View {
         VStack(alignment: .leading, spacing: 12) {
             HStack(alignment: .top, spacing: 12) {
                 AppSectionHeader(
-                    title: "Exercise Blocks",
+                    title: "Exercises",
                     systemImage: "dumbbell",
-                    subtitle: "Keep the default prescription simple, then expand a block for more control.",
-                    trailing: blocks.isEmpty ? nil : "\(blocks.count)",
+                    subtitle: "Keep the default prescription simple, then expand an exercise for more control.",
+                    trailing: draftExercises.isEmpty ? nil : "\(draftExercises.count)",
                     tone: .today
                 )
 
                 Button {
-                    addBlock()
+                    addDraftExercise()
                 } label: {
-                    Label("Add Block", systemImage: "plus")
+                    Label("Add Exercise", systemImage: "plus")
                 }
+                .accessibilityIdentifier("plans.template.addExerciseButton")
                 .appPrimaryActionButton(tone: .today, controlSize: .regular)
-                .accessibilityIdentifier("plans.template.addBlockButton")
             }
 
-            if blocks.isEmpty {
+            if draftExercises.isEmpty {
                 VStack(alignment: .leading, spacing: 8) {
                     AppStatePill(title: "Start Here", systemImage: "sparkles", tone: .today)
 
-                    Text("Add at least one exercise block.")
+                    Text("Add at least one exercise.")
                         .font(.headline.weight(.semibold))
                         .foregroundStyle(AppColors.textPrimary)
 
                     Text(
-                        "Each block holds the main prescription up front, with progression details hidden until you need them."
+                        "Each exercise holds the main prescription up front, with progression details hidden until you need them."
                     )
                     .font(.subheadline)
                     .foregroundStyle(AppColors.textSecondary)
@@ -47,18 +47,18 @@ struct TemplateEditorBlocksSectionView: View {
                 )
             } else {
                 LazyVStack(spacing: 12) {
-                    ForEach($blocks) { $block in
-                        TemplateDraftBlockEditorView(
-                            block: $block,
+                    ForEach($draftExercises) { $draft in
+                        TemplateDraftExerciseEditorView(
+                            draft: $draft,
                             weightUnit: weightUnit,
-                            onPickExercise: { blockID in
-                                showingExercisePickerForBlockID = blockID
+                            onPickExercise: { rowID in
+                                showingExercisePickerForBlockID = rowID
                             },
-                            onDelete: { blockID in
-                                deleteBlock(blockID)
+                            onDelete: { rowID in
+                                deleteDraftExercise(rowID)
                             }
                         )
-                        .id($block.wrappedValue.id)
+                        .id($draft.wrappedValue.id)
                     }
                 }
             }
@@ -66,19 +66,19 @@ struct TemplateEditorBlocksSectionView: View {
         .appSectionFrame(tone: .today, topPadding: 16, bottomPadding: 8)
     }
 
-    private func addBlock() {
-        let newBlock = TemplateDraftBlock()
-        blocks.append(newBlock)
+    private func addDraftExercise() {
+        let newDraft = TemplateDraftExercise()
+        draftExercises.append(newDraft)
 
         Task { @MainActor in
             await Task.yield()
             withAnimation(.easeInOut(duration: 0.2)) {
-                scrollProxy.scrollTo(newBlock.id, anchor: .bottom)
+                scrollProxy.scrollTo(newDraft.id, anchor: .bottom)
             }
         }
     }
 
-    private func deleteBlock(_ blockID: UUID) {
-        blocks.removeAll(where: { $0.id == blockID })
+    private func deleteDraftExercise(_ rowID: UUID) {
+        draftExercises.removeAll(where: { $0.id == rowID })
     }
 }

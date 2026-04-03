@@ -36,14 +36,14 @@ extension WorkoutStoreTests {
         for planName in [PresetPack.fiveThreeOne.displayName, PresetPack.boringButBig.displayName] {
             let plan = try XCTUnwrap(store.plansStore.plans.first(where: { $0.name == planName }))
             let template = try XCTUnwrap(plan.templates.first)
-            let waveBlock = try XCTUnwrap(template.blocks.first)
+            let waveBlock = try XCTUnwrap(template.exercises.first)
 
             XCTAssertNotNil(waveBlock.progressionRule.percentageWave?.trainingMax)
             XCTAssertFalse(waveBlock.targets.isEmpty)
             XCTAssertNotNil(waveBlock.targets.first?.targetWeight)
 
             store.startSession(planID: plan.id, templateID: template.id)
-            XCTAssertNotNil(store.sessionStore.activeDraft?.blocks.first?.sets.first?.target.targetWeight)
+            XCTAssertNotNil(store.sessionStore.activeDraft?.exercises.first?.sets.first?.target.targetWeight)
             store.discardActiveSession()
         }
     }
@@ -60,12 +60,12 @@ extension WorkoutStoreTests {
         let benchDay = try XCTUnwrap(plan.templates.first(where: { $0.name == "Bench Day" }))
         let deadliftDay = try XCTUnwrap(plan.templates.first(where: { $0.name == "Deadlift Day" }))
 
-        XCTAssertEqual(squatDay.blocks.first?.progressionRule.percentageWave?.trainingMax, 135)
-        XCTAssertEqual(squatDay.blocks.first?.progressionRule.percentageWave?.cycleIncrement, 12.5)
-        XCTAssertEqual(benchDay.blocks.first?.progressionRule.percentageWave?.trainingMax, 135)
-        XCTAssertEqual(benchDay.blocks.first?.progressionRule.percentageWave?.cycleIncrement, 5)
-        XCTAssertEqual(deadliftDay.blocks.first?.progressionRule.percentageWave?.trainingMax, 135)
-        XCTAssertEqual(deadliftDay.blocks.first?.progressionRule.percentageWave?.cycleIncrement, 12.5)
+        XCTAssertEqual(squatDay.exercises.first?.progressionRule.percentageWave?.trainingMax, 135)
+        XCTAssertEqual(squatDay.exercises.first?.progressionRule.percentageWave?.cycleIncrement, 12.5)
+        XCTAssertEqual(benchDay.exercises.first?.progressionRule.percentageWave?.trainingMax, 135)
+        XCTAssertEqual(benchDay.exercises.first?.progressionRule.percentageWave?.cycleIncrement, 5)
+        XCTAssertEqual(deadliftDay.exercises.first?.progressionRule.percentageWave?.trainingMax, 135)
+        XCTAssertEqual(deadliftDay.exercises.first?.progressionRule.percentageWave?.cycleIncrement, 12.5)
     }
 
     @MainActor
@@ -78,22 +78,22 @@ extension WorkoutStoreTests {
         let strongLifts = try XCTUnwrap(PresetPackBuilder.makePlans(for: .strongLiftsFiveByFive, settings: settings).first)
         XCTAssertEqual(strongLifts.templates.count, 2)
         XCTAssertTrue(TemplateReferenceSelection.isAlternatingPlan(strongLifts))
-        XCTAssertEqual(strongLifts.templates.first?.blocks.map(\.targets.count), [5, 5, 5])
-        XCTAssertEqual(strongLifts.templates.last?.blocks.last?.targets.count, 1)
+        XCTAssertEqual(strongLifts.templates.first?.exercises.map(\.targets.count), [5, 5, 5])
+        XCTAssertEqual(strongLifts.templates.last?.exercises.last?.targets.count, 1)
 
         let greyskull = try XCTUnwrap(PresetPackBuilder.makePlans(for: .greyskullLP, settings: settings).first)
         XCTAssertEqual(greyskull.templates.count, 2)
-        XCTAssertEqual(greyskull.templates.first?.blocks.first?.targets.last?.note, "AMRAP+")
-        XCTAssertEqual(greyskull.templates.last?.blocks.last?.targets.last?.note, "AMRAP+")
+        XCTAssertEqual(greyskull.templates.first?.exercises.first?.targets.last?.note, "AMRAP+")
+        XCTAssertEqual(greyskull.templates.last?.exercises.last?.targets.last?.note, "AMRAP+")
 
         let madcow = try XCTUnwrap(PresetPackBuilder.makePlans(for: .madcowFiveByFive, settings: settings).first)
         XCTAssertEqual(madcow.templates.map(\.name), ["Volume Day", "Recovery Day", "Intensity Day"])
-        XCTAssertEqual(madcow.templates.last?.blocks.first?.targets.map(\.note), [nil, nil, nil, "Top triple", "Backoff set"])
+        XCTAssertEqual(madcow.templates.last?.exercises.first?.targets.map(\.note), [nil, nil, nil, "Top triple", "Backoff set"])
 
         let gzclp = try XCTUnwrap(PresetPackBuilder.makePlans(for: .gzclp, settings: settings).first)
         XCTAssertEqual(gzclp.templates.count, 4)
         XCTAssertFalse(TemplateReferenceSelection.isAlternatingPlan(gzclp))
-        XCTAssertEqual(gzclp.templates.first?.blocks.count, 3)
+        XCTAssertEqual(gzclp.templates.first?.exercises.count, 3)
     }
 
     @MainActor
@@ -118,7 +118,7 @@ extension WorkoutStoreTests {
                 templateID: try XCTUnwrap(plan.templates.first(where: { $0.name == "Workout A" })?.id),
                 templateNameSnapshot: "Workout A",
                 completedAt: completedAt,
-                blocks: []
+                exercises: []
             )
         ]
 
@@ -148,7 +148,7 @@ extension WorkoutStoreTests {
 
         store.startSession(planID: pinnedTemplate.planID, templateID: pinnedTemplate.templateID)
         let draft = try XCTUnwrap(store.sessionStore.activeDraft)
-        let squatBlock = try XCTUnwrap(draft.blocks.first)
+        let squatBlock = try XCTUnwrap(draft.exercises.first)
         let workingRows = squatBlock.sets.filter { $0.target.setKind == .working }
         XCTAssertEqual(workingRows.count, 5)
         XCTAssertTrue(workingRows.allSatisfy { $0.target.targetWeight == nil })
@@ -164,14 +164,14 @@ extension WorkoutStoreTests {
 
         let updatedPlan = try XCTUnwrap(store.plansStore.plan(for: pinnedTemplate.planID))
         let updatedTemplate = try XCTUnwrap(updatedPlan.templates.first(where: { $0.id == pinnedTemplate.templateID }))
-        XCTAssertEqual(updatedTemplate.blocks.first?.targets.compactMap(\.targetWeight), Array(repeating: 140, count: 5))
+        XCTAssertEqual(updatedTemplate.exercises.first?.targets.compactMap(\.targetWeight), Array(repeating: 140, count: 5))
 
         let rehydratedStore = makeStore(container: container)
         await rehydratedStore.hydrateIfNeeded()
 
         let rehydratedPlan = try XCTUnwrap(rehydratedStore.plansStore.plan(for: pinnedTemplate.planID))
         let rehydratedTemplate = try XCTUnwrap(rehydratedPlan.templates.first(where: { $0.id == pinnedTemplate.templateID }))
-        XCTAssertEqual(rehydratedTemplate.blocks.first?.targets.compactMap(\.targetWeight), Array(repeating: 140, count: 5))
+        XCTAssertEqual(rehydratedTemplate.exercises.first?.targets.compactMap(\.targetWeight), Array(repeating: 140, count: 5))
     }
 
     @MainActor
@@ -183,7 +183,7 @@ extension WorkoutStoreTests {
 
         let pinnedTemplate = try XCTUnwrap(seededStore.todayStore.pinnedTemplate)
         seededStore.startSession(planID: pinnedTemplate.planID, templateID: pinnedTemplate.templateID)
-        let firstBlock = try XCTUnwrap(seededStore.sessionStore.activeDraft?.blocks.first)
+        let firstBlock = try XCTUnwrap(seededStore.sessionStore.activeDraft?.exercises.first)
         let firstRow = try XCTUnwrap(firstBlock.sets.first(where: { $0.target.setKind == .working }))
         seededStore.toggleSetCompletion(blockID: firstBlock.id, setID: firstRow.id)
         XCTAssertTrue(seededStore.finishActiveSession())
@@ -230,7 +230,7 @@ extension WorkoutStoreTests {
         await store.hydrateIfNeeded()
 
         let draft = try XCTUnwrap(store.sessionStore.activeDraft)
-        let firstBlock = try XCTUnwrap(draft.blocks.first)
+        let firstBlock = try XCTUnwrap(draft.exercises.first)
         let firstWorkingRow = try XCTUnwrap(firstBlock.sets.first(where: { $0.target.setKind == .working }))
 
         XCTAssertFalse(store.shouldShowOnboarding)
@@ -264,7 +264,7 @@ extension WorkoutStoreTests {
         store.resumeActiveSession()
         XCTAssertTrue(store.sessionStore.isPresentingSession)
 
-        let initialBlock = try XCTUnwrap(store.sessionStore.activeDraft?.blocks.first)
+        let initialBlock = try XCTUnwrap(store.sessionStore.activeDraft?.exercises.first)
         let initialRow = try XCTUnwrap(initialBlock.sets.first(where: { $0.target.setKind == .working }))
 
         store.toggleSetCompletion(blockID: initialBlock.id, setID: initialRow.id)
@@ -279,18 +279,18 @@ extension WorkoutStoreTests {
         store.copyLastSet(in: initialBlock.id)
         store.addExerciseToActiveSession(exerciseID: CatalogSeed.backSquat)
 
-        let blockCountAfterCatalogExercise = try XCTUnwrap(store.sessionStore.activeDraft?.blocks.count)
+        let blockCountAfterCatalogExercise = try XCTUnwrap(store.sessionStore.activeDraft?.exercises.count)
         store.addCustomExerciseToActiveSession(name: "  Cable Row  ")
-        XCTAssertEqual(store.sessionStore.activeDraft?.blocks.last?.exerciseNameSnapshot, "Cable Row")
+        XCTAssertEqual(store.sessionStore.activeDraft?.exercises.last?.exerciseNameSnapshot, "Cable Row")
 
         store.undoSessionMutation()
 
         let updatedDraft = try XCTUnwrap(store.sessionStore.activeDraft)
-        let updatedPrimaryBlock = try XCTUnwrap(updatedDraft.blocks.first(where: { $0.id == initialBlock.id }))
+        let updatedPrimaryBlock = try XCTUnwrap(updatedDraft.exercises.first(where: { $0.id == initialBlock.id }))
         let updatedWorkingRows = updatedPrimaryBlock.sets.filter { $0.target.setKind == .working }
 
-        XCTAssertEqual(updatedDraft.blocks.count, blockCountAfterCatalogExercise)
-        XCTAssertFalse(updatedDraft.blocks.contains(where: { $0.exerciseNameSnapshot == "Cable Row" }))
+        XCTAssertEqual(updatedDraft.exercises.count, blockCountAfterCatalogExercise)
+        XCTAssertFalse(updatedDraft.exercises.contains(where: { $0.exerciseNameSnapshot == "Cable Row" }))
         XCTAssertEqual(updatedPrimaryBlock.sets.count, 5)
         XCTAssertEqual(updatedWorkingRows.count, 3)
         XCTAssertEqual(updatedWorkingRows[0].log.weight, 190)
@@ -299,7 +299,7 @@ extension WorkoutStoreTests {
         XCTAssertEqual(updatedWorkingRows[1].log.reps, 6)
         XCTAssertEqual(updatedWorkingRows[2].log.weight, 190)
         XCTAssertEqual(updatedWorkingRows[2].log.reps, 6)
-        XCTAssertEqual(updatedDraft.blocks.last?.exerciseID, CatalogSeed.backSquat)
+        XCTAssertEqual(updatedDraft.exercises.last?.exerciseID, CatalogSeed.backSquat)
 
         store.flushPendingSessionPersistence()
         store.flushPendingPlanPersistence()
@@ -307,10 +307,10 @@ extension WorkoutStoreTests {
         let rehydratedStore = makeStore(container: container)
         await rehydratedStore.hydrateIfNeeded()
         let persistedDraft = try XCTUnwrap(rehydratedStore.sessionStore.activeDraft)
-        let persistedPrimaryBlock = try XCTUnwrap(persistedDraft.blocks.first(where: { $0.id == initialBlock.id }))
+        let persistedPrimaryBlock = try XCTUnwrap(persistedDraft.exercises.first(where: { $0.id == initialBlock.id }))
         let persistedWorkingRows = persistedPrimaryBlock.sets.filter { $0.target.setKind == .working }
 
-        XCTAssertEqual(persistedDraft.blocks.count, blockCountAfterCatalogExercise)
+        XCTAssertEqual(persistedDraft.exercises.count, blockCountAfterCatalogExercise)
         XCTAssertEqual(persistedPrimaryBlock.sets.count, 5)
         XCTAssertEqual(persistedWorkingRows.count, 3)
         XCTAssertEqual(persistedWorkingRows[0].log.weight, 190)
@@ -330,8 +330,8 @@ extension WorkoutStoreTests {
 
         let template = WorkoutTemplate(
             name: "Upper Builder",
-            blocks: [
-                ExerciseBlock(
+            exercises: [
+                TemplateExercise(
                     exerciseID: CatalogSeed.benchPress,
                     exerciseNameSnapshot: store.plansStore.exerciseName(for: CatalogSeed.benchPress),
                     progressionRule: .manual,
@@ -385,14 +385,14 @@ extension WorkoutStoreTests {
         await store.hydrateIfNeeded()
         store.completeOnboarding(with: nil)
 
-        let benchBlock = ExerciseBlock(
+        let benchBlock = TemplateExercise(
             exerciseID: CatalogSeed.benchPress,
             exerciseNameSnapshot: store.plansStore.exerciseName(for: CatalogSeed.benchPress),
             restSeconds: 90,
             progressionRule: .manual,
             targets: [SetTarget(setKind: .working, targetWeight: 185, repRange: RepRange(5, 5))]
         )
-        let pressBlock = ExerciseBlock(
+        let pressBlock = TemplateExercise(
             exerciseID: CatalogSeed.overheadPress,
             exerciseNameSnapshot: store.plansStore.exerciseName(for: CatalogSeed.overheadPress),
             restSeconds: 90,
@@ -400,8 +400,8 @@ extension WorkoutStoreTests {
             targets: [SetTarget(setKind: .working, targetWeight: 115, repRange: RepRange(5, 5))]
         )
 
-        let firstTemplate = WorkoutTemplate(name: "Bench Day", blocks: [benchBlock])
-        let secondTemplate = WorkoutTemplate(name: "Press Day", blocks: [pressBlock])
+        let firstTemplate = WorkoutTemplate(name: "Bench Day", exercises: [benchBlock])
+        let secondTemplate = WorkoutTemplate(name: "Press Day", exercises: [pressBlock])
         let plan = Plan(
             name: "Push Plan",
             pinnedTemplateID: firstTemplate.id,
@@ -437,13 +437,13 @@ extension WorkoutStoreTests {
         store.savePlan(plan)
         store.startSession(planID: plan.id, templateID: try XCTUnwrap(plan.templates.first?.id))
 
-        let initialBlockCount = try XCTUnwrap(store.sessionStore.activeDraft?.blocks.count)
+        let initialBlockCount = try XCTUnwrap(store.sessionStore.activeDraft?.exercises.count)
         let initialCatalogCount = store.plansStore.catalog.count
 
         store.addCustomExerciseToActiveSession(name: "   ")
         store.addCustomExerciseToActiveSession(name: "\n\t")
 
-        XCTAssertEqual(store.sessionStore.activeDraft?.blocks.count, initialBlockCount)
+        XCTAssertEqual(store.sessionStore.activeDraft?.exercises.count, initialBlockCount)
         XCTAssertEqual(store.plansStore.catalog.count, initialCatalogCount)
         XCTAssertFalse(store.plansStore.catalog.contains(where: { $0.name.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty }))
     }

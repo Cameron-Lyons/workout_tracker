@@ -69,7 +69,7 @@ final class AppSessionCoordinator {
         sessionStore.pushMutation(
             blockID: blockID,
             setID: setID,
-            undoStrategy: .block(blockID),
+            undoStrategy: .exercise(blockID),
             persistence: .deferred
         ) { draft, context in
             SessionEngine.toggleCompletion(of: setID, in: blockID, draft: &draft, context: context)
@@ -80,7 +80,7 @@ final class AppSessionCoordinator {
         sessionStore.pushMutation(
             blockID: blockID,
             setID: setID,
-            undoStrategy: .block(blockID),
+            undoStrategy: .exercise(blockID),
             persistence: .deferred
         ) { draft, context in
             SessionEngine.adjustWeight(by: delta, setID: setID, in: blockID, draft: &draft, context: context)
@@ -91,7 +91,7 @@ final class AppSessionCoordinator {
         sessionStore.pushMutation(
             blockID: blockID,
             setID: setID,
-            undoStrategy: .block(blockID),
+            undoStrategy: .exercise(blockID),
             persistence: .deferred
         ) { draft, context in
             SessionEngine.adjustReps(by: delta, setID: setID, in: blockID, draft: &draft, context: context)
@@ -102,7 +102,7 @@ final class AppSessionCoordinator {
         sessionStore.pushMutation(
             blockID: blockID,
             setID: setID,
-            undoStrategy: .block(blockID),
+            undoStrategy: .exercise(blockID),
             persistence: .deferred
         ) { draft, context in
             SessionEngine.updateWeight(to: weight, setID: setID, in: blockID, draft: &draft, context: context)
@@ -113,7 +113,7 @@ final class AppSessionCoordinator {
         sessionStore.pushMutation(
             blockID: blockID,
             setID: setID,
-            undoStrategy: .block(blockID),
+            undoStrategy: .exercise(blockID),
             persistence: .deferred
         ) { draft, context in
             SessionEngine.updateReps(to: reps, setID: setID, in: blockID, draft: &draft, context: context)
@@ -123,7 +123,7 @@ final class AppSessionCoordinator {
     func addSet(to blockID: UUID) {
         sessionStore.pushMutation(
             blockID: blockID,
-            undoStrategy: .block(blockID),
+            undoStrategy: .exercise(blockID),
             persistence: .deferred
         ) { draft, context in
             SessionEngine.addSet(to: blockID, draft: &draft, context: context)
@@ -133,7 +133,7 @@ final class AppSessionCoordinator {
     func copyLastSet(in blockID: UUID) {
         sessionStore.pushMutation(
             blockID: blockID,
-            undoStrategy: .block(blockID),
+            undoStrategy: .exercise(blockID),
             persistence: .deferred
         ) { draft, context in
             SessionEngine.copyLastSet(in: blockID, draft: &draft, context: context)
@@ -146,7 +146,7 @@ final class AppSessionCoordinator {
         }
 
         sessionStore.pushMutation(persistence: .deferred) { draft, _ in
-            SessionEngine.addExerciseBlock(
+            SessionEngine.addSessionExercise(
                 exercise: exercise,
                 draft: &draft,
                 defaultRestSeconds: settingsStore.defaultRestSeconds
@@ -173,7 +173,7 @@ final class AppSessionCoordinator {
         defer { PerformanceSignpost.end(signpost) }
 
         let catalogByID = plansStore.catalogByID
-        let finishedBlocks = sessionStore.activeDraft?.blocks
+        let finishedBlocks = sessionStore.activeDraft?.exercises
         guard let completedSession = sessionStore.completeSession() else {
             return false
         }

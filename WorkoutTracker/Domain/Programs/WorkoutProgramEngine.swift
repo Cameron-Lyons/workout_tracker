@@ -4,7 +4,7 @@ enum ProgressionEngine {
     private static let defaultWaveRounding = StrengthProgressionDefaults.gymRoundingIncrement
 
     static func resolvedTargets(
-        for block: ExerciseBlock,
+        for block: TemplateExercise,
         profile: ExerciseProfile?
     ) -> [SetTarget] {
         switch block.progressionRule.kind {
@@ -34,11 +34,11 @@ enum ProgressionEngine {
     }
 
     static func applyCompletion(
-        to block: ExerciseBlock,
+        to block: TemplateExercise,
         using completedRows: [SessionSetRow],
         profile: ExerciseProfile?,
         fallbackIncrement: Double
-    ) -> (block: ExerciseBlock, profile: ExerciseProfile?) {
+    ) -> (block: TemplateExercise, profile: ExerciseProfile?) {
         switch block.progressionRule.kind {
         case .manual:
             return (block, profile)
@@ -62,11 +62,11 @@ enum ProgressionEngine {
     }
 
     private static func applyDoubleProgression(
-        to block: ExerciseBlock,
+        to block: TemplateExercise,
         using completedRows: [SessionSetRow],
         profile: ExerciseProfile?,
         fallbackIncrement: Double
-    ) -> (block: ExerciseBlock, profile: ExerciseProfile?) {
+    ) -> (block: TemplateExercise, profile: ExerciseProfile?) {
         guard let config = block.progressionRule.doubleProgression else {
             return (block, profile)
         }
@@ -130,11 +130,11 @@ enum ProgressionEngine {
     }
 
     private static func applyPercentageWave(
-        to block: ExerciseBlock,
+        to block: TemplateExercise,
         using completedRows: [SessionSetRow],
         profile: ExerciseProfile?,
         fallbackIncrement: Double
-    ) -> (block: ExerciseBlock, profile: ExerciseProfile?) {
+    ) -> (block: TemplateExercise, profile: ExerciseProfile?) {
         guard var wave = block.progressionRule.percentageWave, !wave.weeks.isEmpty else {
             return (block, profile)
         }
@@ -173,10 +173,10 @@ enum ProgressionEngine {
     }
 
     private static func updatedWaveBlock(
-        from block: ExerciseBlock,
+        from block: TemplateExercise,
         wave: PercentageWaveRule,
         profile: ExerciseProfile?
-    ) -> ExerciseBlock {
+    ) -> TemplateExercise {
         var updatedBlock = block.updatingWave(wave)
         updatedBlock.targets = resolvedTargets(for: updatedBlock, profile: profile)
         return updatedBlock
@@ -184,7 +184,7 @@ enum ProgressionEngine {
 }
 
 enum SessionEngine {
-    private static let defaultRepRange = ExerciseBlockDefaults.repRange
+    private static let defaultRepRange = TemplateExerciseDefaults.repRange
     private static let minimumRestTimerSeconds = 1
 
     static func startSession(
@@ -194,7 +194,7 @@ enum SessionEngine {
         warmupRamp: [WarmupRampStep],
         startedAt: Date = .now
     ) -> SessionDraft {
-        let blocks = template.blocks.map { block in
+        let blocks = template.exercises.map { block in
             let profile = profilesByExerciseID[block.exerciseID]
             let workingTargets = ProgressionEngine.resolvedTargets(for: block, profile: profile)
             let targets = resolvedTargets(
@@ -203,7 +203,7 @@ enum SessionEngine {
                 warmupRamp: warmupRamp
             )
 
-            return SessionBlock(
+            return SessionExercise(
                 id: block.id,
                 exerciseID: block.exerciseID,
                 exerciseNameSnapshot: block.exerciseNameSnapshot,
@@ -220,7 +220,7 @@ enum SessionEngine {
             templateNameSnapshot: template.name,
             startedAt: startedAt,
             lastUpdatedAt: startedAt,
-            blocks: blocks
+            exercises: blocks
         )
     }
 
@@ -233,9 +233,9 @@ enum SessionEngine {
         completedAt: Date = .now
     ) -> SessionMutationResult {
         guard
-            let blockIndex = resolvedBlockIndex(in: draft, blockID: blockID, suggested: context.blockIndex),
+            let exerciseIndex = resolvedExerciseIndex(in: draft, blockID: blockID, suggested: context.exerciseIndex),
             let setIndex = resolvedSetIndex(
-                in: draft.blocks[blockIndex],
+                in: draft.exercises[exerciseIndex],
                 setID: setID,
                 suggested: context.setIndex
             )
@@ -243,25 +243,25 @@ enum SessionEngine {
             return .unchanged
         }
 
-        let blockRestSeconds = draft.blocks[blockIndex].restSeconds
-        if draft.blocks[blockIndex].sets[setIndex].log.isCompleted {
-            draft.blocks[blockIndex].sets[setIndex].log.completedAt = nil
+        let blockRestSeconds = draft.exercises[exerciseIndex].restSeconds
+        if draft.exercises[exerciseIndex].sets[setIndex].log.isCompleted {
+            draft.exercises[exerciseIndex].sets[setIndex].log.completedAt = nil
             draft.restTimerEndsAt = nil
         } else {
-            if draft.blocks[blockIndex].sets[setIndex].log.weight == nil {
-                draft.blocks[blockIndex].sets[setIndex].log.weight =
-                    draft.blocks[blockIndex].sets[setIndex].target.targetWeight
+            if draft.exercises[exerciseIndex].sets[setIndex].log.weight == nil {
+                draft.exercises[exerciseIndex].sets[setIndex].log.weight =
+                    draft.exercises[exerciseIndex].sets[setIndex].target.targetWeight
             }
-            if draft.blocks[blockIndex].sets[setIndex].log.reps == nil {
-                draft.blocks[blockIndex].sets[setIndex].log.reps =
-                    draft.blocks[blockIndex].sets[setIndex].target.repRange.upperBound
+            if draft.exercises[exerciseIndex].sets[setIndex].log.reps == nil {
+                draft.exercises[exerciseIndex].sets[setIndex].log.reps =
+                    draft.exercises[exerciseIndex].sets[setIndex].target.repRange.upperBound
             }
-            if draft.blocks[blockIndex].sets[setIndex].log.rir == nil {
-                draft.blocks[blockIndex].sets[setIndex].log.rir =
-                    draft.blocks[blockIndex].sets[setIndex].target.rir
+            if draft.exercises[exerciseIndex].sets[setIndex].log.rir == nil {
+                draft.exercises[exerciseIndex].sets[setIndex].log.rir =
+                    draft.exercises[exerciseIndex].sets[setIndex].target.rir
             }
-            draft.blocks[blockIndex].sets[setIndex].log.completedAt = completedAt
-            let seconds = draft.blocks[blockIndex].sets[setIndex].target.restSeconds ?? blockRestSeconds
+            draft.exercises[exerciseIndex].sets[setIndex].log.completedAt = completedAt
+            let seconds = draft.exercises[exerciseIndex].sets[setIndex].target.restSeconds ?? blockRestSeconds
             draft.restTimerEndsAt = completedAt.addingTimeInterval(
                 TimeInterval(max(minimumRestTimerSeconds, seconds))
             )
@@ -281,9 +281,9 @@ enum SessionEngine {
         now: Date = .now
     ) -> SessionMutationResult {
         guard
-            let blockIndex = resolvedBlockIndex(in: draft, blockID: blockID, suggested: context.blockIndex),
+            let exerciseIndex = resolvedExerciseIndex(in: draft, blockID: blockID, suggested: context.exerciseIndex),
             let setIndex = resolvedSetIndex(
-                in: draft.blocks[blockIndex],
+                in: draft.exercises[exerciseIndex],
                 setID: setID,
                 suggested: context.setIndex
             )
@@ -291,18 +291,18 @@ enum SessionEngine {
             return .unchanged
         }
 
-        let previousWeight = draft.blocks[blockIndex].sets[setIndex].log.weight
-        if let baseWeight = previousWeight ?? draft.blocks[blockIndex].sets[setIndex].target.targetWeight {
+        let previousWeight = draft.exercises[exerciseIndex].sets[setIndex].log.weight
+        if let baseWeight = previousWeight ?? draft.exercises[exerciseIndex].sets[setIndex].target.targetWeight {
             let updatedWeight = max(0, baseWeight + delta)
             guard previousWeight != updatedWeight else {
                 return .unchanged
             }
-            draft.blocks[blockIndex].sets[setIndex].log.weight = updatedWeight
+            draft.exercises[exerciseIndex].sets[setIndex].log.weight = updatedWeight
         } else {
             guard delta > 0 else {
                 return .unchanged
             }
-            draft.blocks[blockIndex].sets[setIndex].log.weight = delta
+            draft.exercises[exerciseIndex].sets[setIndex].log.weight = delta
         }
 
         draft.touch(now: now)
@@ -319,9 +319,9 @@ enum SessionEngine {
         now: Date = .now
     ) -> SessionMutationResult {
         guard
-            let blockIndex = resolvedBlockIndex(in: draft, blockID: blockID, suggested: context.blockIndex),
+            let exerciseIndex = resolvedExerciseIndex(in: draft, blockID: blockID, suggested: context.exerciseIndex),
             let setIndex = resolvedSetIndex(
-                in: draft.blocks[blockIndex],
+                in: draft.exercises[exerciseIndex],
                 setID: setID,
                 suggested: context.setIndex
             )
@@ -330,11 +330,11 @@ enum SessionEngine {
         }
 
         let updatedWeight = max(0, newWeight)
-        guard draft.blocks[blockIndex].sets[setIndex].log.weight != updatedWeight else {
+        guard draft.exercises[exerciseIndex].sets[setIndex].log.weight != updatedWeight else {
             return .unchanged
         }
 
-        draft.blocks[blockIndex].sets[setIndex].log.weight = updatedWeight
+        draft.exercises[exerciseIndex].sets[setIndex].log.weight = updatedWeight
         draft.touch(now: now)
         return .changed
     }
@@ -349,9 +349,9 @@ enum SessionEngine {
         now: Date = .now
     ) -> SessionMutationResult {
         guard
-            let blockIndex = resolvedBlockIndex(in: draft, blockID: blockID, suggested: context.blockIndex),
+            let exerciseIndex = resolvedExerciseIndex(in: draft, blockID: blockID, suggested: context.exerciseIndex),
             let setIndex = resolvedSetIndex(
-                in: draft.blocks[blockIndex],
+                in: draft.exercises[exerciseIndex],
                 setID: setID,
                 suggested: context.setIndex
             )
@@ -359,14 +359,14 @@ enum SessionEngine {
             return .unchanged
         }
 
-        let previousReps = draft.blocks[blockIndex].sets[setIndex].log.reps
-        let baseReps = previousReps ?? draft.blocks[blockIndex].sets[setIndex].target.repRange.upperBound
+        let previousReps = draft.exercises[exerciseIndex].sets[setIndex].log.reps
+        let baseReps = previousReps ?? draft.exercises[exerciseIndex].sets[setIndex].target.repRange.upperBound
         let updatedReps = max(0, baseReps + delta)
         guard previousReps != updatedReps else {
             return .unchanged
         }
 
-        draft.blocks[blockIndex].sets[setIndex].log.reps = updatedReps
+        draft.exercises[exerciseIndex].sets[setIndex].log.reps = updatedReps
         draft.touch(now: now)
         return .changed
     }
@@ -381,9 +381,9 @@ enum SessionEngine {
         now: Date = .now
     ) -> SessionMutationResult {
         guard
-            let blockIndex = resolvedBlockIndex(in: draft, blockID: blockID, suggested: context.blockIndex),
+            let exerciseIndex = resolvedExerciseIndex(in: draft, blockID: blockID, suggested: context.exerciseIndex),
             let setIndex = resolvedSetIndex(
-                in: draft.blocks[blockIndex],
+                in: draft.exercises[exerciseIndex],
                 setID: setID,
                 suggested: context.setIndex
             )
@@ -392,11 +392,11 @@ enum SessionEngine {
         }
 
         let updatedReps = max(0, newReps)
-        guard draft.blocks[blockIndex].sets[setIndex].log.reps != updatedReps else {
+        guard draft.exercises[exerciseIndex].sets[setIndex].log.reps != updatedReps else {
             return .unchanged
         }
 
-        draft.blocks[blockIndex].sets[setIndex].log.reps = updatedReps
+        draft.exercises[exerciseIndex].sets[setIndex].log.reps = updatedReps
         draft.touch(now: now)
         return .changed
     }
@@ -408,12 +408,12 @@ enum SessionEngine {
         context: SessionMutationContext = .empty,
         now: Date = .now
     ) -> SessionMutationResult {
-        guard let blockIndex = resolvedBlockIndex(in: draft, blockID: blockID, suggested: context.blockIndex) else {
+        guard let exerciseIndex = resolvedExerciseIndex(in: draft, blockID: blockID, suggested: context.exerciseIndex) else {
             return .unchanged
         }
 
-        let copiedTarget = draft.blocks[blockIndex].sets.last?.target ?? SetTarget(repRange: defaultRepRange)
-        let copiedLog = draft.blocks[blockIndex].sets.last?.log
+        let copiedTarget = draft.exercises[exerciseIndex].sets.last?.target ?? SetTarget(repRange: defaultRepRange)
+        let copiedLog = draft.exercises[exerciseIndex].sets.last?.log
         var newRow = SessionSetRow(target: copiedTarget)
         newRow.target.id = UUID()
         newRow.log.setTargetID = newRow.target.id
@@ -422,7 +422,7 @@ enum SessionEngine {
             newRow.log.reps = copiedLog.reps
             newRow.log.rir = copiedLog.rir
         }
-        draft.blocks[blockIndex].sets.append(newRow)
+        draft.exercises[exerciseIndex].sets.append(newRow)
         draft.touch(now: now)
         return .structureChanged
     }
@@ -434,11 +434,11 @@ enum SessionEngine {
         context: SessionMutationContext = .empty,
         now: Date = .now
     ) -> SessionMutationResult {
-        guard let blockIndex = resolvedBlockIndex(in: draft, blockID: blockID, suggested: context.blockIndex) else {
+        guard let exerciseIndex = resolvedExerciseIndex(in: draft, blockID: blockID, suggested: context.exerciseIndex) else {
             return .unchanged
         }
 
-        guard let lastRow = draft.blocks[blockIndex].sets.last else {
+        guard let lastRow = draft.exercises[exerciseIndex].sets.last else {
             return .unchanged
         }
 
@@ -453,20 +453,20 @@ enum SessionEngine {
         )
         newRow.target.id = UUID()
         newRow.log.setTargetID = newRow.target.id
-        draft.blocks[blockIndex].sets.append(newRow)
+        draft.exercises[exerciseIndex].sets.append(newRow)
         draft.touch(now: now)
         return .structureChanged
     }
 
     @discardableResult
-    static func addExerciseBlock(
+    static func addSessionExercise(
         exercise: ExerciseCatalogItem,
         draft: inout SessionDraft,
         defaultRestSeconds: Int,
         now: Date = .now
     ) -> SessionMutationResult {
-        draft.blocks.append(
-            SessionBlock(
+        draft.exercises.append(
+            SessionExercise(
                 exerciseID: exercise.id,
                 exerciseNameSnapshot: exercise.name,
                 restSeconds: defaultRestSeconds,
@@ -497,8 +497,8 @@ enum SessionEngine {
             templateID: draft.templateID,
             templateNameSnapshot: draft.templateNameSnapshot,
             completedAt: completedAt,
-            blocks: draft.blocks.map { block in
-                CompletedSessionBlock(
+            exercises: draft.exercises.map { block in
+                CompletedSessionExercise(
                     exerciseID: block.exerciseID,
                     exerciseNameSnapshot: block.exerciseNameSnapshot,
                     sets: block.sets
@@ -526,7 +526,7 @@ enum SessionEngine {
     }
 
     private static func resolvedTargets(
-        for block: ExerciseBlock,
+        for block: TemplateExercise,
         workingTargets: [SetTarget],
         warmupRamp: [WarmupRampStep]
     ) -> [SetTarget] {
@@ -554,8 +554,8 @@ enum SessionEngine {
 
 }
 
-private extension ExerciseBlock {
-    func updatingWave(_ wave: PercentageWaveRule) -> ExerciseBlock {
+private extension TemplateExercise {
+    func updatingWave(_ wave: PercentageWaveRule) -> TemplateExercise {
         var updatedRule = progressionRule
         updatedRule.percentageWave = wave
 
@@ -573,33 +573,33 @@ private extension SessionDraft {
 }
 
 private extension SessionEngine {
-    static func resolvedBlockIndex(
+    static func resolvedExerciseIndex(
         in draft: SessionDraft,
         blockID: UUID,
         suggested: Int?
     ) -> Int? {
         if let suggested,
-            draft.blocks.indices.contains(suggested),
-            draft.blocks[suggested].id == blockID
+            draft.exercises.indices.contains(suggested),
+            draft.exercises[suggested].id == blockID
         {
             return suggested
         }
 
-        return draft.blocks.firstIndex(where: { $0.id == blockID })
+        return draft.exercises.firstIndex(where: { $0.id == blockID })
     }
 
     static func resolvedSetIndex(
-        in block: SessionBlock,
+        in sessionExercise: SessionExercise,
         setID: UUID,
         suggested: Int?
     ) -> Int? {
         if let suggested,
-            block.sets.indices.contains(suggested),
-            block.sets[suggested].id == setID
+            sessionExercise.sets.indices.contains(suggested),
+            sessionExercise.sets[suggested].id == setID
         {
             return suggested
         }
 
-        return block.sets.firstIndex(where: { $0.id == setID })
+        return sessionExercise.sets.firstIndex(where: { $0.id == setID })
     }
 }

@@ -40,7 +40,7 @@ enum WorkoutBenchmarkFixtures {
                     templateID: UUID(),
                     templateNameSnapshot: "Benchmark Template \(sessionIndex % 8)",
                     completedAt: completedAt,
-                    blocks: blocks
+                    exercises: blocks
                 )
             )
         }
@@ -99,7 +99,7 @@ enum WorkoutBenchmarkFixtures {
                 WorkoutTemplate(
                     name: "Benchmark Template \(planIndex)-\(templateIndex)",
                     scheduledWeekdays: weekdayPatterns[(planIndex + templateIndex) % weekdayPatterns.count],
-                    blocks: (0..<blocksPerTemplate).map { blockIndex in
+                    exercises: (0..<blocksPerTemplate).map { blockIndex in
                         makeExerciseBlock(
                             planIndex: planIndex,
                             templateIndex: templateIndex,
@@ -141,7 +141,7 @@ enum WorkoutBenchmarkFixtures {
         let template = WorkoutTemplate(
             name: templateName,
             scheduledWeekdays: [.monday, .thursday],
-            blocks: (0..<blockCount).map { blockIndex in
+            exercises: (0..<blockCount).map { blockIndex in
                 makeProgressiveBlock(
                     blockIndex: blockIndex,
                     targetsPerBlock: targetsPerBlock
@@ -180,13 +180,13 @@ enum WorkoutBenchmarkFixtures {
     ) -> SessionDraft {
         var completedDraft = draft
 
-        for blockIndex in completedDraft.blocks.indices {
-            for setIndex in completedDraft.blocks[blockIndex].sets.indices {
-                let target = completedDraft.blocks[blockIndex].sets[setIndex].target
-                completedDraft.blocks[blockIndex].sets[setIndex].log.weight = target.targetWeight ?? 135
-                completedDraft.blocks[blockIndex].sets[setIndex].log.reps = target.repRange.upperBound
-                completedDraft.blocks[blockIndex].sets[setIndex].log.completedAt = completedAt
-                completedDraft.blocks[blockIndex].sets[setIndex].log.rir = target.rir
+        for blockIndex in completedDraft.exercises.indices {
+            for setIndex in completedDraft.exercises[blockIndex].sets.indices {
+                let target = completedDraft.exercises[blockIndex].sets[setIndex].target
+                completedDraft.exercises[blockIndex].sets[setIndex].log.weight = target.targetWeight ?? 135
+                completedDraft.exercises[blockIndex].sets[setIndex].log.reps = target.repRange.upperBound
+                completedDraft.exercises[blockIndex].sets[setIndex].log.completedAt = completedAt
+                completedDraft.exercises[blockIndex].sets[setIndex].log.rir = target.rir
             }
         }
 
@@ -238,7 +238,7 @@ enum WorkoutBenchmarkFixtures {
         blockIndex: Int,
         setsPerBlock: Int,
         completedAt: Date
-    ) -> CompletedSessionBlock {
+    ) -> CompletedSessionExercise {
         let exercise = catalog[(sessionIndex + blockIndex) % catalog.count]
         let baseWeight = 95.0 + Double(((sessionIndex * 3) + blockIndex) % 20) * 5
         let sets = (0..<setsPerBlock).map { setIndex in
@@ -250,7 +250,7 @@ enum WorkoutBenchmarkFixtures {
             )
         }
 
-        return CompletedSessionBlock(
+        return CompletedSessionExercise(
             exerciseID: exercise.id,
             exerciseNameSnapshot: exercise.name,
             sets: sets
@@ -289,7 +289,7 @@ enum WorkoutBenchmarkFixtures {
         templateIndex: Int,
         blockIndex: Int,
         targetsPerBlock: Int
-    ) -> ExerciseBlock {
+    ) -> TemplateExercise {
         let exercise = catalog[(planIndex + templateIndex + blockIndex) % catalog.count]
         let baseWeight = 115.0 + Double(((planIndex + templateIndex + blockIndex) % 16) * 5)
         let targets = (0..<targetsPerBlock).map { targetIndex in
@@ -303,7 +303,7 @@ enum WorkoutBenchmarkFixtures {
             )
         }
 
-        return ExerciseBlock(
+        return TemplateExercise(
             exerciseID: exercise.id,
             exerciseNameSnapshot: exercise.name,
             restSeconds: 90,
@@ -315,13 +315,13 @@ enum WorkoutBenchmarkFixtures {
     private static func makeProgressiveBlock(
         blockIndex: Int,
         targetsPerBlock: Int
-    ) -> ExerciseBlock {
+    ) -> TemplateExercise {
         let exercise = catalog[blockIndex % catalog.count]
         let baseWeight = 135.0 + Double((blockIndex % 10) * 10)
 
         switch blockIndex % 3 {
         case 0:
-            return ExerciseBlock(
+            return TemplateExercise(
                 exerciseID: exercise.id,
                 exerciseNameSnapshot: exercise.name,
                 restSeconds: 120,
@@ -344,7 +344,7 @@ enum WorkoutBenchmarkFixtures {
                 trainingMax: baseWeight + 40,
                 cycleIncrement: 10
             )
-            return ExerciseBlock(
+            return TemplateExercise(
                 exerciseID: exercise.id,
                 exerciseNameSnapshot: exercise.name,
                 restSeconds: 150,
@@ -361,7 +361,7 @@ enum WorkoutBenchmarkFixtures {
             )
 
         default:
-            return ExerciseBlock(
+            return TemplateExercise(
                 exerciseID: exercise.id,
                 exerciseNameSnapshot: exercise.name,
                 restSeconds: 90,

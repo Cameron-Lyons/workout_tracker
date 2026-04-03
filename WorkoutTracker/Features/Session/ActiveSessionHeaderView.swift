@@ -45,7 +45,7 @@ struct ActiveSessionHeaderView: View, Equatable {
                     spacing: 14
                 ) {
                     headerMetric(label: "Started", value: state.startedAtLabel, systemImage: "clock", tone: .today)
-                    headerMetric(label: "Blocks", value: "\(state.progress.blockCount)", systemImage: "square.grid.2x2", tone: .progress)
+                    headerMetric(label: "Exercises", value: "\(state.progress.exerciseCount)", systemImage: "square.grid.2x2", tone: .progress)
                     headerMetric(label: "Logged", value: "\(state.progress.completedSetCount)", systemImage: "checklist", tone: .success)
                 }
             }

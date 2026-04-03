@@ -1,26 +1,26 @@
 import SwiftUI
 
 @MainActor
-struct SessionBlockCardView: View, Equatable {
-    let block: SessionBlock
+struct SessionExerciseCardView: View, Equatable {
+    let sessionExercise: SessionExercise
     let displaySettings: ActiveSessionDisplaySettings
     let actions: ActiveSessionActions
     let showsDetailedChrome: Bool
 
     init(
-        block: SessionBlock,
+        sessionExercise: SessionExercise,
         displaySettings: ActiveSessionDisplaySettings,
         actions: ActiveSessionActions,
         showsDetailedChrome: Bool
     ) {
-        self.block = block
+        self.sessionExercise = sessionExercise
         self.displaySettings = displaySettings
         self.actions = actions
         self.showsDetailedChrome = showsDetailedChrome
     }
 
-    nonisolated static func == (lhs: SessionBlockCardView, rhs: SessionBlockCardView) -> Bool {
-        lhs.block == rhs.block
+    nonisolated static func == (lhs: SessionExerciseCardView, rhs: SessionExerciseCardView) -> Bool {
+        lhs.sessionExercise == rhs.sessionExercise
             && lhs.displaySettings == rhs.displaySettings
             && lhs.showsDetailedChrome == rhs.showsDetailedChrome
     }
@@ -29,20 +29,20 @@ struct SessionBlockCardView: View, Equatable {
         VStack(alignment: .leading, spacing: 16) {
             HStack(alignment: .top) {
                 VStack(alignment: .leading, spacing: 6) {
-                    Text(block.exerciseNameSnapshot)
+                    Text(sessionExercise.exerciseNameSnapshot)
                         .font(.system(size: 22, weight: .black))
                         .foregroundStyle(AppColors.textPrimary)
 
-                    Text(compactBlockSummary)
+                    Text(compactExerciseSummary)
                         .font(.caption.weight(.medium))
                         .foregroundStyle(AppColors.textSecondary)
                 }
 
                 Spacer()
 
-                Text("\(completedSetCount)/\(block.sets.count) done")
+                Text("\(completedSetCount)/\(sessionExercise.sets.count) done")
                     .font(.caption.weight(.semibold))
-                    .foregroundStyle(completedSetCount == block.sets.count ? AppToneStyle.success.accent : AppColors.textSecondary)
+                    .foregroundStyle(completedSetCount == sessionExercise.sets.count ? AppToneStyle.success.accent : AppColors.textSecondary)
             }
 
             if showsDetailedChrome, let hoisted = hoistedSharedWaveNote {
@@ -51,7 +51,7 @@ struct SessionBlockCardView: View, Equatable {
                     .foregroundStyle(AppToneStyle.progress.accent)
             }
 
-            if !block.sets.isEmpty {
+            if !sessionExercise.sets.isEmpty {
                 HStack(alignment: .top, spacing: 18) {
                     Text("LOAD")
                         .font(.caption2.weight(.semibold))
@@ -70,9 +70,9 @@ struct SessionBlockCardView: View, Equatable {
             }
 
             VStack(spacing: 0) {
-                ForEach(Array(block.sets.enumerated()), id: \.element.id) { index, row in
+                ForEach(Array(sessionExercise.sets.enumerated()), id: \.element.id) { index, row in
                     SessionSetRowView(
-                        blockID: block.id,
+                        blockID: sessionExercise.id,
                         row: row,
                         weightUnit: displaySettings.weightUnit,
                         actions: actions,
@@ -82,7 +82,7 @@ struct SessionBlockCardView: View, Equatable {
                     )
                     .equatable()
 
-                    if index < block.sets.count - 1 {
+                    if index < sessionExercise.sets.count - 1 {
                         Rectangle()
                             .fill(AppColors.stroke.opacity(0.78))
                             .frame(height: 1)
@@ -92,7 +92,7 @@ struct SessionBlockCardView: View, Equatable {
 
             HStack(spacing: 18) {
                 Button {
-                    actions.addSet(block.id)
+                    actions.addSet(sessionExercise.id)
                 } label: {
                     Label("Add Set", systemImage: "plus")
                         .font(.subheadline.weight(.semibold))
@@ -101,7 +101,7 @@ struct SessionBlockCardView: View, Equatable {
                 .foregroundStyle(AppToneStyle.today.accent)
 
                 Button {
-                    actions.copyLastSet(block.id)
+                    actions.copyLastSet(sessionExercise.id)
                 } label: {
                     Label("Copy Last", systemImage: "doc.on.doc")
                         .font(.subheadline.weight(.semibold))
@@ -117,26 +117,26 @@ struct SessionBlockCardView: View, Equatable {
     }
 
     private var hoistedSharedWaveNote: String? {
-        Self.hoistedSharedNotePrefix(for: block)
+        Self.hoistedSharedNotePrefix(for: sessionExercise)
     }
 
     private var completedSetCount: Int {
-        block.sets.reduce(0) { partialResult, row in
+        sessionExercise.sets.reduce(0) { partialResult, row in
             partialResult + (row.log.isCompleted ? 1 : 0)
         }
     }
 
-    private var compactBlockSummary: String {
-        var parts = ["\(block.sets.count) sets", "\(block.restSeconds)s rest", block.progressionRule.kind.displayLabel]
-        if let supersetGroup = block.supersetGroup, !supersetGroup.isEmpty {
+    private var compactExerciseSummary: String {
+        var parts = ["\(sessionExercise.sets.count) sets", "\(sessionExercise.restSeconds)s rest", sessionExercise.progressionRule.kind.displayLabel]
+        if let supersetGroup = sessionExercise.supersetGroup, !supersetGroup.isEmpty {
             parts.insert("Superset \(supersetGroup)", at: 2)
         }
         return parts.joined(separator: " • ")
     }
 
-    /// When every non-empty set note shares the same prefix (text before ` • `, or the whole note), return it once at the block level.
-    private static func hoistedSharedNotePrefix(for block: SessionBlock) -> String? {
-        let trimmedNotes = block.sets.compactMap { row -> String? in
+    /// When every non-empty set note shares the same prefix (text before ` • `, or the whole note), return it once at the exercise level.
+    private static func hoistedSharedNotePrefix(for sessionExercise: SessionExercise) -> String? {
+        let trimmedNotes = sessionExercise.sets.compactMap { row -> String? in
             guard let raw = row.target.note?.trimmingCharacters(in: .whitespacesAndNewlines), !raw.isEmpty else {
                 return nil
             }

@@ -16,21 +16,21 @@ extension WorkoutStoreTests {
                 templateID: UUID(),
                 templateNameSnapshot: "Day One AM",
                 completedAt: dayOne,
-                blocks: []
+                exercises: []
             ),
             CompletedSession(
                 planID: nil,
                 templateID: UUID(),
                 templateNameSnapshot: "Day One PM",
                 completedAt: dayOne.addingTimeInterval(7_200),
-                blocks: []
+                exercises: []
             ),
             CompletedSession(
                 planID: nil,
                 templateID: UUID(),
                 templateNameSnapshot: "Day Two",
                 completedAt: dayTwo,
-                blocks: []
+                exercises: []
             ),
         ]
 
@@ -282,7 +282,7 @@ extension WorkoutStoreTests {
         store.savePlan(plan)
         store.startSession(planID: plan.id, templateID: try XCTUnwrap(plan.templates.first?.id))
 
-        let block = try XCTUnwrap(store.sessionStore.activeDraft?.blocks.first)
+        let block = try XCTUnwrap(store.sessionStore.activeDraft?.exercises.first)
         let row = try XCTUnwrap(block.sets.first(where: { $0.target.setKind == .working }))
         store.toggleSetCompletion(blockID: block.id, setID: row.id)
         store.finishActiveSession()
@@ -303,8 +303,8 @@ extension WorkoutStoreTests {
         var plan = store.makePlan(name: "Duplicate Bench")
         let template = WorkoutTemplate(
             name: "Bench Day",
-            blocks: [
-                ExerciseBlock(
+            exercises: [
+                TemplateExercise(
                     exerciseID: CatalogSeed.benchPress,
                     exerciseNameSnapshot: "Bench Press",
                     progressionRule: ProgressionRule(
@@ -313,7 +313,7 @@ extension WorkoutStoreTests {
                     ),
                     targets: []
                 ),
-                ExerciseBlock(
+                TemplateExercise(
                     exerciseID: CatalogSeed.benchPress,
                     exerciseNameSnapshot: "Bench Press",
                     progressionRule: .manual,
@@ -329,7 +329,7 @@ extension WorkoutStoreTests {
         store.savePlan(plan)
 
         store.startSession(planID: plan.id, templateID: template.id)
-        let activeBlocks = try XCTUnwrap(store.sessionStore.activeDraft?.blocks)
+        let activeBlocks = try XCTUnwrap(store.sessionStore.activeDraft?.exercises)
         let mainSessionBlock = try XCTUnwrap(activeBlocks.first)
         for row in mainSessionBlock.sets where row.target.setKind == .working {
             store.toggleSetCompletion(blockID: mainSessionBlock.id, setID: row.id)
@@ -337,8 +337,8 @@ extension WorkoutStoreTests {
         store.finishActiveSession()
 
         let updatedTemplate = try XCTUnwrap(store.plansStore.plan(for: plan.id)?.templates.first)
-        let mainBlock = try XCTUnwrap(updatedTemplate.blocks.first)
-        let supplementalBlock = try XCTUnwrap(updatedTemplate.blocks.dropFirst().first)
+        let mainBlock = try XCTUnwrap(updatedTemplate.exercises.first)
+        let supplementalBlock = try XCTUnwrap(updatedTemplate.exercises.dropFirst().first)
 
         XCTAssertEqual(mainBlock.progressionRule.percentageWave?.currentWeekIndex, 1)
         XCTAssertEqual(mainBlock.progressionRule.percentageWave?.cycle, 1)
@@ -355,8 +355,8 @@ extension WorkoutStoreTests {
         var plan = store.makePlan(name: "Ad Hoc Bench")
         let template = WorkoutTemplate(
             name: "Bench Day",
-            blocks: [
-                ExerciseBlock(
+            exercises: [
+                TemplateExercise(
                     exerciseID: CatalogSeed.benchPress,
                     exerciseNameSnapshot: "Bench Press",
                     progressionRule: ProgressionRule(
@@ -373,21 +373,21 @@ extension WorkoutStoreTests {
 
         store.startSession(planID: plan.id, templateID: template.id)
 
-        let startedBlock = try XCTUnwrap(store.sessionStore.activeDraft?.blocks.first)
+        let startedBlock = try XCTUnwrap(store.sessionStore.activeDraft?.exercises.first)
         for row in startedBlock.sets where row.target.setKind == .working {
             store.toggleSetCompletion(blockID: startedBlock.id, setID: row.id)
         }
 
         store.addExerciseToActiveSession(exerciseID: CatalogSeed.benchPress)
-        let addedBlock = try XCTUnwrap(store.sessionStore.activeDraft?.blocks.last)
+        let addedBlock = try XCTUnwrap(store.sessionStore.activeDraft?.exercises.last)
         let addedRow = try XCTUnwrap(addedBlock.sets.first(where: { $0.target.setKind == .working }))
         store.toggleSetCompletion(blockID: addedBlock.id, setID: addedRow.id)
 
         XCTAssertTrue(store.finishActiveSession())
 
         let updatedTemplate = try XCTUnwrap(store.plansStore.plan(for: plan.id)?.templates.first)
-        XCTAssertEqual(updatedTemplate.blocks.first?.progressionRule.percentageWave?.currentWeekIndex, 1)
-        XCTAssertEqual(updatedTemplate.blocks.first?.progressionRule.percentageWave?.cycle, 1)
+        XCTAssertEqual(updatedTemplate.exercises.first?.progressionRule.percentageWave?.currentWeekIndex, 1)
+        XCTAssertEqual(updatedTemplate.exercises.first?.progressionRule.percentageWave?.cycle, 1)
     }
 
     @MainActor
@@ -400,7 +400,7 @@ extension WorkoutStoreTests {
         XCTAssertEqual(initialPinned.templateName, "Workout A")
 
         store.startSession(planID: initialPinned.planID, templateID: initialPinned.templateID)
-        let block = try XCTUnwrap(store.sessionStore.activeDraft?.blocks.first)
+        let block = try XCTUnwrap(store.sessionStore.activeDraft?.exercises.first)
         let row = try XCTUnwrap(block.sets.first(where: { $0.target.setKind == .working }))
         store.toggleSetCompletion(blockID: block.id, setID: row.id)
         store.finishActiveSession()
@@ -422,7 +422,7 @@ extension WorkoutStoreTests {
         XCTAssertEqual(initialPinned.templateName, "Workout A")
 
         store.startSession(planID: initialPinned.planID, templateID: initialPinned.templateID)
-        let block = try XCTUnwrap(store.sessionStore.activeDraft?.blocks.first)
+        let block = try XCTUnwrap(store.sessionStore.activeDraft?.exercises.first)
         let row = try XCTUnwrap(block.sets.first(where: { $0.target.setKind == .working }))
         store.toggleSetCompletion(blockID: block.id, setID: row.id)
         store.finishActiveSession()
@@ -444,7 +444,7 @@ extension WorkoutStoreTests {
 
         for _ in 0..<2 {
             store.startSession(planID: reference.planID, templateID: reference.templateID)
-            let block = try XCTUnwrap(store.sessionStore.activeDraft?.blocks.first)
+            let block = try XCTUnwrap(store.sessionStore.activeDraft?.exercises.first)
             let row = try XCTUnwrap(block.sets.first(where: { $0.target.setKind == .working }))
             store.toggleSetCompletion(blockID: block.id, setID: row.id)
             store.finishActiveSession()
@@ -461,7 +461,7 @@ extension WorkoutStoreTests {
         let dayB = try XCTUnwrap(alternatingPlan.templates.last)
         let accessoryTemplate = WorkoutTemplate(
             name: "Accessory Day",
-            blocks: []
+            exercises: []
         )
         let accessoryPlan = Plan(
             name: "Accessory",
