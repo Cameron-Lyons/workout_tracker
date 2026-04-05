@@ -114,9 +114,11 @@ struct SessionDraft: Identifiable, Codable, Equatable, Sendable {
     var lastUpdatedAt: Date
     var exercises: [SessionExercise]
     var restTimerEndsAt: Date?
+    /// Wall-clock time when the current rest interval began (used for Live Activity `Text(timerInterval:)`).
+    var restTimerBeganAt: Date?
 
     enum CodingKeys: String, CodingKey {
-        case id, planID, templateID, templateNameSnapshot, startedAt, lastUpdatedAt, exercises, restTimerEndsAt
+        case id, planID, templateID, templateNameSnapshot, startedAt, lastUpdatedAt, exercises, restTimerEndsAt, restTimerBeganAt
         case legacyBlocks = "blocks"
     }
 
@@ -128,7 +130,8 @@ struct SessionDraft: Identifiable, Codable, Equatable, Sendable {
         startedAt: Date = .now,
         lastUpdatedAt: Date = .now,
         exercises: [SessionExercise],
-        restTimerEndsAt: Date? = nil
+        restTimerEndsAt: Date? = nil,
+        restTimerBeganAt: Date? = nil
     ) {
         self.id = id
         self.planID = planID
@@ -138,6 +141,7 @@ struct SessionDraft: Identifiable, Codable, Equatable, Sendable {
         self.lastUpdatedAt = lastUpdatedAt
         self.exercises = exercises
         self.restTimerEndsAt = restTimerEndsAt
+        self.restTimerBeganAt = restTimerBeganAt
     }
 
     init(from decoder: Decoder) throws {
@@ -154,6 +158,7 @@ struct SessionDraft: Identifiable, Codable, Equatable, Sendable {
             exercises = try container.decode([SessionExercise].self, forKey: .legacyBlocks)
         }
         restTimerEndsAt = try container.decodeIfPresent(Date.self, forKey: .restTimerEndsAt)
+        restTimerBeganAt = try container.decodeIfPresent(Date.self, forKey: .restTimerBeganAt)
     }
 
     func encode(to encoder: Encoder) throws {
@@ -166,6 +171,7 @@ struct SessionDraft: Identifiable, Codable, Equatable, Sendable {
         try container.encode(lastUpdatedAt, forKey: .lastUpdatedAt)
         try container.encode(exercises, forKey: .exercises)
         try container.encodeIfPresent(restTimerEndsAt, forKey: .restTimerEndsAt)
+        try container.encodeIfPresent(restTimerBeganAt, forKey: .restTimerBeganAt)
     }
 }
 

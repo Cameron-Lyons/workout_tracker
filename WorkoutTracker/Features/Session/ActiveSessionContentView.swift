@@ -14,9 +14,6 @@ struct ActiveSessionContentView: View {
 
     var body: some View {
         VStack(spacing: 0) {
-            ActiveSessionHeaderView(state: headerState)
-                .equatable()
-
             ScrollView {
                 LazyVStack(spacing: 0) {
                     ForEach(Array(exercises.enumerated()), id: \.element.id) { index, sessionExercise in

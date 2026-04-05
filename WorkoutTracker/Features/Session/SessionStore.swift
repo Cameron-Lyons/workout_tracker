@@ -42,15 +42,18 @@ struct SessionMutationResult {
 
 private struct SessionDraftMetadata {
     var restTimerEndsAt: Date?
+    var restTimerBeganAt: Date?
     var lastUpdatedAt: Date
 
     init(draft: SessionDraft) {
         restTimerEndsAt = draft.restTimerEndsAt
+        restTimerBeganAt = draft.restTimerBeganAt
         lastUpdatedAt = draft.lastUpdatedAt
     }
 
     func applying(to draft: inout SessionDraft) {
         draft.restTimerEndsAt = restTimerEndsAt
+        draft.restTimerBeganAt = restTimerBeganAt
         draft.lastUpdatedAt = lastUpdatedAt
     }
 }
@@ -324,6 +327,7 @@ final class SessionStore {
         }
 
         activeDraft.restTimerEndsAt = nil
+        activeDraft.restTimerBeganAt = nil
         updateActiveDraft(activeDraft, recomputeProgress: false)
         cancelPendingDraftSave()
         persistActiveDraft(using: .immediate)
@@ -459,11 +463,12 @@ final class SessionStore {
         activeDraftIndexCache = ActiveDraftIndexCache(draft: activeDraft)
     }
 
-    private func liveActivityState(for draft: SessionDraft?) -> (UUID?, String?, Date?) {
+    private func liveActivityState(for draft: SessionDraft?) -> (UUID?, String?, Date?, Date?) {
         (
             draft?.id,
             draft?.templateNameSnapshot,
-            draft?.restTimerEndsAt
+            draft?.restTimerEndsAt,
+            draft?.restTimerBeganAt
         )
     }
 

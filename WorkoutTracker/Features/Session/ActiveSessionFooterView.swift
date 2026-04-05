@@ -17,27 +17,53 @@ struct ActiveSessionFooterView: View {
 
     @ViewBuilder
     private func footerContent(now: Date) -> some View {
-        HStack(spacing: 10) {
+        let restPresentation = ActiveSessionRestTimerPresentation(endDate: state.restTimerEndsAt, now: now)
+
+        VStack(alignment: .leading, spacing: 10) {
             if state.restTimerEndsAt != nil {
-                Button {
-                    onClearRest()
-                } label: {
-                    Label("Clear Rest", systemImage: "timer")
-                        .frame(maxWidth: .infinity)
+                HStack(alignment: .center, spacing: 10) {
+                    Text("REST")
+                        .font(.caption2.weight(.black))
+                        .tracking(0.8)
+                        .foregroundStyle(restPresentation.tone.accent)
+
+                    Text(restPresentation.label)
+                        .font(.title2.weight(.black))
+                        .monospacedDigit()
+                        .foregroundStyle(AppColors.textPrimary)
+
+                    Spacer(minLength: 0)
+
+                    Image(systemName: restPresentation.label == "Ready" ? "checkmark.circle.fill" : "timer")
+                        .font(.title3.weight(.black))
+                        .foregroundStyle(restPresentation.tone.accent)
                 }
-                .appSecondaryActionButton(tone: .warning, controlSize: .regular)
+                .accessibilityElement(children: .combine)
+                .accessibilityLabel("Rest timer, \(restPresentation.label)")
             }
 
-            Button {
-                onFinishWorkout()
-            } label: {
-                Label("Finish Workout", systemImage: "checkmark.circle.fill")
-                    .frame(maxWidth: .infinity)
+            HStack(spacing: 10) {
+                if state.restTimerEndsAt != nil {
+                    Button {
+                        onClearRest()
+                    } label: {
+                        Label("Clear Rest", systemImage: "timer")
+                            .frame(maxWidth: .infinity)
+                    }
+                    .appSecondaryActionButton(tone: .warning, controlSize: .regular)
+                }
+
+                Button {
+                    onFinishWorkout()
+                } label: {
+                    Label("Finish Workout", systemImage: "checkmark.circle.fill")
+                        .frame(maxWidth: .infinity)
+                }
+                .appPrimaryActionButton(tone: .success, controlSize: .regular)
+                .disabled(!state.progress.canFinishWorkout)
+                .accessibilityIdentifier("session.finishButton")
             }
-            .appPrimaryActionButton(tone: .success, controlSize: .regular)
-            .disabled(!state.progress.canFinishWorkout)
-            .accessibilityIdentifier("session.finishButton")
+            .padding(.top, state.restTimerEndsAt == nil ? 6 : 0)
         }
-        .padding(.top, 6)
     }
 }

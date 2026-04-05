@@ -143,7 +143,7 @@ struct ActiveSessionView: View {
                     )
                 }
             }
-            .navigationTitle(draft != nil ? "Active Session" : "Session")
+            .navigationTitle(draft.map(\.templateNameSnapshot) ?? "Session")
             .toolbarTitleDisplayMode(.inline)
             .toolbar {
                 ToolbarItem(placement: .topBarLeading) {

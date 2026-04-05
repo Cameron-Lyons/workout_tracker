@@ -247,6 +247,7 @@ enum SessionEngine {
         if draft.exercises[exerciseIndex].sets[setIndex].log.isCompleted {
             draft.exercises[exerciseIndex].sets[setIndex].log.completedAt = nil
             draft.restTimerEndsAt = nil
+            draft.restTimerBeganAt = nil
         } else {
             if draft.exercises[exerciseIndex].sets[setIndex].log.weight == nil {
                 draft.exercises[exerciseIndex].sets[setIndex].log.weight =
@@ -262,6 +263,7 @@ enum SessionEngine {
             }
             draft.exercises[exerciseIndex].sets[setIndex].log.completedAt = completedAt
             let seconds = draft.exercises[exerciseIndex].sets[setIndex].target.restSeconds ?? blockRestSeconds
+            draft.restTimerBeganAt = completedAt
             draft.restTimerEndsAt = completedAt.addingTimeInterval(
                 TimeInterval(max(minimumRestTimerSeconds, seconds))
             )

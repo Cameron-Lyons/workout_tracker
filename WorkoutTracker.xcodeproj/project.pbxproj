@@ -15,6 +15,8 @@
 		06BB2BDEE78F9A9B6B3B0FB1 /* TodayResumeCardView.swift in Sources */ = {isa = PBXBuildFile; fileRef = AE0F343F930E993FACF6AC2F /* TodayResumeCardView.swift */; };
 		0EA4006E6B132B866E232271 /* AppChromeComponents.swift in Sources */ = {isa = PBXBuildFile; fileRef = 529545F8415525BCAA1BA69A /* AppChromeComponents.swift */; };
 		0EEB92B4A03BBB7D041ED21A /* RestTimerLiveActivityManager.swift in Sources */ = {isa = PBXBuildFile; fileRef = 4B71A65CCEC38D0EA65A693B /* RestTimerLiveActivityManager.swift */; };
+		71A82B93C4D55E6F708192A1 /* AgentSessionDebugLog.swift in Sources */ = {isa = PBXBuildFile; fileRef = 71A82B93C4D55E6F708192A0 /* AgentSessionDebugLog.swift */; };
+		71A82B93C4D55E6F708192A2 /* AgentSessionDebugLog.swift in Sources */ = {isa = PBXBuildFile; fileRef = 71A82B93C4D55E6F708192A0 /* AgentSessionDebugLog.swift */; };
 		1273B0A5144A366C58AB2964 /* WorkoutStoreTests+Analytics.swift in Sources */ = {isa = PBXBuildFile; fileRef = A04D5F7786D4CF5FECD899AA /* WorkoutStoreTests+Analytics.swift */; };
 		13F43772D61C439794F27472 /* AnalyticsRepository.swift in Sources */ = {isa = PBXBuildFile; fileRef = F438895A33123202B2F4A0F2 /* AnalyticsRepository.swift */; };
 		151E142B9E4D45D37013658F /* TemplateEditorScheduleSectionView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 035CE58F88A535907B9B82C2 /* TemplateEditorScheduleSectionView.swift */; };
@@ -87,7 +89,6 @@
 		D05F807131780E9BEC4B0D5A /* TemplateReferenceSelection.swift in Sources */ = {isa = PBXBuildFile; fileRef = F109B1EC03D0903A64C04C70 /* TemplateReferenceSelection.swift */; };
 		D1BEBE38A146BA1856E80102 /* ProgressCalendarGrid.swift in Sources */ = {isa = PBXBuildFile; fileRef = 348194211AF3FA4B103153F1 /* ProgressCalendarGrid.swift */; };
 		D1E2D2A2FFE41F316C5FD697 /* TodayHeroCardView.swift in Sources */ = {isa = PBXBuildFile; fileRef = CFD4C2CA07E2253128F6E0D6 /* TodayHeroCardView.swift */; };
-		D2285D9148B58B816073C8AF /* ActiveSessionHeaderView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 02CF02643EED7A11C3728037 /* ActiveSessionHeaderView.swift */; };
 		D3CCA51510E57EB23EC2CADF /* SessionStore.swift in Sources */ = {isa = PBXBuildFile; fileRef = 37C6D3E95AC8B122C4EE5956 /* SessionStore.swift */; };
 		D53A766F1AE936687A92E60F /* ProgressHistorySectionView.swift in Sources */ = {isa = PBXBuildFile; fileRef = F743216C0D376A5016DCDFD6 /* ProgressHistorySectionView.swift */; };
 		D562699C531A9DC92FE663D1 /* TodayStore.swift in Sources */ = {isa = PBXBuildFile; fileRef = 4F668B577DF5B3DD4E71DD6F /* TodayStore.swift */; };
@@ -156,7 +157,6 @@
 /* End PBXCopyFilesBuildPhase section */
 
 /* Begin PBXFileReference section */
-		02CF02643EED7A11C3728037 /* ActiveSessionHeaderView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ActiveSessionHeaderView.swift; sourceTree = "<group>"; };
 		0325F096B784BFE7100C7FD3 /* ProgressDashboardView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ProgressDashboardView.swift; sourceTree = "<group>"; };
 		035CE58F88A535907B9B82C2 /* TemplateEditorScheduleSectionView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = TemplateEditorScheduleSectionView.swift; sourceTree = "<group>"; };
 		0674AE004F36484525E3FDE4 /* WorkoutStoreTests+Persistence.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = "WorkoutStoreTests+Persistence.swift"; sourceTree = "<group>"; };
@@ -216,6 +216,7 @@
 		8EB99DF94CF53C9764164CA5 /* ExercisePickerSheet.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ExercisePickerSheet.swift; sourceTree = "<group>"; };
 		900AC0AFDD70EA87DD29B1D9 /* SessionModels.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SessionModels.swift; sourceTree = "<group>"; };
 		9112C55EE4EA76038C3BD9C1 /* WorkoutRestLiveActivityAttributes.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = WorkoutRestLiveActivityAttributes.swift; sourceTree = "<group>"; };
+		71A82B93C4D55E6F708192A0 /* AgentSessionDebugLog.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AgentSessionDebugLog.swift; sourceTree = "<group>"; };
 		9345111EB872990345F84B6F /* TodayRecentRecordsSectionView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = TodayRecentRecordsSectionView.swift; sourceTree = "<group>"; };
 		9559BC3C08A08FF40CC53612 /* CatalogSeed.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = CatalogSeed.swift; sourceTree = "<group>"; };
 		95BA1294C3D4536816FBAE96 /* TodayQuickStartSectionView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = TodayQuickStartSectionView.swift; sourceTree = "<group>"; };
@@ -371,7 +372,6 @@
 			children = (
 				620348E2386C747CA921ABD7 /* ActiveSessionContentView.swift */,
 				985844D8C0955E8BB5B691B0 /* ActiveSessionFooterView.swift */,
-				02CF02643EED7A11C3728037 /* ActiveSessionHeaderView.swift */,
 				83FEE8710421DBF9D383304B /* ActiveSessionSupportViews.swift */,
 				C87181B3A04494C45C051A16 /* ActiveSessionView.swift */,
 				4B71A65CCEC38D0EA65A693B /* RestTimerLiveActivityManager.swift */,
@@ -425,6 +425,7 @@
 		77C7E4B6B6617E25FC4AF403 /* LiveActivities */ = {
 			isa = PBXGroup;
 			children = (
+				71A82B93C4D55E6F708192A0 /* AgentSessionDebugLog.swift */,
 				9112C55EE4EA76038C3BD9C1 /* WorkoutRestLiveActivityAttributes.swift */,
 			);
 			path = LiveActivities;
@@ -855,6 +856,7 @@
 			isa = PBXSourcesBuildPhase;
 			buildActionMask = 2147483647;
 			files = (
+				71A82B93C4D55E6F708192A2 /* AgentSessionDebugLog.swift in Sources */,
 				A8828D7A8B1D188313BE25B7 /* WorkoutRestLiveActivityAttributes.swift in Sources */,
 				F5236A54CCF0ABCE1261E3B7 /* WorkoutRestLiveActivityWidget.swift in Sources */,
 				CB42BFC61A84E86CFD82EF09 /* WorkoutTrackerWidgetsBundle.swift in Sources */,
@@ -883,7 +885,6 @@
 			files = (
 				512AC9BB6235B75F0A287412 /* ActiveSessionContentView.swift in Sources */,
 				C873F1BF28BC4543E6C2E3B9 /* ActiveSessionFooterView.swift in Sources */,
-				D2285D9148B58B816073C8AF /* ActiveSessionHeaderView.swift in Sources */,
 				8A3DDA1BBDF250378A8B71D9 /* ActiveSessionSupportViews.swift in Sources */,
 				4CAA40F74A67F20665C4B088 /* ActiveSessionView.swift in Sources */,
 				13F43772D61C439794F27472 /* AnalyticsRepository.swift in Sources */,
@@ -924,6 +925,7 @@
 				BFE42511CB7F6529C5BC3822 /* ProgressRecordsSectionView.swift in Sources */,
 				550B0655619EF583A271AC2B /* ProgressStore.swift in Sources */,
 				0EEB92B4A03BBB7D041ED21A /* RestTimerLiveActivityManager.swift in Sources */,
+				71A82B93C4D55E6F708192A1 /* AgentSessionDebugLog.swift in Sources */,
 				FB95140922C4E21C545D8942 /* RootAppView.swift in Sources */,
 				89DD61978E9B320E81F42462 /* RootTabView.swift in Sources */,
 				EE3D1D6184CA8BDEFEC01279 /* SectionSurfaceDivider.swift in Sources */,

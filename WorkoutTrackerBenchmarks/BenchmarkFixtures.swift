@@ -192,6 +192,7 @@ enum WorkoutBenchmarkFixtures {
 
         completedDraft.lastUpdatedAt = completedAt
         completedDraft.restTimerEndsAt = nil
+        completedDraft.restTimerBeganAt = nil
         return completedDraft
     }
 
