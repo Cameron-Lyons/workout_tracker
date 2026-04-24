@@ -2,1178 +2,418 @@ import Foundation
 
 @MainActor
 enum PresetPackBuilder {
-    private enum PresetPackRest {
-        static let accessory = 60
-        static let unilateralAccessory = 75
-        static let standard = TemplateExerciseDefaults.restSeconds
-        static let compound = 120
-        static let mainLift = 150
-        static let waveMainLift = 180
-        static let powerMainLift = 150
-    }
-
-    private enum PresetPackSets {
-        static let standard = TemplateExerciseDefaults.setCount
-        static let powerMainSets = 4
-        static let strongLifts = 5
-        static let greyskull = 3
-        static let gzclTierOne = 3
-        static let gzclTierTwo = 3
-        static let gzclTierThree = 3
-        static let deadliftTopSets = 2
-        static let singleTopSet = 1
-        static let powerCleanSets = 5
-        static let madcowRecovery = 4
-        static let madcowIntensityRamp = 3
-        static let boringButBig = 5
-    }
-
-    private enum PresetPackRepRange {
-        static let powerStrength = RepRange(3, 5)
-        static let hypertrophyMain = RepRange(8, 12)
-        static let upperMain = RepRange(6, 8)
-        static let row = RepRange(8, 10)
-        static let posteriorChain = DoubleProgressionDefaults.repRange
-        static let shoulders = RepRange(12, 15)
-        static let accessory = RepRange(10, 15)
-        static let squatVolume = RepRange(5, 8)
-        static let heavyPull = RepRange(4, 6)
-        static let calves = RepRange(12, 20)
-        static let strength = RepRange(5, 5)
-        static let power = RepRange(3, 3)
-        static let boringButBig = RepRange(10, 10)
-        static let gzclTierTwo = RepRange(8, 10)
-        static let gzclTierThree = RepRange(12, 15)
-        static let madcowTriple = RepRange(3, 3)
-        static let madcowBackoff = RepRange(8, 8)
-    }
-
-    private enum PresetPackLabels {
-        static let boringButBig = "BBB 5x10"
-        static let greyskullAMRAP = "AMRAP+"
-        static let madcowTopTriple = "Top triple"
-        static let madcowBackoff = "Backoff set"
-    }
+    fileprivate static let catalogByKey: [String: ExerciseCatalogItem] = [
+        "benchPress": ExerciseCatalogItem(id: CatalogSeed.benchPress, name: "Bench Press", category: .chest),
+        "inclineBenchPress": ExerciseCatalogItem(id: CatalogSeed.inclineBenchPress, name: "Incline Bench Press", category: .chest),
+        "dumbbellFly": ExerciseCatalogItem(id: CatalogSeed.dumbbellFly, name: "Dumbbell Fly", category: .chest),
+        "backSquat": ExerciseCatalogItem(id: CatalogSeed.backSquat, name: "Back Squat", category: .legs),
+        "frontSquat": ExerciseCatalogItem(id: CatalogSeed.frontSquat, name: "Front Squat", category: .legs),
+        "deadlift": ExerciseCatalogItem(id: CatalogSeed.deadlift, name: "Deadlift", category: .legs),
+        "romanianDeadlift": ExerciseCatalogItem(id: CatalogSeed.romanianDeadlift, name: "Romanian Deadlift", category: .legs),
+        "overheadPress": ExerciseCatalogItem(id: CatalogSeed.overheadPress, name: "Overhead Press", category: .shoulders),
+        "dumbbellShoulderPress": ExerciseCatalogItem(id: CatalogSeed.dumbbellShoulderPress, name: "Dumbbell Shoulder Press", category: .shoulders),
+        "powerClean": ExerciseCatalogItem(id: CatalogSeed.powerClean, name: "Power Clean", category: .fullBody),
+        "barbellRow": ExerciseCatalogItem(id: CatalogSeed.barbellRow, name: "Barbell Row", category: .back),
+        "pullUp": ExerciseCatalogItem(id: CatalogSeed.pullUp, name: "Pull Up", category: .back),
+        "weightedPullUp": ExerciseCatalogItem(id: CatalogSeed.weightedPullUp, name: "Weighted Pull Up", aliases: ["Pull Up"], category: .back),
+        "latPulldown": ExerciseCatalogItem(id: CatalogSeed.latPulldown, name: "Lat Pulldown", category: .back),
+        "seatedCableRow": ExerciseCatalogItem(id: CatalogSeed.seatedCableRow, name: "Seated Cable Row", category: .back),
+        "dips": ExerciseCatalogItem(id: CatalogSeed.dips, name: "Dips", category: .chest),
+        "lateralRaise": ExerciseCatalogItem(id: CatalogSeed.lateralRaise, name: "Lateral Raise", category: .shoulders),
+        "facePull": ExerciseCatalogItem(id: CatalogSeed.facePull, name: "Face Pull", category: .shoulders),
+        "rearDeltFly": ExerciseCatalogItem(id: CatalogSeed.rearDeltFly, name: "Rear Delt Fly", category: .shoulders),
+        "tricepsPushdown": ExerciseCatalogItem(id: CatalogSeed.tricepsPushdown, name: "Triceps Pushdown", category: .arms),
+        "skullCrusher": ExerciseCatalogItem(id: CatalogSeed.skullCrusher, name: "Skull Crusher", category: .arms),
+        "barbellCurl": ExerciseCatalogItem(id: CatalogSeed.barbellCurl, name: "Barbell Curl", category: .arms),
+        "hammerCurl": ExerciseCatalogItem(id: CatalogSeed.hammerCurl, name: "Hammer Curl", category: .arms),
+        "legPress": ExerciseCatalogItem(id: CatalogSeed.legPress, name: "Leg Press", category: .legs),
+        "legCurl": ExerciseCatalogItem(id: CatalogSeed.legCurl, name: "Leg Curl", category: .legs),
+        "legExtension": ExerciseCatalogItem(id: CatalogSeed.legExtension, name: "Leg Extension", category: .legs),
+        "walkingLunge": ExerciseCatalogItem(id: CatalogSeed.walkingLunge, name: "Walking Lunge", category: .legs),
+        "bulgarianSplitSquat": ExerciseCatalogItem(id: CatalogSeed.bulgarianSplitSquat, name: "Bulgarian Split Squat", category: .legs),
+        "hipThrust": ExerciseCatalogItem(id: CatalogSeed.hipThrust, name: "Hip Thrust", category: .legs),
+        "standingCalfRaise": ExerciseCatalogItem(id: CatalogSeed.standingCalfRaise, name: "Standing Calf Raise", category: .legs),
+        "seatedCalfRaise": ExerciseCatalogItem(id: CatalogSeed.seatedCalfRaise, name: "Seated Calf Raise", category: .legs),
+    ]
 
     static func makePlans(for pack: PresetPack, settings: SettingsStore) -> [Plan] {
-        switch pack {
-        case .generalGym:
-            return [makeGeneralGymPlan(settings: settings)]
-        case .phul:
-            return [makePHULPlan(settings: settings)]
-        case .startingStrength:
-            return [makeStartingStrengthPlan(settings: settings)]
-        case .strongLiftsFiveByFive:
-            return [makeStrongLiftsPlan(settings: settings)]
-        case .greyskullLP:
-            return [makeGreyskullPlan(settings: settings)]
-        case .fiveThreeOne:
-            return [makeFiveThreeOnePlan(settings: settings)]
-        case .boringButBig:
-            return [makeBoringButBigPlan(settings: settings)]
-        case .madcowFiveByFive:
-            return [makeMadcowPlan()]
-        case .gzclp:
-            return [makeGZCLPPlan(settings: settings)]
+        guard let definition = PresetProgramCatalog.shared.program(for: pack) else {
+            assertionFailure("Missing preset program definition for \(pack.rawValue)")
+            return []
+        }
+
+        do {
+            return [try buildPlan(from: definition, settings: settings)]
+        } catch {
+            assertionFailure("Invalid preset program \(pack.rawValue): \(error)")
+            return []
         }
     }
 
-    private static func makeGeneralGymPlan(settings: SettingsStore) -> Plan {
-        let upperRule = SessionEngine.defaultDoubleProgressionRule(
-            exerciseName: "Bench Press",
-            preferredIncrement: settings.upperBodyIncrement
-        )
-        let lowerRule = SessionEngine.defaultDoubleProgressionRule(
-            exerciseName: "Back Squat",
-            preferredIncrement: settings.lowerBodyIncrement
-        )
+    private static func buildPlan(
+        from definition: PresetProgramDefinition,
+        settings: SettingsStore
+    ) throws -> Plan {
+        var templates: [WorkoutTemplate] = []
 
-        let upperA = WorkoutTemplate(
-            name: "Upper A",
-            scheduledWeekdays: [.monday, .thursday],
-            exercises: [
-                TemplateExercise(
-                    exerciseID: CatalogSeed.benchPress,
-                    exerciseNameSnapshot: "Bench Press",
-                    restSeconds: PresetPackRest.compound,
-                    progressionRule: upperRule,
-                    targets: repeatedTargets(repRange: PresetPackRepRange.upperMain)
-                ),
-                TemplateExercise(
-                    exerciseID: CatalogSeed.barbellRow,
-                    exerciseNameSnapshot: "Barbell Row",
-                    restSeconds: PresetPackRest.compound,
-                    progressionRule: upperRule,
-                    targets: repeatedTargets(repRange: PresetPackRepRange.row)
-                ),
-                TemplateExercise(
-                    exerciseID: CatalogSeed.lateralRaise,
-                    exerciseNameSnapshot: "Lateral Raise",
-                    restSeconds: PresetPackRest.accessory,
-                    supersetGroup: "A",
-                    progressionRule: .manual,
-                    targets: repeatedTargets(repRange: PresetPackRepRange.shoulders)
-                ),
-                TemplateExercise(
-                    exerciseID: CatalogSeed.tricepsPushdown,
-                    exerciseNameSnapshot: "Triceps Pushdown",
-                    restSeconds: PresetPackRest.accessory,
-                    supersetGroup: "A",
-                    progressionRule: .manual,
-                    targets: repeatedTargets(repRange: PresetPackRepRange.accessory)
-                ),
-            ]
-        )
+        for templateDefinition in definition.templates {
+            let exercises = try templateDefinition.exercises.map { exerciseDefinition in
+                try buildExercise(from: exerciseDefinition, settings: settings)
+            }
+            templates.append(
+                WorkoutTemplate(
+                    name: templateDefinition.name,
+                    scheduledWeekdays: templateDefinition.scheduledWeekdays ?? [],
+                    exercises: exercises
+                )
+            )
+        }
 
-        let lowerA = WorkoutTemplate(
-            name: "Lower A",
-            scheduledWeekdays: [.tuesday, .friday],
-            exercises: [
-                TemplateExercise(
-                    exerciseID: CatalogSeed.backSquat,
-                    exerciseNameSnapshot: "Back Squat",
-                    restSeconds: PresetPackRest.mainLift,
-                    progressionRule: lowerRule,
-                    targets: repeatedTargets(repRange: PresetPackRepRange.squatVolume)
-                ),
-                TemplateExercise(
-                    exerciseID: CatalogSeed.romanianDeadlift,
-                    exerciseNameSnapshot: "Romanian Deadlift",
-                    restSeconds: PresetPackRest.compound,
-                    progressionRule: lowerRule,
-                    targets: repeatedTargets(repRange: PresetPackRepRange.posteriorChain)
-                ),
-                TemplateExercise(
-                    exerciseID: CatalogSeed.legPress,
-                    exerciseNameSnapshot: "Leg Press",
-                    restSeconds: PresetPackRest.standard,
-                    progressionRule: .manual,
-                    targets: repeatedTargets(repRange: PresetPackRepRange.accessory)
-                ),
-                TemplateExercise(
-                    exerciseID: CatalogSeed.standingCalfRaise,
-                    exerciseNameSnapshot: "Standing Calf Raise",
-                    restSeconds: PresetPackRest.accessory,
-                    progressionRule: .manual,
-                    targets: repeatedTargets(repRange: PresetPackRepRange.calves)
-                ),
-            ]
-        )
-
-        let upperB = WorkoutTemplate(
-            name: "Upper B",
-            exercises: [
-                TemplateExercise(
-                    exerciseID: CatalogSeed.overheadPress,
-                    exerciseNameSnapshot: "Overhead Press",
-                    restSeconds: PresetPackRest.compound,
-                    progressionRule: upperRule,
-                    targets: repeatedTargets(repRange: PresetPackRepRange.upperMain)
-                ),
-                TemplateExercise(
-                    exerciseID: CatalogSeed.pullUp,
-                    exerciseNameSnapshot: "Pull Up",
-                    restSeconds: PresetPackRest.compound,
-                    progressionRule: .manual,
-                    targets: repeatedTargets(repRange: PresetPackRepRange.posteriorChain)
-                ),
-                TemplateExercise(
-                    exerciseID: CatalogSeed.inclineBenchPress,
-                    exerciseNameSnapshot: "Incline Bench Press",
-                    restSeconds: PresetPackRest.standard,
-                    supersetGroup: "B",
-                    progressionRule: .manual,
-                    targets: repeatedTargets(repRange: TemplateExerciseDefaults.repRange)
-                ),
-                TemplateExercise(
-                    exerciseID: CatalogSeed.hammerCurl,
-                    exerciseNameSnapshot: "Hammer Curl",
-                    restSeconds: PresetPackRest.accessory,
-                    supersetGroup: "B",
-                    progressionRule: .manual,
-                    targets: repeatedTargets(repRange: PresetPackRepRange.accessory)
-                ),
-            ]
-        )
-
-        let lowerB = WorkoutTemplate(
-            name: "Lower B",
-            exercises: [
-                TemplateExercise(
-                    exerciseID: CatalogSeed.deadlift,
-                    exerciseNameSnapshot: "Deadlift",
-                    restSeconds: PresetPackRest.mainLift,
-                    progressionRule: lowerRule,
-                    targets: repeatedTargets(
-                        count: PresetPackSets.deadliftTopSets,
-                        repRange: PresetPackRepRange.heavyPull
-                    )
-                ),
-                TemplateExercise(
-                    exerciseID: CatalogSeed.frontSquat,
-                    exerciseNameSnapshot: "Front Squat",
-                    restSeconds: PresetPackRest.compound,
-                    progressionRule: lowerRule,
-                    targets: repeatedTargets(repRange: PresetPackRepRange.upperMain)
-                ),
-                TemplateExercise(
-                    exerciseID: CatalogSeed.bulgarianSplitSquat,
-                    exerciseNameSnapshot: "Bulgarian Split Squat",
-                    restSeconds: PresetPackRest.unilateralAccessory,
-                    supersetGroup: "C",
-                    progressionRule: .manual,
-                    targets: repeatedTargets(repRange: TemplateExerciseDefaults.repRange)
-                ),
-                TemplateExercise(
-                    exerciseID: CatalogSeed.legCurl,
-                    exerciseNameSnapshot: "Leg Curl",
-                    restSeconds: PresetPackRest.accessory,
-                    supersetGroup: "C",
-                    progressionRule: .manual,
-                    targets: repeatedTargets(repRange: PresetPackRepRange.accessory)
-                ),
-            ]
-        )
+        guard let pinnedTemplateID = templates.first(where: { $0.name == definition.pinnedTemplate })?.id else {
+            throw PresetProgramError.missingPinnedTemplate(definition.pinnedTemplate)
+        }
 
         return Plan(
-            name: "General Gym",
-            pinnedTemplateID: upperA.id,
-            templates: [upperA, lowerA, upperB, lowerB]
+            name: definition.planName,
+            pinnedTemplateID: pinnedTemplateID,
+            templates: templates
         )
     }
 
-    private static func makePHULPlan(settings: SettingsStore) -> Plan {
-        let upperPower = WorkoutTemplate(
-            name: "Upper Power",
-            scheduledWeekdays: [.monday],
-            exercises: [
-                doubleProgressionBlock(
-                    exerciseID: CatalogSeed.benchPress,
-                    exerciseName: "Bench Press",
-                    restSeconds: PresetPackRest.powerMainLift,
-                    count: PresetPackSets.powerMainSets,
-                    repRange: PresetPackRepRange.powerStrength,
-                    increment: settings.upperBodyIncrement
-                ),
-                doubleProgressionBlock(
-                    exerciseID: CatalogSeed.barbellRow,
-                    exerciseName: "Barbell Row",
-                    restSeconds: PresetPackRest.powerMainLift,
-                    count: PresetPackSets.powerMainSets,
-                    repRange: PresetPackRepRange.powerStrength,
-                    increment: settings.upperBodyIncrement
-                ),
-                doubleProgressionBlock(
-                    exerciseID: CatalogSeed.overheadPress,
-                    exerciseName: "Overhead Press",
-                    restSeconds: PresetPackRest.compound,
-                    repRange: PresetPackRepRange.upperMain,
-                    increment: settings.upperBodyIncrement
-                ),
-                manualBlock(
-                    exerciseID: CatalogSeed.pullUp,
-                    exerciseName: "Pull Up",
-                    restSeconds: PresetPackRest.compound,
-                    repRange: PresetPackRepRange.row
-                ),
-                manualBlock(
-                    exerciseID: CatalogSeed.hammerCurl,
-                    exerciseName: "Hammer Curl",
-                    restSeconds: PresetPackRest.accessory,
-                    repRange: PresetPackRepRange.accessory
-                ),
-                manualBlock(
-                    exerciseID: CatalogSeed.tricepsPushdown,
-                    exerciseName: "Triceps Pushdown",
-                    restSeconds: PresetPackRest.accessory,
-                    repRange: PresetPackRepRange.accessory
-                ),
-            ]
+    private static func buildExercise(
+        from definition: PresetExerciseDefinition,
+        settings: SettingsStore
+    ) throws -> TemplateExercise {
+        guard let catalogItem = catalogByKey[definition.exercise] else {
+            throw PresetProgramError.unknownExercise(definition.exercise)
+        }
+
+        let progressionRule = try progressionRule(
+            for: definition.progression,
+            exerciseName: catalogItem.name,
+            targets: definition.targets,
+            settings: settings
+        )
+        var exercise = TemplateExercise(
+            exerciseID: catalogItem.id,
+            exerciseNameSnapshot: catalogItem.name,
+            restSeconds: definition.restSeconds,
+            supersetGroup: definition.supersetGroup,
+            progressionRule: progressionRule,
+            targets: try targets(from: definition.targets, requiresTargets: definition.progression != .wave)
         )
 
-        let lowerPower = WorkoutTemplate(
-            name: "Lower Power",
-            scheduledWeekdays: [.tuesday],
-            exercises: [
-                doubleProgressionBlock(
-                    exerciseID: CatalogSeed.backSquat,
-                    exerciseName: "Back Squat",
-                    restSeconds: PresetPackRest.powerMainLift,
-                    count: PresetPackSets.powerMainSets,
-                    repRange: PresetPackRepRange.powerStrength,
-                    increment: settings.lowerBodyIncrement
-                ),
-                doubleProgressionBlock(
-                    exerciseID: CatalogSeed.deadlift,
-                    exerciseName: "Deadlift",
-                    restSeconds: PresetPackRest.mainLift,
-                    count: PresetPackSets.standard,
-                    repRange: PresetPackRepRange.powerStrength,
-                    increment: settings.lowerBodyIncrement
-                ),
-                manualBlock(
-                    exerciseID: CatalogSeed.legPress,
-                    exerciseName: "Leg Press",
-                    repRange: PresetPackRepRange.hypertrophyMain
-                ),
-                manualBlock(
-                    exerciseID: CatalogSeed.legCurl,
-                    exerciseName: "Leg Curl",
-                    repRange: PresetPackRepRange.row
-                ),
-                manualBlock(
-                    exerciseID: CatalogSeed.standingCalfRaise,
-                    exerciseName: "Standing Calf Raise",
-                    count: PresetPackSets.powerMainSets,
-                    repRange: RepRange(8, 12)
-                ),
-            ]
-        )
+        if definition.progression == .wave {
+            exercise.targets = ProgressionEngine.resolvedTargets(for: exercise, profile: nil)
+        }
 
-        let upperHypertrophy = WorkoutTemplate(
-            name: "Upper Hypertrophy",
-            scheduledWeekdays: [.thursday],
-            exercises: [
-                doubleProgressionBlock(
-                    exerciseID: CatalogSeed.inclineBenchPress,
-                    exerciseName: "Incline Bench Press",
-                    restSeconds: PresetPackRest.compound,
-                    count: PresetPackSets.powerMainSets,
-                    repRange: PresetPackRepRange.hypertrophyMain,
-                    increment: settings.upperBodyIncrement
-                ),
-                doubleProgressionBlock(
-                    exerciseID: CatalogSeed.seatedCableRow,
-                    exerciseName: "Seated Cable Row",
-                    restSeconds: PresetPackRest.compound,
-                    count: PresetPackSets.powerMainSets,
-                    repRange: PresetPackRepRange.hypertrophyMain,
-                    increment: settings.upperBodyIncrement
-                ),
-                doubleProgressionBlock(
-                    exerciseID: CatalogSeed.overheadPress,
-                    exerciseName: "Overhead Press",
-                    restSeconds: PresetPackRest.standard,
-                    repRange: PresetPackRepRange.hypertrophyMain,
-                    increment: settings.upperBodyIncrement
-                ),
-                manualBlock(
-                    exerciseID: CatalogSeed.latPulldown,
-                    exerciseName: "Lat Pulldown",
-                    repRange: PresetPackRepRange.accessory
-                ),
-                manualBlock(
-                    exerciseID: CatalogSeed.lateralRaise,
-                    exerciseName: "Lateral Raise",
-                    restSeconds: PresetPackRest.accessory,
-                    repRange: PresetPackRepRange.shoulders
-                ),
-                manualBlock(
-                    exerciseID: CatalogSeed.hammerCurl,
-                    exerciseName: "Hammer Curl",
-                    restSeconds: PresetPackRest.accessory,
-                    repRange: PresetPackRepRange.accessory
-                ),
-                manualBlock(
-                    exerciseID: CatalogSeed.tricepsPushdown,
-                    exerciseName: "Triceps Pushdown",
-                    restSeconds: PresetPackRest.accessory,
-                    repRange: PresetPackRepRange.accessory
-                ),
-            ]
-        )
-
-        let lowerHypertrophy = WorkoutTemplate(
-            name: "Lower Hypertrophy",
-            scheduledWeekdays: [.friday],
-            exercises: [
-                doubleProgressionBlock(
-                    exerciseID: CatalogSeed.frontSquat,
-                    exerciseName: "Front Squat",
-                    restSeconds: PresetPackRest.compound,
-                    count: PresetPackSets.powerMainSets,
-                    repRange: PresetPackRepRange.hypertrophyMain,
-                    increment: settings.lowerBodyIncrement
-                ),
-                doubleProgressionBlock(
-                    exerciseID: CatalogSeed.romanianDeadlift,
-                    exerciseName: "Romanian Deadlift",
-                    restSeconds: PresetPackRest.compound,
-                    count: PresetPackSets.powerMainSets,
-                    repRange: PresetPackRepRange.hypertrophyMain,
-                    increment: settings.lowerBodyIncrement
-                ),
-                manualBlock(
-                    exerciseID: CatalogSeed.bulgarianSplitSquat,
-                    exerciseName: "Bulgarian Split Squat",
-                    restSeconds: PresetPackRest.unilateralAccessory,
-                    repRange: PresetPackRepRange.accessory
-                ),
-                manualBlock(
-                    exerciseID: CatalogSeed.legCurl,
-                    exerciseName: "Leg Curl",
-                    repRange: PresetPackRepRange.accessory
-                ),
-                manualBlock(
-                    exerciseID: CatalogSeed.legExtension,
-                    exerciseName: "Leg Extension",
-                    repRange: PresetPackRepRange.accessory
-                ),
-                manualBlock(
-                    exerciseID: CatalogSeed.seatedCalfRaise,
-                    exerciseName: "Seated Calf Raise",
-                    count: PresetPackSets.powerMainSets,
-                    repRange: PresetPackRepRange.calves
-                ),
-            ]
-        )
-
-        return Plan(
-            name: "PHUL",
-            pinnedTemplateID: upperPower.id,
-            templates: [upperPower, lowerPower, upperHypertrophy, lowerHypertrophy]
-        )
+        return exercise
     }
 
-    private static func makeStrongLiftsPlan(settings: SettingsStore) -> Plan {
-        let workoutA = WorkoutTemplate(
-            name: "Workout A",
-            scheduledWeekdays: [.monday, .friday],
-            exercises: [
-                doubleProgressionBlock(
-                    exerciseID: CatalogSeed.backSquat,
-                    exerciseName: "Back Squat",
-                    restSeconds: PresetPackRest.mainLift,
-                    count: PresetPackSets.strongLifts,
-                    repRange: PresetPackRepRange.strength,
-                    increment: settings.lowerBodyIncrement
-                ),
-                doubleProgressionBlock(
-                    exerciseID: CatalogSeed.benchPress,
-                    exerciseName: "Bench Press",
-                    restSeconds: PresetPackRest.compound,
-                    count: PresetPackSets.strongLifts,
-                    repRange: PresetPackRepRange.strength,
-                    increment: settings.upperBodyIncrement
-                ),
-                doubleProgressionBlock(
-                    exerciseID: CatalogSeed.barbellRow,
-                    exerciseName: "Barbell Row",
-                    restSeconds: PresetPackRest.compound,
-                    count: PresetPackSets.strongLifts,
-                    repRange: PresetPackRepRange.strength,
-                    increment: settings.upperBodyIncrement
-                ),
-            ]
-        )
-
-        let workoutB = WorkoutTemplate(
-            name: "Workout B",
-            scheduledWeekdays: [.wednesday],
-            exercises: [
-                doubleProgressionBlock(
-                    exerciseID: CatalogSeed.backSquat,
-                    exerciseName: "Back Squat",
-                    restSeconds: PresetPackRest.mainLift,
-                    count: PresetPackSets.strongLifts,
-                    repRange: PresetPackRepRange.strength,
-                    increment: settings.lowerBodyIncrement
-                ),
-                doubleProgressionBlock(
-                    exerciseID: CatalogSeed.overheadPress,
-                    exerciseName: "Overhead Press",
-                    restSeconds: PresetPackRest.compound,
-                    count: PresetPackSets.strongLifts,
-                    repRange: PresetPackRepRange.strength,
-                    increment: settings.upperBodyIncrement
-                ),
-                doubleProgressionBlock(
-                    exerciseID: CatalogSeed.deadlift,
-                    exerciseName: "Deadlift",
-                    restSeconds: PresetPackRest.waveMainLift,
-                    count: PresetPackSets.singleTopSet,
-                    repRange: PresetPackRepRange.strength,
-                    increment: settings.lowerBodyIncrement
-                ),
-            ]
-        )
-
-        return Plan(
-            name: "StrongLifts 5x5",
-            pinnedTemplateID: workoutA.id,
-            templates: [workoutA, workoutB]
-        )
-    }
-
-    private static func makeGreyskullPlan(settings: SettingsStore) -> Plan {
-        let workoutA = WorkoutTemplate(
-            name: "Workout A",
-            scheduledWeekdays: [.monday, .friday],
-            exercises: [
-                greyskullBlock(
-                    exerciseID: CatalogSeed.backSquat,
-                    exerciseName: "Back Squat",
-                    restSeconds: PresetPackRest.mainLift,
-                    increment: settings.lowerBodyIncrement
-                ),
-                greyskullBlock(
-                    exerciseID: CatalogSeed.benchPress,
-                    exerciseName: "Bench Press",
-                    restSeconds: PresetPackRest.compound,
-                    increment: settings.upperBodyIncrement
-                ),
-                greyskullBlock(
-                    exerciseID: CatalogSeed.barbellRow,
-                    exerciseName: "Barbell Row",
-                    restSeconds: PresetPackRest.compound,
-                    increment: settings.upperBodyIncrement
-                ),
-            ]
-        )
-
-        let workoutB = WorkoutTemplate(
-            name: "Workout B",
-            scheduledWeekdays: [.wednesday],
-            exercises: [
-                greyskullBlock(
-                    exerciseID: CatalogSeed.backSquat,
-                    exerciseName: "Back Squat",
-                    restSeconds: PresetPackRest.mainLift,
-                    increment: settings.lowerBodyIncrement
-                ),
-                greyskullBlock(
-                    exerciseID: CatalogSeed.overheadPress,
-                    exerciseName: "Overhead Press",
-                    restSeconds: PresetPackRest.compound,
-                    increment: settings.upperBodyIncrement
-                ),
-                greyskullBlock(
-                    exerciseID: CatalogSeed.deadlift,
-                    exerciseName: "Deadlift",
-                    restSeconds: PresetPackRest.waveMainLift,
-                    increment: settings.lowerBodyIncrement
-                ),
-            ]
-        )
-
-        return Plan(
-            name: "Greyskull LP",
-            pinnedTemplateID: workoutA.id,
-            templates: [workoutA, workoutB]
-        )
-    }
-
-    private static func makeStartingStrengthPlan(settings: SettingsStore) -> Plan {
-        let squatRule = SessionEngine.defaultDoubleProgressionRule(
-            exerciseName: "Back Squat",
-            preferredIncrement: settings.lowerBodyIncrement
-        )
-        let upperRule = SessionEngine.defaultDoubleProgressionRule(
-            exerciseName: "Bench Press",
-            preferredIncrement: settings.upperBodyIncrement
-        )
-
-        let dayA = WorkoutTemplate(
-            name: "Workout A",
-            scheduledWeekdays: [.monday, .friday],
-            exercises: [
-                TemplateExercise(
-                    exerciseID: CatalogSeed.backSquat,
-                    exerciseNameSnapshot: "Back Squat",
-                    restSeconds: PresetPackRest.mainLift,
-                    progressionRule: squatRule,
-                    targets: repeatedTargets(repRange: PresetPackRepRange.strength)
-                ),
-                TemplateExercise(
-                    exerciseID: CatalogSeed.benchPress,
-                    exerciseNameSnapshot: "Bench Press",
-                    restSeconds: PresetPackRest.compound,
-                    progressionRule: upperRule,
-                    targets: repeatedTargets(repRange: PresetPackRepRange.strength)
-                ),
-                TemplateExercise(
-                    exerciseID: CatalogSeed.deadlift,
-                    exerciseNameSnapshot: "Deadlift",
-                    restSeconds: PresetPackRest.waveMainLift,
-                    progressionRule: SessionEngine.defaultDoubleProgressionRule(
-                        exerciseName: "Deadlift",
-                        preferredIncrement: settings.lowerBodyIncrement
-                    ),
-                    targets: repeatedTargets(
-                        count: PresetPackSets.singleTopSet,
-                        repRange: PresetPackRepRange.strength
-                    )
-                ),
-            ]
-        )
-
-        let dayB = WorkoutTemplate(
-            name: "Workout B",
-            scheduledWeekdays: [.wednesday],
-            exercises: [
-                TemplateExercise(
-                    exerciseID: CatalogSeed.backSquat,
-                    exerciseNameSnapshot: "Back Squat",
-                    restSeconds: PresetPackRest.mainLift,
-                    progressionRule: squatRule,
-                    targets: repeatedTargets(repRange: PresetPackRepRange.strength)
-                ),
-                TemplateExercise(
-                    exerciseID: CatalogSeed.overheadPress,
-                    exerciseNameSnapshot: "Overhead Press",
-                    restSeconds: PresetPackRest.compound,
-                    progressionRule: upperRule,
-                    targets: repeatedTargets(repRange: PresetPackRepRange.strength)
-                ),
-                TemplateExercise(
-                    exerciseID: CatalogSeed.powerClean,
-                    exerciseNameSnapshot: "Power Clean",
-                    restSeconds: PresetPackRest.compound,
-                    progressionRule: upperRule,
-                    targets: repeatedTargets(
-                        count: PresetPackSets.powerCleanSets,
-                        repRange: PresetPackRepRange.power
-                    )
-                ),
-            ]
-        )
-
-        return Plan(
-            name: "Starting Strength",
-            pinnedTemplateID: dayA.id,
-            templates: [dayA, dayB]
-        )
-    }
-
-    private static func makeFiveThreeOnePlan(settings: SettingsStore) -> Plan {
-        let squatDay = waveTemplate(
-            name: "Squat Day",
-            mainExerciseID: CatalogSeed.backSquat,
-            mainExerciseName: "Back Squat",
-            settings: settings,
-            accessories: [
-                accessoryBlock(id: CatalogSeed.frontSquat, name: "Front Squat"),
-                accessoryBlock(id: CatalogSeed.legCurl, name: "Leg Curl"),
-            ]
-        )
-        let benchDay = waveTemplate(
-            name: "Bench Day",
-            mainExerciseID: CatalogSeed.benchPress,
-            mainExerciseName: "Bench Press",
-            settings: settings,
-            accessories: [
-                accessoryBlock(id: CatalogSeed.pullUp, name: "Pull Up"),
-                accessoryBlock(id: CatalogSeed.tricepsPushdown, name: "Triceps Pushdown"),
-            ]
-        )
-        let deadliftDay = waveTemplate(
-            name: "Deadlift Day",
-            mainExerciseID: CatalogSeed.deadlift,
-            mainExerciseName: "Deadlift",
-            settings: settings,
-            accessories: [
-                accessoryBlock(id: CatalogSeed.barbellRow, name: "Barbell Row"),
-                accessoryBlock(id: CatalogSeed.seatedCalfRaise, name: "Seated Calf Raise"),
-            ]
-        )
-        let pressDay = waveTemplate(
-            name: "Press Day",
-            mainExerciseID: CatalogSeed.overheadPress,
-            mainExerciseName: "Overhead Press",
-            settings: settings,
-            accessories: [
-                accessoryBlock(id: CatalogSeed.latPulldown, name: "Lat Pulldown"),
-                accessoryBlock(id: CatalogSeed.hammerCurl, name: "Hammer Curl"),
-            ]
-        )
-
-        return Plan(
-            name: "5/3/1",
-            pinnedTemplateID: squatDay.id,
-            templates: [squatDay, benchDay, deadliftDay, pressDay]
-        )
-    }
-
-    private static func makeBoringButBigPlan(settings: SettingsStore) -> Plan {
-        let squatDay = bbbTemplate(
-            name: "BBB Squat Day",
-            mainExerciseID: CatalogSeed.backSquat,
-            mainExerciseName: "Back Squat",
-            settings: settings,
-            bbbExerciseID: CatalogSeed.backSquat,
-            bbbExerciseName: "Back Squat"
-        )
-        let benchDay = bbbTemplate(
-            name: "BBB Bench Day",
-            mainExerciseID: CatalogSeed.benchPress,
-            mainExerciseName: "Bench Press",
-            settings: settings,
-            bbbExerciseID: CatalogSeed.benchPress,
-            bbbExerciseName: "Bench Press"
-        )
-        let deadliftDay = bbbTemplate(
-            name: "BBB Deadlift Day",
-            mainExerciseID: CatalogSeed.deadlift,
-            mainExerciseName: "Deadlift",
-            settings: settings,
-            bbbExerciseID: CatalogSeed.deadlift,
-            bbbExerciseName: "Deadlift"
-        )
-        let pressDay = bbbTemplate(
-            name: "BBB Press Day",
-            mainExerciseID: CatalogSeed.overheadPress,
-            mainExerciseName: "Overhead Press",
-            settings: settings,
-            bbbExerciseID: CatalogSeed.overheadPress,
-            bbbExerciseName: "Overhead Press"
-        )
-
-        return Plan(
-            name: "Boring But Big",
-            pinnedTemplateID: squatDay.id,
-            templates: [squatDay, benchDay, deadliftDay, pressDay]
-        )
-    }
-
-    private static func makeMadcowPlan() -> Plan {
-        let volumeDay = WorkoutTemplate(
-            name: "Volume Day",
-            scheduledWeekdays: [.monday],
-            exercises: [
-                manualBlock(
-                    exerciseID: CatalogSeed.backSquat,
-                    exerciseName: "Back Squat",
-                    restSeconds: PresetPackRest.mainLift,
-                    count: PresetPackSets.strongLifts,
-                    repRange: PresetPackRepRange.strength
-                ),
-                manualBlock(
-                    exerciseID: CatalogSeed.benchPress,
-                    exerciseName: "Bench Press",
-                    restSeconds: PresetPackRest.compound,
-                    count: PresetPackSets.strongLifts,
-                    repRange: PresetPackRepRange.strength
-                ),
-                manualBlock(
-                    exerciseID: CatalogSeed.barbellRow,
-                    exerciseName: "Barbell Row",
-                    restSeconds: PresetPackRest.compound,
-                    count: PresetPackSets.strongLifts,
-                    repRange: PresetPackRepRange.strength
-                ),
-            ]
-        )
-
-        let recoveryDay = WorkoutTemplate(
-            name: "Recovery Day",
-            scheduledWeekdays: [.wednesday],
-            exercises: [
-                manualBlock(
-                    exerciseID: CatalogSeed.backSquat,
-                    exerciseName: "Back Squat",
-                    restSeconds: PresetPackRest.compound,
-                    count: PresetPackSets.madcowRecovery,
-                    repRange: PresetPackRepRange.strength
-                ),
-                manualBlock(
-                    exerciseID: CatalogSeed.overheadPress,
-                    exerciseName: "Overhead Press",
-                    restSeconds: PresetPackRest.compound,
-                    count: PresetPackSets.madcowRecovery,
-                    repRange: PresetPackRepRange.strength
-                ),
-                manualBlock(
-                    exerciseID: CatalogSeed.deadlift,
-                    exerciseName: "Deadlift",
-                    restSeconds: PresetPackRest.mainLift,
-                    count: PresetPackSets.madcowRecovery,
-                    repRange: PresetPackRepRange.strength
-                ),
-            ]
-        )
-
-        let intensityDay = WorkoutTemplate(
-            name: "Intensity Day",
-            scheduledWeekdays: [.friday],
-            exercises: [
-                manualBlock(
-                    exerciseID: CatalogSeed.backSquat,
-                    exerciseName: "Back Squat",
-                    restSeconds: PresetPackRest.mainLift,
-                    targets: madcowIntensityTargets()
-                ),
-                manualBlock(
-                    exerciseID: CatalogSeed.benchPress,
-                    exerciseName: "Bench Press",
-                    restSeconds: PresetPackRest.compound,
-                    targets: madcowIntensityTargets()
-                ),
-                manualBlock(
-                    exerciseID: CatalogSeed.barbellRow,
-                    exerciseName: "Barbell Row",
-                    restSeconds: PresetPackRest.compound,
-                    targets: madcowIntensityTargets()
-                ),
-            ]
-        )
-
-        return Plan(
-            name: "Madcow 5x5",
-            pinnedTemplateID: volumeDay.id,
-            templates: [volumeDay, recoveryDay, intensityDay]
-        )
-    }
-
-    private static func makeGZCLPPlan(settings: SettingsStore) -> Plan {
-        let workoutA = WorkoutTemplate(
-            name: "Workout A",
-            scheduledWeekdays: [.monday],
-            exercises: [
-                gzclTierOneBlock(
-                    exerciseID: CatalogSeed.backSquat,
-                    exerciseName: "Back Squat",
-                    increment: settings.lowerBodyIncrement
-                ),
-                gzclTierTwoBlock(
-                    exerciseID: CatalogSeed.benchPress,
-                    exerciseName: "Bench Press",
-                    increment: settings.upperBodyIncrement
-                ),
-                gzclTierThreeBlock(
-                    exerciseID: CatalogSeed.barbellRow,
-                    exerciseName: "Barbell Row"
-                ),
-            ]
-        )
-
-        let workoutB = WorkoutTemplate(
-            name: "Workout B",
-            scheduledWeekdays: [.tuesday],
-            exercises: [
-                gzclTierOneBlock(
-                    exerciseID: CatalogSeed.overheadPress,
-                    exerciseName: "Overhead Press",
-                    increment: settings.upperBodyIncrement
-                ),
-                gzclTierTwoBlock(
-                    exerciseID: CatalogSeed.deadlift,
-                    exerciseName: "Deadlift",
-                    increment: settings.lowerBodyIncrement
-                ),
-                gzclTierThreeBlock(
-                    exerciseID: CatalogSeed.latPulldown,
-                    exerciseName: "Lat Pulldown"
-                ),
-            ]
-        )
-
-        let workoutC = WorkoutTemplate(
-            name: "Workout C",
-            scheduledWeekdays: [.thursday],
-            exercises: [
-                gzclTierOneBlock(
-                    exerciseID: CatalogSeed.benchPress,
-                    exerciseName: "Bench Press",
-                    increment: settings.upperBodyIncrement
-                ),
-                gzclTierTwoBlock(
-                    exerciseID: CatalogSeed.frontSquat,
-                    exerciseName: "Front Squat",
-                    increment: settings.lowerBodyIncrement
-                ),
-                gzclTierThreeBlock(
-                    exerciseID: CatalogSeed.seatedCableRow,
-                    exerciseName: "Seated Cable Row"
-                ),
-            ]
-        )
-
-        let workoutD = WorkoutTemplate(
-            name: "Workout D",
-            scheduledWeekdays: [.friday],
-            exercises: [
-                gzclTierOneBlock(
-                    exerciseID: CatalogSeed.deadlift,
-                    exerciseName: "Deadlift",
-                    increment: settings.lowerBodyIncrement
-                ),
-                gzclTierTwoBlock(
-                    exerciseID: CatalogSeed.overheadPress,
-                    exerciseName: "Overhead Press",
-                    increment: settings.upperBodyIncrement
-                ),
-                gzclTierThreeBlock(
-                    exerciseID: CatalogSeed.pullUp,
-                    exerciseName: "Pull Up"
-                ),
-            ]
-        )
-
-        return Plan(
-            name: "GZCLP",
-            pinnedTemplateID: workoutA.id,
-            templates: [workoutA, workoutB, workoutC, workoutD]
-        )
+    private static func progressionRule(
+        for progression: PresetProgression,
+        exerciseName: String,
+        targets: PresetTargetDefinition?,
+        settings: SettingsStore
+    ) throws -> ProgressionRule {
+        switch progression {
+        case .manual:
+            return .manual
+        case .doubleUpper:
+            return try doubleProgressionRule(targets: targets, increment: settings.upperBodyIncrement)
+        case .doubleLower:
+            return try doubleProgressionRule(targets: targets, increment: settings.lowerBodyIncrement)
+        case .wave:
+            return ProgressionRule(
+                kind: .percentageWave,
+                percentageWave: PercentageWaveRule.fiveThreeOne(
+                    trainingMax: ExerciseRecommendationDefaults.defaultTrainingMax(for: exerciseName),
+                    cycleIncrement: settings.preferredIncrement(for: exerciseName)
+                )
+            )
+        }
     }
 
     private static func doubleProgressionRule(
-        repRange: RepRange,
+        targets: PresetTargetDefinition?,
         increment: Double
-    ) -> ProgressionRule {
+    ) throws -> ProgressionRule {
         ProgressionRule(
             kind: .doubleProgression,
             doubleProgression: DoubleProgressionRule(
-                targetRepRange: repRange,
+                targetRepRange: try primaryRepRange(from: targets),
                 increment: increment
             )
         )
     }
 
-    private static func doubleProgressionBlock(
-        exerciseID: UUID,
-        exerciseName: String,
-        restSeconds: Int = TemplateExerciseDefaults.restSeconds,
-        count: Int = PresetPackSets.standard,
-        repRange: RepRange = DoubleProgressionDefaults.repRange,
-        increment: Double,
-        supersetGroup: String? = nil
-    ) -> TemplateExercise {
-        TemplateExercise(
-            exerciseID: exerciseID,
-            exerciseNameSnapshot: exerciseName,
-            restSeconds: restSeconds,
-            supersetGroup: supersetGroup,
-            progressionRule: doubleProgressionRule(repRange: repRange, increment: increment),
-            targets: repeatedTargets(count: count, repRange: repRange)
-        )
-    }
+    fileprivate static func targets(
+        from definition: PresetTargetDefinition?,
+        requiresTargets: Bool
+    ) throws -> [SetTarget] {
+        guard let definition else {
+            if requiresTargets {
+                throw PresetProgramError.missingTargets
+            }
+            return []
+        }
 
-    private static func manualBlock(
-        exerciseID: UUID,
-        exerciseName: String,
-        restSeconds: Int = TemplateExerciseDefaults.restSeconds,
-        count: Int = PresetPackSets.standard,
-        repRange: RepRange = TemplateExerciseDefaults.repRange,
-        supersetGroup: String? = nil
-    ) -> TemplateExercise {
-        TemplateExercise(
-            exerciseID: exerciseID,
-            exerciseNameSnapshot: exerciseName,
-            restSeconds: restSeconds,
-            supersetGroup: supersetGroup,
-            progressionRule: .manual,
-            targets: repeatedTargets(count: count, repRange: repRange)
-        )
-    }
+        if let sets = definition.sets {
+            return try sets.map { set in
+                SetTarget(repRange: try set.repRangeValue(), note: set.note)
+            }
+        }
 
-    private static func manualBlock(
-        exerciseID: UUID,
-        exerciseName: String,
-        restSeconds: Int = TemplateExerciseDefaults.restSeconds,
-        targets: [SetTarget],
-        supersetGroup: String? = nil
-    ) -> TemplateExercise {
-        TemplateExercise(
-            exerciseID: exerciseID,
-            exerciseNameSnapshot: exerciseName,
-            restSeconds: restSeconds,
-            supersetGroup: supersetGroup,
-            progressionRule: .manual,
-            targets: targets
-        )
-    }
+        guard let count = definition.count, count > 0 else {
+            throw PresetProgramError.invalidTargetCount(definition.count ?? 0)
+        }
 
-    private static func greyskullBlock(
-        exerciseID: UUID,
-        exerciseName: String,
-        restSeconds: Int = TemplateExerciseDefaults.restSeconds,
-        increment: Double
-    ) -> TemplateExercise {
-        TemplateExercise(
-            exerciseID: exerciseID,
-            exerciseNameSnapshot: exerciseName,
-            restSeconds: restSeconds,
-            progressionRule: doubleProgressionRule(
-                repRange: PresetPackRepRange.strength,
-                increment: increment
-            ),
-            targets: greyskullTargets()
-        )
-    }
-
-    private static func greyskullTargets() -> [SetTarget] {
-        var targets = repeatedTargets(
-            count: PresetPackSets.greyskull,
-            repRange: PresetPackRepRange.strength
-        )
-        targets[targets.index(before: targets.endIndex)].note = PresetPackLabels.greyskullAMRAP
-        return targets
-    }
-
-    private static func madcowIntensityTargets() -> [SetTarget] {
-        var targets = repeatedTargets(
-            count: PresetPackSets.madcowIntensityRamp,
-            repRange: PresetPackRepRange.strength
-        )
-        targets.append(
+        let repRange = try definition.repRangeValue()
+        return (0..<count).map { index in
             SetTarget(
-                repRange: PresetPackRepRange.madcowTriple,
-                note: PresetPackLabels.madcowTopTriple
+                repRange: repRange,
+                note: index == count - 1 ? definition.finalSetNote ?? definition.note : definition.note
             )
-        )
-        targets.append(
-            SetTarget(
-                repRange: PresetPackRepRange.madcowBackoff,
-                note: PresetPackLabels.madcowBackoff
-            )
-        )
-        return targets
-    }
-
-    private static func gzclTierOneBlock(
-        exerciseID: UUID,
-        exerciseName: String,
-        increment: Double
-    ) -> TemplateExercise {
-        doubleProgressionBlock(
-            exerciseID: exerciseID,
-            exerciseName: exerciseName,
-            restSeconds: PresetPackRest.mainLift,
-            count: PresetPackSets.gzclTierOne,
-            repRange: PresetPackRepRange.powerStrength,
-            increment: increment
-        )
-    }
-
-    private static func gzclTierTwoBlock(
-        exerciseID: UUID,
-        exerciseName: String,
-        increment: Double
-    ) -> TemplateExercise {
-        doubleProgressionBlock(
-            exerciseID: exerciseID,
-            exerciseName: exerciseName,
-            restSeconds: PresetPackRest.compound,
-            count: PresetPackSets.gzclTierTwo,
-            repRange: PresetPackRepRange.gzclTierTwo,
-            increment: increment
-        )
-    }
-
-    private static func gzclTierThreeBlock(
-        exerciseID: UUID,
-        exerciseName: String
-    ) -> TemplateExercise {
-        manualBlock(
-            exerciseID: exerciseID,
-            exerciseName: exerciseName,
-            restSeconds: PresetPackRest.standard,
-            count: PresetPackSets.gzclTierThree,
-            repRange: PresetPackRepRange.gzclTierThree
-        )
-    }
-
-    private static func repeatedTargets(
-        count: Int = PresetPackSets.standard,
-        repRange: RepRange,
-        note: String? = nil
-    ) -> [SetTarget] {
-        (0..<count).map { _ in
-            SetTarget(repRange: repRange, note: note)
         }
     }
 
-    private static func accessoryBlock(id: UUID, name: String) -> TemplateExercise {
-        TemplateExercise(
-            exerciseID: id,
-            exerciseNameSnapshot: name,
-            restSeconds: TemplateExerciseDefaults.restSeconds,
-            progressionRule: .manual,
-            targets: repeatedTargets(
-                count: TemplateExerciseDefaults.setCount,
-                repRange: TemplateExerciseDefaults.repRange
-            )
-        )
+    fileprivate static func primaryRepRange(from definition: PresetTargetDefinition?) throws -> RepRange {
+        guard let definition else {
+            throw PresetProgramError.missingTargets
+        }
+
+        if let sets = definition.sets, let firstSet = sets.first {
+            return try firstSet.repRangeValue()
+        }
+
+        return try definition.repRangeValue()
+    }
+}
+
+private enum PresetProgression: String, Decodable {
+    case manual
+    case doubleUpper
+    case doubleLower
+    case wave
+}
+
+private struct PresetProgramCatalogFile: Decodable {
+    var programs: [PresetProgramDefinition]
+}
+
+private struct PresetProgramDefinition: Decodable {
+    var pack: PresetPack
+    var planName: String
+    var pinnedTemplate: String
+    var templates: [PresetTemplateDefinition]
+}
+
+private struct PresetTemplateDefinition: Decodable {
+    var name: String
+    var scheduledWeekdays: [Weekday]?
+    var exercises: [PresetExerciseDefinition]
+
+    private enum CodingKeys: String, CodingKey {
+        case name
+        case scheduledWeekdays
+        case exercises
     }
 
-    private static func waveProgressionRule(
-        for exerciseName: String,
-        settings: SettingsStore
-    ) -> ProgressionRule {
-        ProgressionRule(
-            kind: .percentageWave,
-            percentageWave: PercentageWaveRule.fiveThreeOne(
-                trainingMax: ExerciseRecommendationDefaults.defaultTrainingMax(for: exerciseName),
-                cycleIncrement: settings.preferredIncrement(for: exerciseName)
-            )
-        )
-    }
+    init(from decoder: Decoder) throws {
+        let container = try decoder.container(keyedBy: CodingKeys.self)
+        name = try container.decode(String.self, forKey: .name)
+        exercises = try container.decode([PresetExerciseDefinition].self, forKey: .exercises)
 
-    private static func waveMainBlock(
-        exerciseID: UUID,
-        exerciseName: String,
-        settings: SettingsStore
-    ) -> TemplateExercise {
-        var block = TemplateExercise(
-            exerciseID: exerciseID,
-            exerciseNameSnapshot: exerciseName,
-            restSeconds: PresetPackRest.waveMainLift,
-            progressionRule: waveProgressionRule(for: exerciseName, settings: settings),
-            targets: []
-        )
-
-        block.targets = ProgressionEngine.resolvedTargets(for: block, profile: nil)
-        return block
-    }
-
-    private static func waveTemplate(
-        name: String,
-        mainExerciseID: UUID,
-        mainExerciseName: String,
-        settings: SettingsStore,
-        accessories: [TemplateExercise]
-    ) -> WorkoutTemplate {
-        WorkoutTemplate(
-            name: name,
-            exercises: [
-                waveMainBlock(
-                    exerciseID: mainExerciseID,
-                    exerciseName: mainExerciseName,
-                    settings: settings
+        let weekdayKeys = try container.decodeIfPresent([String].self, forKey: .scheduledWeekdays)
+        scheduledWeekdays = try weekdayKeys?.map { weekdayKey in
+            switch weekdayKey {
+            case "sunday":
+                return .sunday
+            case "monday":
+                return .monday
+            case "tuesday":
+                return .tuesday
+            case "wednesday":
+                return .wednesday
+            case "thursday":
+                return .thursday
+            case "friday":
+                return .friday
+            case "saturday":
+                return .saturday
+            default:
+                throw DecodingError.dataCorruptedError(
+                    forKey: .scheduledWeekdays,
+                    in: container,
+                    debugDescription: "Unknown weekday '\(weekdayKey)'."
                 )
-            ] + accessories
-        )
+            }
+        }
+    }
+}
+
+private struct PresetExerciseDefinition: Decodable {
+    var exercise: String
+    var restSeconds: Int
+    var supersetGroup: String?
+    var progression: PresetProgression
+    var targets: PresetTargetDefinition?
+}
+
+private struct PresetTargetDefinition: Decodable {
+    var count: Int?
+    var repRange: [Int]?
+    var note: String?
+    var finalSetNote: String?
+    var sets: [PresetSetDefinition]?
+
+    func repRangeValue() throws -> RepRange {
+        try Self.repRangeValue(from: repRange)
     }
 
-    private static func bbbTemplate(
-        name: String,
-        mainExerciseID: UUID,
-        mainExerciseName: String,
-        settings: SettingsStore,
-        bbbExerciseID: UUID,
-        bbbExerciseName: String
-    ) -> WorkoutTemplate {
-        WorkoutTemplate(
-            name: name,
-            exercises: [
-                waveMainBlock(
-                    exerciseID: mainExerciseID,
-                    exerciseName: mainExerciseName,
-                    settings: settings
-                ),
-                TemplateExercise(
-                    exerciseID: bbbExerciseID,
-                    exerciseNameSnapshot: bbbExerciseName,
-                    restSeconds: PresetPackRest.compound,
-                    progressionRule: .manual,
-                    targets: repeatedTargets(
-                        count: PresetPackSets.boringButBig,
-                        repRange: PresetPackRepRange.boringButBig,
-                        note: PresetPackLabels.boringButBig
+    static func repRangeValue(from values: [Int]?) throws -> RepRange {
+        guard let values, values.count == 2 else {
+            throw PresetProgramError.invalidRepRange(values ?? [])
+        }
+
+        guard values[0] > 0, values[0] <= values[1] else {
+            throw PresetProgramError.invalidRepRange(values)
+        }
+
+        return RepRange(values[0], values[1])
+    }
+}
+
+private struct PresetSetDefinition: Decodable {
+    var repRange: [Int]
+    var note: String?
+
+    func repRangeValue() throws -> RepRange {
+        try PresetTargetDefinition.repRangeValue(from: repRange)
+    }
+}
+
+private enum PresetProgramError: Error, CustomStringConvertible {
+    case missingResource
+    case missingPinnedTemplate(String)
+    case missingTargets
+    case unknownExercise(String)
+    case invalidRepRange([Int])
+    case invalidTargetCount(Int)
+    case duplicateProgram(String)
+    case emptyProgram(String)
+    case emptyTemplate(String)
+    case missingProgram(String)
+
+    var description: String {
+        switch self {
+        case .missingResource:
+            return "PresetPrograms.json was not found."
+        case let .missingPinnedTemplate(name):
+            return "Pinned template '\(name)' does not exist."
+        case .missingTargets:
+            return "Non-wave exercises must declare targets."
+        case let .unknownExercise(key):
+            return "Unknown exercise key '\(key)'."
+        case let .invalidRepRange(values):
+            return "Invalid rep range \(values)."
+        case let .invalidTargetCount(count):
+            return "Invalid target count \(count)."
+        case let .duplicateProgram(pack):
+            return "Duplicate program definition for '\(pack)'."
+        case let .emptyProgram(pack):
+            return "Program '\(pack)' has no templates."
+        case let .emptyTemplate(name):
+            return "Template '\(name)' has no exercises."
+        case let .missingProgram(pack):
+            return "Program '\(pack)' is not defined."
+        }
+    }
+}
+
+@MainActor
+private final class PresetProgramCatalog {
+    static let shared = PresetProgramCatalog()
+
+    private let programsByPack: [PresetPack: PresetProgramDefinition]
+
+    private init() {
+        do {
+            let catalog = try Self.loadCatalog()
+            try Self.validate(catalog)
+            programsByPack = Dictionary(uniqueKeysWithValues: catalog.programs.map { ($0.pack, $0) })
+        } catch {
+            assertionFailure("Unable to load preset program catalog: \(error)")
+            programsByPack = [:]
+        }
+    }
+
+    func program(for pack: PresetPack) -> PresetProgramDefinition? {
+        programsByPack[pack]
+    }
+
+    private static func loadCatalog() throws -> PresetProgramCatalogFile {
+        let url = try resourceURL()
+        let data = try Data(contentsOf: url)
+        return try JSONDecoder().decode(PresetProgramCatalogFile.self, from: data)
+    }
+
+    private static func resourceURL() throws -> URL {
+        for bundle in Bundle.allBundles + Bundle.allFrameworks {
+            if let url = bundle.url(forResource: "PresetPrograms", withExtension: "json", subdirectory: "Presets") {
+                return url
+            }
+            if let url = bundle.url(forResource: "PresetPrograms", withExtension: "json") {
+                return url
+            }
+        }
+
+        let sourceURL = URL(fileURLWithPath: #filePath)
+            .deletingLastPathComponent()
+            .deletingLastPathComponent()
+            .deletingLastPathComponent()
+            .appendingPathComponent("Resources/Presets/PresetPrograms.json")
+        if FileManager.default.fileExists(atPath: sourceURL.path) {
+            return sourceURL
+        }
+
+        throw PresetProgramError.missingResource
+    }
+
+    private static func validate(_ catalog: PresetProgramCatalogFile) throws {
+        var seenPacks = Set<PresetPack>()
+        for program in catalog.programs {
+            guard seenPacks.insert(program.pack).inserted else {
+                throw PresetProgramError.duplicateProgram(program.pack.rawValue)
+            }
+            guard !program.templates.isEmpty else {
+                throw PresetProgramError.emptyProgram(program.pack.rawValue)
+            }
+            guard program.templates.contains(where: { $0.name == program.pinnedTemplate }) else {
+                throw PresetProgramError.missingPinnedTemplate(program.pinnedTemplate)
+            }
+
+            for template in program.templates {
+                guard !template.exercises.isEmpty else {
+                    throw PresetProgramError.emptyTemplate(template.name)
+                }
+                for exercise in template.exercises {
+                    guard PresetPackBuilder.catalogByKey[exercise.exercise] != nil else {
+                        throw PresetProgramError.unknownExercise(exercise.exercise)
+                    }
+                    _ = try PresetPackBuilder.targets(
+                        from: exercise.targets,
+                        requiresTargets: exercise.progression != .wave
                     )
-                ),
-            ]
-        )
-    }
+                    if exercise.progression != .manual, exercise.progression != .wave {
+                        _ = try PresetPackBuilder.primaryRepRange(from: exercise.targets)
+                    }
+                }
+            }
+        }
 
+        for pack in PresetPack.allCases where !seenPacks.contains(pack) {
+            throw PresetProgramError.missingProgram(pack.rawValue)
+        }
+    }
 }

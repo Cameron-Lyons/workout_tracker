@@ -2,6 +2,8 @@ import Foundation
 import SwiftData
 
 final class SessionRepository: RepositoryBase {
+    private let analyticsSnapshotID = "session-analytics"
+
     override init(modelContext: ModelContext) {
         super.init(modelContext: modelContext)
     }
@@ -60,6 +62,16 @@ final class SessionRepository: RepositoryBase {
         return records.compactMap(decodedCompletedSession(from:))
     }
 
+    func loadSessionAnalyticsSnapshot() -> AnalyticsRepository.SessionAnalyticsSnapshot? {
+        loadAnalyticsSnapshotRecord().flatMap { record in
+            decode(
+                AnalyticsRepository.SessionAnalyticsSnapshot.self,
+                from: record.payloadData,
+                operation: "session analytics snapshot"
+            )
+        }
+    }
+
     @discardableResult
     func persistCompletedSessionAndClearActiveDraft(_ session: CompletedSession) -> Bool {
         guard
@@ -91,9 +103,39 @@ final class SessionRepository: RepositoryBase {
     }
 
     @discardableResult
+    func saveSessionAnalyticsSnapshot(
+        _ snapshot: AnalyticsRepository.SessionAnalyticsSnapshot,
+        completedSessionsRevision: Int
+    ) -> Bool {
+        guard let payloadData = encode(snapshot, operation: "session analytics snapshot") else {
+            return false
+        }
+
+        let record =
+            loadAnalyticsSnapshotRecord()
+            ?? StoredAnalyticsSnapshot(
+                id: analyticsSnapshotID,
+                completedSessionsRevision: completedSessionsRevision,
+                updatedAt: .now,
+                payloadData: payloadData
+            )
+        if record.modelContext == nil {
+            modelContext.insert(record)
+        }
+
+        record.completedSessionsRevision = completedSessionsRevision
+        record.updatedAt = .now
+        if record.payloadData != payloadData {
+            record.payloadData = payloadData
+        }
+        return saveContext("session analytics snapshot")
+    }
+
+    @discardableResult
     func deleteEverything() -> Bool {
         loadActiveDraftRecords().forEach(modelContext.delete)
         loadCompletedSessionRecords().forEach(modelContext.delete)
+        loadAnalyticsSnapshotRecords().forEach(modelContext.delete)
         return saveContext("sessions reset")
     }
 
@@ -183,6 +225,17 @@ final class SessionRepository: RepositoryBase {
 
     private func loadCompletedSessionRecords() -> [StoredCompletedSession] {
         (try? modelContext.fetch(FetchDescriptor<StoredCompletedSession>())) ?? []
+    }
+
+    private func loadAnalyticsSnapshotRecords() -> [StoredAnalyticsSnapshot] {
+        (try? modelContext.fetch(FetchDescriptor<StoredAnalyticsSnapshot>())) ?? []
+    }
+
+    private func loadAnalyticsSnapshotRecord() -> StoredAnalyticsSnapshot? {
+        let descriptor = FetchDescriptor<StoredAnalyticsSnapshot>(
+            predicate: #Predicate<StoredAnalyticsSnapshot> { $0.id == analyticsSnapshotID }
+        )
+        return (try? modelContext.fetch(descriptor))?.first
     }
 
     private func loadCompletedSessionRecord(_ sessionID: UUID) -> StoredCompletedSession? {

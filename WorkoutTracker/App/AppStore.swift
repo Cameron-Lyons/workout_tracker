@@ -261,7 +261,11 @@ final class AppStore {
                 includesCompleteHistory: isEmptyStoreLaunch
             )
         )
-        await derivedStateController.hydrate(plansStore: plansStore, sessionStore: sessionStore)
+        await derivedStateController.hydrate(
+            plansStore: plansStore,
+            sessionStore: sessionStore,
+            persistedSessionAnalytics: hydrationSnapshot.sessionAnalytics
+        )
         applyUITestingFixturesIfNeeded()
         isHydrated = true
     }

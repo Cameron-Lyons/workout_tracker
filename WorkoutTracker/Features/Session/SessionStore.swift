@@ -342,6 +342,13 @@ final class SessionStore {
         persistenceController.flush()
     }
 
+    func persistSessionAnalyticsSnapshot(_ snapshot: AnalyticsRepository.SessionAnalyticsSnapshot) {
+        persistenceController.scheduleSaveSessionAnalyticsSnapshot(
+            snapshot,
+            completedSessionsRevision: completedSessionsRevision
+        )
+    }
+
     func completeSession() -> CompletedSession? {
         guard let activeDraft else {
             return nil

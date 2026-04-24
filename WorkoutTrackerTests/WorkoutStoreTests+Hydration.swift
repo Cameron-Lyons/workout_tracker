@@ -54,8 +54,10 @@ extension WorkoutStoreTests {
 
         XCTAssertFalse(rehydratedStore.sessionStore.hasLoadedCompletedSessionHistory)
         XCTAssertTrue(rehydratedStore.sessionStore.completedSessions.isEmpty)
-        XCTAssertTrue(rehydratedStore.todayStore.recentSessions.isEmpty)
-        XCTAssertEqual(rehydratedStore.progressStore.overview.totalSessions, 0)
+        XCTAssertEqual(rehydratedStore.todayStore.recentSessions.first?.templateNameSnapshot, "Bench Day")
+        XCTAssertEqual(rehydratedStore.progressStore.overview.totalSessions, 1)
+        XCTAssertEqual(rehydratedStore.progressStore.personalRecords.count, 1)
+        XCTAssertTrue(rehydratedStore.progressStore.historySessions.isEmpty)
 
         await rehydratedStore.hydrateCompletedSessionHistoryIfNeeded(priority: .userInitiated)
 

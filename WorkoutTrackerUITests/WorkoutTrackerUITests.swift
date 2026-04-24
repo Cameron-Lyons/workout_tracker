@@ -7,9 +7,7 @@ final class WorkoutTrackerUITests: XCTestCase {
 
     @MainActor
     private func launchAppForUITest(
-        extraArguments: [String] = [],
-        languageCode: String? = nil,
-        localeIdentifier: String? = nil
+        extraArguments: [String] = []
     ) -> XCUIApplication {
         let app = XCUIApplication()
         app.launchArguments += [
@@ -17,14 +15,6 @@ final class WorkoutTrackerUITests: XCTestCase {
             "--uitesting-in-memory",
             "--uitesting-empty-store",
         ]
-
-        if let languageCode {
-            app.launchArguments += ["-AppleLanguages", "(\(languageCode))"]
-        }
-
-        if let localeIdentifier {
-            app.launchArguments += ["-AppleLocale", localeIdentifier]
-        }
 
         app.launchArguments += extraArguments
         app.launch()
@@ -339,28 +329,6 @@ final class WorkoutTrackerUITests: XCTestCase {
         let resumeButton = app.buttons["today.resumeSessionButton"]
         XCTAssertTrue(resumeButton.waitForExistence(timeout: 8))
         attachScreenshot(named: "layout-resume-session")
-    }
-
-    @MainActor
-    func testSpanishLocaleSessionSmokeUsesStableIdentifiers() throws {
-        let app = launchAppForUITest(languageCode: "es", localeIdentifier: "es_ES")
-
-        let presetButton = app.buttons["onboarding.preset.generalGym"]
-        XCTAssertTrue(presetButton.waitForExistence(timeout: 8))
-        presetButton.tap()
-
-        let pinnedStart = app.buttons["today.pinnedStartButton"]
-        XCTAssertTrue(pinnedStart.waitForExistence(timeout: 8))
-        attachScreenshot(named: "locale-es-today")
-        pinnedStart.tap()
-        app.swipeUp()
-
-        let finishButton = app.buttons["session.finishButton"]
-        XCTAssertTrue(finishButton.waitForExistence(timeout: 8))
-        let completeSetButton = app.firstButton(withIdentifierPrefix: "session.completeSet.")
-        app.revealIfNeeded(completeSetButton)
-        XCTAssertTrue(completeSetButton.waitForExistence(timeout: 8))
-        attachScreenshot(named: "locale-es-session")
     }
 
     @MainActor

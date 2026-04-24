@@ -3,6 +3,7 @@ import SwiftData
 struct AppHydrationSnapshot: Sendable {
     var plans: PlansStore.HydrationSnapshot
     var sessions: SessionStore.HydrationSnapshot
+    var sessionAnalytics: AnalyticsRepository.SessionAnalyticsSnapshot?
 }
 
 actor PersistenceHydrationLoader {
@@ -51,7 +52,8 @@ actor PersistenceHydrationLoader {
                 activeDraft: sessionRepository.loadActiveDraft(),
                 completedSessions: [],
                 includesCompleteHistory: false
-            )
+            ),
+            sessionAnalytics: sessionRepository.loadSessionAnalyticsSnapshot()
         )
     }
 

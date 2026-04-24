@@ -39,7 +39,46 @@ final class AppDerivedStateController {
         self.progressStore = progressStore
     }
 
-    func hydrate(plansStore: PlansStore, sessionStore: SessionStore) async {
+    func hydrate(
+        plansStore: PlansStore,
+        sessionStore: SessionStore,
+        persistedSessionAnalytics: AnalyticsRepository.SessionAnalyticsSnapshot? = nil
+    ) async {
+        if let persistedSessionAnalytics,
+            sessionStore.hasLoadedCompletedSessionHistory == false
+        {
+            let persistedSessionAnalytics = analytics.updatingOverview(
+                of: persistedSessionAnalytics,
+                sessions: sessionStore.completedSessions
+            )
+            let key = sessionAnalyticsCacheKey(plansStore: plansStore, sessionStore: sessionStore)
+            let dayBucket = dayBucket()
+            cacheSessionAnalytics(persistedSessionAnalytics, key: key, dayBucket: dayBucket)
+
+            todayStore.apply(
+                analytics.makeTodaySnapshot(
+                    planSummaries: plansStore.planSummaries,
+                    references: plansStore.templateReferences(),
+                    sessions: sessionStore.completedSessions,
+                    sessionAnalytics: persistedSessionAnalytics
+                )
+            )
+            let progressState = await preparedProgressState(
+                sessionAnalytics: persistedSessionAnalytics,
+                completedSessions: sessionStore.completedSessions,
+                selectedExerciseID: progressStore.selectedExerciseID,
+                selectedDay: progressStore.selectedDay
+            )
+            progressStore.apply(progressState)
+            lastAppliedTodayStateKey = TodayStateKey(
+                sessionAnalytics: key,
+                planRevision: plansStore.planRevision,
+                dayBucket: dayBucket
+            )
+            lastAppliedProgressStateKey = ProgressStateKey(sessionAnalytics: key, dayBucket: dayBucket)
+            return
+        }
+
         await refreshDerivedStores(plansStore: plansStore, sessionStore: sessionStore)
     }
 
@@ -218,13 +257,14 @@ final class AppDerivedStateController {
         return true
     }
 
+    @discardableResult
     func recordCompletedSession(
         _ session: CompletedSession,
         plansStore: PlansStore,
         sessionStore: SessionStore,
         finishSummary: SessionFinishSummary?,
         payloads: [SessionExercisePayload]? = nil
-    ) {
+    ) -> AnalyticsRepository.SessionAnalyticsSnapshot {
         progressRefreshTask?.cancel()
         progressRefreshTask = nil
 
@@ -244,14 +284,21 @@ final class AppDerivedStateController {
             finishSummary: finishSummary,
             payloads: payloads
         )
+        let updatedSessionAnalytics = AnalyticsRepository.SessionAnalyticsSnapshot(
+            overview: progressStore.overview,
+            personalRecords: Array(progressStore.personalRecords.reversed()),
+            exerciseSummaries: progressStore.exerciseSummaries,
+            recentPersonalRecords: todayStore.recentPersonalRecords,
+            recentSessions: todayStore.recentSessions,
+            firstSessionDate: cachedSessionAnalytics?.firstSessionDate ?? sessionStore.completedSessions.first?.completedAt
+                ?? session.completedAt,
+            workoutDayCounts: updatedWorkoutDayCounts(
+                recording: session,
+                completedSessions: sessionStore.completedSessions
+            )
+        )
         cacheSessionAnalytics(
-            AnalyticsRepository.SessionAnalyticsSnapshot(
-                overview: progressStore.overview,
-                personalRecords: Array(progressStore.personalRecords.reversed()),
-                exerciseSummaries: progressStore.exerciseSummaries,
-                recentPersonalRecords: todayStore.recentPersonalRecords,
-                recentSessions: todayStore.recentSessions
-            ),
+            updatedSessionAnalytics,
             key: sessionAnalyticsCacheKey(plansStore: plansStore, sessionStore: sessionStore),
             dayBucket: dayBucket()
         )
@@ -262,6 +309,7 @@ final class AppDerivedStateController {
             dayBucket: dayBucket()
         )
         lastAppliedProgressStateKey = ProgressStateKey(sessionAnalytics: sessionAnalyticsKey, dayBucket: dayBucket())
+        return updatedSessionAnalytics
     }
 
     func completedSessionResult(
@@ -400,5 +448,26 @@ final class AppDerivedStateController {
 
     private func dayBucket(for now: Date = .now) -> Date {
         Calendar.autoupdatingCurrent.startOfDay(for: now)
+    }
+
+    private func updatedWorkoutDayCounts(
+        recording session: CompletedSession,
+        completedSessions: [CompletedSession]
+    ) -> [Date: Int] {
+        guard let cachedSessionAnalytics else {
+            return workoutDayCounts(from: completedSessions)
+        }
+
+        var counts = cachedSessionAnalytics.workoutDayCounts
+        let day = Calendar.autoupdatingCurrent.startOfDay(for: session.completedAt)
+        counts[day, default: 0] += 1
+        return counts
+    }
+
+    private func workoutDayCounts(from sessions: [CompletedSession]) -> [Date: Int] {
+        let calendar = Calendar.autoupdatingCurrent
+        return sessions.reduce(into: [:]) { counts, session in
+            counts[calendar.startOfDay(for: session.completedAt), default: 0] += 1
+        }
     }
 }

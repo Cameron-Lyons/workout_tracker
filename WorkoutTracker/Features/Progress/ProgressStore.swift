@@ -28,6 +28,7 @@ final class ProgressStore {
         var exerciseSummariesByID: [UUID: ExerciseAnalyticsSummary]
         var exerciseChartSeriesByID: [UUID: ExerciseChartSeries]
         var personalBestByExerciseID: [UUID: Double]
+        var firstSessionDate: Date?
     }
 
     @ObservationIgnored private let calendar = Calendar.autoupdatingCurrent
@@ -36,6 +37,7 @@ final class ProgressStore {
     @ObservationIgnored private var exerciseSummariesByID: [UUID: ExerciseAnalyticsSummary] = [:]
     @ObservationIgnored private var exerciseChartSeriesByID: [UUID: ExerciseChartSeries] = [:]
     @ObservationIgnored private var personalBestByExerciseID: [UUID: Double] = [:]
+    @ObservationIgnored private var firstSessionDate: Date?
 
     var overview: ProgressOverview = .empty
     var personalRecords: [PersonalRecord] = []
@@ -69,6 +71,7 @@ final class ProgressStore {
         exerciseSummariesByID = state.exerciseSummariesByID
         exerciseChartSeriesByID = state.exerciseChartSeriesByID
         personalBestByExerciseID = state.personalBestByExerciseID
+        firstSessionDate = state.firstSessionDate
     }
 
     func recordCompletedSession(
@@ -81,10 +84,11 @@ final class ProgressStore {
     ) {
         overview = overview.recording(
             session,
-            sessionCount: completedSessions.count,
-            firstSessionDate: completedSessions.first?.completedAt,
+            sessionCount: max(completedSessions.count, overview.totalSessions + 1),
+            firstSessionDate: completedSessions.first?.completedAt ?? firstSessionDate,
             addedVolume: finishSummary?.totalVolume ?? analytics.volume(for: session)
         )
+        firstSessionDate = completedSessions.first?.completedAt ?? firstSessionDate ?? session.completedAt
 
         if let finishSummary, !finishSummary.personalRecords.isEmpty {
             personalRecords = PersonalRecordSelection.mergedNewestFirst(
@@ -230,7 +234,8 @@ final class ProgressStore {
             sessionsByDay: sessionsByDay,
             exerciseSummariesByID: exerciseSummariesByID,
             exerciseChartSeriesByID: exerciseChartSeriesByID,
-            personalBestByExerciseID: personalBestByExerciseID
+            personalBestByExerciseID: personalBestByExerciseID,
+            firstSessionDate: snapshot.firstSessionDate
         )
     }
 

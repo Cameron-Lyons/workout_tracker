@@ -196,13 +196,14 @@ final class AppSessionCoordinator {
             )
         }
 
-        derivedStateController.recordCompletedSession(
+        let sessionAnalyticsSnapshot = derivedStateController.recordCompletedSession(
             completedSession,
             plansStore: plansStore,
             sessionStore: sessionStore,
             finishSummary: finishSummary,
             payloads: completedSessionResult.payloads
         )
+        sessionStore.persistSessionAnalyticsSnapshot(sessionAnalyticsSnapshot)
         return true
     }
 

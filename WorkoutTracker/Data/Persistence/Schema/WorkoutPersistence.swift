@@ -282,26 +282,176 @@ enum WorkoutSchemaV6: VersionedSchema {
     }
 }
 
+enum WorkoutSchemaV7: VersionedSchema {
+    static let versionIdentifier = Schema.Version(7, 0, 0)
+
+    static var models: [any PersistentModel.Type] {
+        [
+            StoredCatalogItem.self,
+            StoredExerciseProfile.self,
+            StoredPlan.self,
+            StoredActiveSession.self,
+            StoredCompletedSession.self,
+            StoredAnalyticsSnapshot.self,
+        ]
+    }
+
+    @Model
+    final class StoredCatalogItem {
+        @Attribute(.unique) var id: UUID
+        var name: String
+        var aliasesData: Data
+        var categoryRaw: String
+
+        init(id: UUID, name: String, aliasesData: Data, categoryRaw: String) {
+            self.id = id
+            self.name = name
+            self.aliasesData = aliasesData
+            self.categoryRaw = categoryRaw
+        }
+    }
+
+    @Model
+    final class StoredExerciseProfile {
+        @Attribute(.unique) var id: UUID
+        var exerciseID: UUID
+        var trainingMax: Double?
+        var preferredIncrement: Double?
+
+        init(id: UUID, exerciseID: UUID, trainingMax: Double?, preferredIncrement: Double?) {
+            self.id = id
+            self.exerciseID = exerciseID
+            self.trainingMax = trainingMax
+            self.preferredIncrement = preferredIncrement
+        }
+    }
+
+    @Model
+    final class StoredPlan {
+        @Attribute(.unique) var id: UUID
+        var name: String
+        var createdAt: Date
+        var pinnedTemplateID: UUID?
+        var payloadData: Data
+        var summaryData: Data
+
+        init(
+            id: UUID,
+            name: String,
+            createdAt: Date,
+            pinnedTemplateID: UUID?,
+            payloadData: Data,
+            summaryData: Data
+        ) {
+            self.id = id
+            self.name = name
+            self.createdAt = createdAt
+            self.pinnedTemplateID = pinnedTemplateID
+            self.payloadData = payloadData
+            self.summaryData = summaryData
+        }
+    }
+
+    @Model
+    final class StoredActiveSession {
+        @Attribute(.unique) var id: UUID
+        var planID: UUID?
+        var templateID: UUID
+        var templateNameSnapshot: String
+        var startedAt: Date
+        var lastUpdatedAt: Date
+        var restTimerEndsAt: Date?
+        var payloadData: Data
+
+        init(
+            id: UUID,
+            planID: UUID?,
+            templateID: UUID,
+            templateNameSnapshot: String,
+            startedAt: Date,
+            lastUpdatedAt: Date,
+            restTimerEndsAt: Date?,
+            payloadData: Data
+        ) {
+            self.id = id
+            self.planID = planID
+            self.templateID = templateID
+            self.templateNameSnapshot = templateNameSnapshot
+            self.startedAt = startedAt
+            self.lastUpdatedAt = lastUpdatedAt
+            self.restTimerEndsAt = restTimerEndsAt
+            self.payloadData = payloadData
+        }
+    }
+
+    @Model
+    final class StoredCompletedSession {
+        @Attribute(.unique) var id: UUID
+        var planID: UUID?
+        var templateID: UUID
+        var templateNameSnapshot: String
+        var completedAt: Date
+        var payloadData: Data
+
+        init(
+            id: UUID,
+            planID: UUID?,
+            templateID: UUID,
+            templateNameSnapshot: String,
+            completedAt: Date,
+            payloadData: Data
+        ) {
+            self.id = id
+            self.planID = planID
+            self.templateID = templateID
+            self.templateNameSnapshot = templateNameSnapshot
+            self.completedAt = completedAt
+            self.payloadData = payloadData
+        }
+    }
+
+    @Model
+    final class StoredAnalyticsSnapshot {
+        @Attribute(.unique) var id: String
+        var completedSessionsRevision: Int
+        var updatedAt: Date
+        var payloadData: Data
+
+        init(id: String, completedSessionsRevision: Int, updatedAt: Date, payloadData: Data) {
+            self.id = id
+            self.completedSessionsRevision = completedSessionsRevision
+            self.updatedAt = updatedAt
+            self.payloadData = payloadData
+        }
+    }
+}
+
 enum WorkoutModelsMigrationPlan: SchemaMigrationPlan {
     static var schemas: [any VersionedSchema.Type] {
-        [WorkoutSchemaV5.self, WorkoutSchemaV6.self]
+        [WorkoutSchemaV5.self, WorkoutSchemaV6.self, WorkoutSchemaV7.self]
     }
 
     static var stages: [MigrationStage] {
-        [migrateV5toV6]
+        [migrateV5toV6, migrateV6toV7]
     }
 
     static let migrateV5toV6 = MigrationStage.lightweight(
         fromVersion: WorkoutSchemaV5.self,
         toVersion: WorkoutSchemaV6.self
     )
+
+    static let migrateV6toV7 = MigrationStage.lightweight(
+        fromVersion: WorkoutSchemaV6.self,
+        toVersion: WorkoutSchemaV7.self
+    )
 }
 
-typealias StoredCatalogItem = WorkoutSchemaV6.StoredCatalogItem
-typealias StoredExerciseProfile = WorkoutSchemaV6.StoredExerciseProfile
-typealias StoredPlan = WorkoutSchemaV6.StoredPlan
-typealias StoredActiveSession = WorkoutSchemaV6.StoredActiveSession
-typealias StoredCompletedSession = WorkoutSchemaV6.StoredCompletedSession
+typealias StoredCatalogItem = WorkoutSchemaV7.StoredCatalogItem
+typealias StoredExerciseProfile = WorkoutSchemaV7.StoredExerciseProfile
+typealias StoredPlan = WorkoutSchemaV7.StoredPlan
+typealias StoredActiveSession = WorkoutSchemaV7.StoredActiveSession
+typealias StoredCompletedSession = WorkoutSchemaV7.StoredCompletedSession
+typealias StoredAnalyticsSnapshot = WorkoutSchemaV7.StoredAnalyticsSnapshot
 
 struct PersistenceStartupIssue: Identifiable, Equatable {
     let id = UUID()
@@ -445,7 +595,7 @@ enum PersistenceRecoveryClassifier {
 }
 
 enum WorkoutModelContainerFactory {
-    private static let schema = Schema(versionedSchema: WorkoutSchemaV6.self)
+    private static let schema = Schema(versionedSchema: WorkoutSchemaV7.self)
     private static let storeDirectoryName = "WorkoutTracker"
     private static let storeFilename = "WorkoutTracker.store"
     nonisolated(unsafe) private static var pendingStartupIssue: PersistenceStartupIssue?

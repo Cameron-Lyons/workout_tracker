@@ -1,0 +1,299 @@
+{
+  "programs": [
+    {
+      "pack": "generalGym",
+      "planName": "General Gym",
+      "pinnedTemplate": "Upper A",
+      "templates": [
+        {
+          "name": "Upper A",
+          "scheduledWeekdays": ["monday", "thursday"],
+          "exercises": [
+            { "exercise": "benchPress", "restSeconds": 120, "progression": "doubleUpper", "targets": { "count": 3, "repRange": [6, 8] } },
+            { "exercise": "barbellRow", "restSeconds": 120, "progression": "doubleUpper", "targets": { "count": 3, "repRange": [8, 10] } },
+            { "exercise": "lateralRaise", "restSeconds": 60, "supersetGroup": "A", "progression": "manual", "targets": { "count": 3, "repRange": [12, 15] } },
+            { "exercise": "tricepsPushdown", "restSeconds": 60, "supersetGroup": "A", "progression": "manual", "targets": { "count": 3, "repRange": [10, 15] } }
+          ]
+        },
+        {
+          "name": "Lower A",
+          "scheduledWeekdays": ["tuesday", "friday"],
+          "exercises": [
+            { "exercise": "backSquat", "restSeconds": 150, "progression": "doubleLower", "targets": { "count": 3, "repRange": [5, 8] } },
+            { "exercise": "romanianDeadlift", "restSeconds": 120, "progression": "doubleLower", "targets": { "count": 3, "repRange": [8, 12] } },
+            { "exercise": "legPress", "restSeconds": 90, "progression": "manual", "targets": { "count": 3, "repRange": [10, 15] } },
+            { "exercise": "standingCalfRaise", "restSeconds": 60, "progression": "manual", "targets": { "count": 3, "repRange": [12, 20] } }
+          ]
+        },
+        {
+          "name": "Upper B",
+          "exercises": [
+            { "exercise": "overheadPress", "restSeconds": 120, "progression": "doubleUpper", "targets": { "count": 3, "repRange": [6, 8] } },
+            { "exercise": "pullUp", "restSeconds": 120, "progression": "manual", "targets": { "count": 3, "repRange": [8, 12] } },
+            { "exercise": "inclineBenchPress", "restSeconds": 90, "supersetGroup": "B", "progression": "manual", "targets": { "count": 3, "repRange": [8, 12] } },
+            { "exercise": "hammerCurl", "restSeconds": 60, "supersetGroup": "B", "progression": "manual", "targets": { "count": 3, "repRange": [10, 15] } }
+          ]
+        },
+        {
+          "name": "Lower B",
+          "exercises": [
+            { "exercise": "deadlift", "restSeconds": 150, "progression": "doubleLower", "targets": { "count": 2, "repRange": [4, 6] } },
+            { "exercise": "frontSquat", "restSeconds": 120, "progression": "doubleLower", "targets": { "count": 3, "repRange": [6, 8] } },
+            { "exercise": "bulgarianSplitSquat", "restSeconds": 75, "supersetGroup": "C", "progression": "manual", "targets": { "count": 3, "repRange": [8, 12] } },
+            { "exercise": "legCurl", "restSeconds": 60, "supersetGroup": "C", "progression": "manual", "targets": { "count": 3, "repRange": [10, 15] } }
+          ]
+        }
+      ]
+    },
+    {
+      "pack": "phul",
+      "planName": "PHUL",
+      "pinnedTemplate": "Upper Power",
+      "templates": [
+        {
+          "name": "Upper Power",
+          "scheduledWeekdays": ["monday"],
+          "exercises": [
+            { "exercise": "benchPress", "restSeconds": 150, "progression": "doubleUpper", "targets": { "count": 4, "repRange": [3, 5] } },
+            { "exercise": "barbellRow", "restSeconds": 150, "progression": "doubleUpper", "targets": { "count": 4, "repRange": [3, 5] } },
+            { "exercise": "overheadPress", "restSeconds": 120, "progression": "doubleUpper", "targets": { "count": 3, "repRange": [6, 8] } },
+            { "exercise": "pullUp", "restSeconds": 120, "progression": "manual", "targets": { "count": 3, "repRange": [8, 10] } },
+            { "exercise": "hammerCurl", "restSeconds": 60, "progression": "manual", "targets": { "count": 3, "repRange": [10, 15] } },
+            { "exercise": "tricepsPushdown", "restSeconds": 60, "progression": "manual", "targets": { "count": 3, "repRange": [10, 15] } }
+          ]
+        },
+        {
+          "name": "Lower Power",
+          "scheduledWeekdays": ["tuesday"],
+          "exercises": [
+            { "exercise": "backSquat", "restSeconds": 150, "progression": "doubleLower", "targets": { "count": 4, "repRange": [3, 5] } },
+            { "exercise": "deadlift", "restSeconds": 150, "progression": "doubleLower", "targets": { "count": 3, "repRange": [3, 5] } },
+            { "exercise": "legPress", "restSeconds": 90, "progression": "manual", "targets": { "count": 3, "repRange": [8, 12] } },
+            { "exercise": "legCurl", "restSeconds": 90, "progression": "manual", "targets": { "count": 3, "repRange": [8, 10] } },
+            { "exercise": "standingCalfRaise", "restSeconds": 90, "progression": "manual", "targets": { "count": 4, "repRange": [8, 12] } }
+          ]
+        },
+        {
+          "name": "Upper Hypertrophy",
+          "scheduledWeekdays": ["thursday"],
+          "exercises": [
+            { "exercise": "inclineBenchPress", "restSeconds": 120, "progression": "doubleUpper", "targets": { "count": 4, "repRange": [8, 12] } },
+            { "exercise": "seatedCableRow", "restSeconds": 120, "progression": "doubleUpper", "targets": { "count": 4, "repRange": [8, 12] } },
+            { "exercise": "overheadPress", "restSeconds": 90, "progression": "doubleUpper", "targets": { "count": 3, "repRange": [8, 12] } },
+            { "exercise": "latPulldown", "restSeconds": 90, "progression": "manual", "targets": { "count": 3, "repRange": [10, 15] } },
+            { "exercise": "lateralRaise", "restSeconds": 60, "progression": "manual", "targets": { "count": 3, "repRange": [12, 15] } },
+            { "exercise": "hammerCurl", "restSeconds": 60, "progression": "manual", "targets": { "count": 3, "repRange": [10, 15] } },
+            { "exercise": "tricepsPushdown", "restSeconds": 60, "progression": "manual", "targets": { "count": 3, "repRange": [10, 15] } }
+          ]
+        },
+        {
+          "name": "Lower Hypertrophy",
+          "scheduledWeekdays": ["friday"],
+          "exercises": [
+            { "exercise": "frontSquat", "restSeconds": 120, "progression": "doubleLower", "targets": { "count": 4, "repRange": [8, 12] } },
+            { "exercise": "romanianDeadlift", "restSeconds": 120, "progression": "doubleLower", "targets": { "count": 4, "repRange": [8, 12] } },
+            { "exercise": "bulgarianSplitSquat", "restSeconds": 75, "progression": "manual", "targets": { "count": 3, "repRange": [10, 15] } },
+            { "exercise": "legCurl", "restSeconds": 90, "progression": "manual", "targets": { "count": 3, "repRange": [10, 15] } },
+            { "exercise": "legExtension", "restSeconds": 90, "progression": "manual", "targets": { "count": 3, "repRange": [10, 15] } },
+            { "exercise": "seatedCalfRaise", "restSeconds": 90, "progression": "manual", "targets": { "count": 4, "repRange": [12, 20] } }
+          ]
+        }
+      ]
+    },
+    {
+      "pack": "startingStrength",
+      "planName": "Starting Strength",
+      "pinnedTemplate": "Workout A",
+      "templates": [
+        {
+          "name": "Workout A",
+          "scheduledWeekdays": ["monday", "friday"],
+          "exercises": [
+            { "exercise": "backSquat", "restSeconds": 150, "progression": "doubleLower", "targets": { "count": 3, "repRange": [5, 5] } },
+            { "exercise": "benchPress", "restSeconds": 120, "progression": "doubleUpper", "targets": { "count": 3, "repRange": [5, 5] } },
+            { "exercise": "deadlift", "restSeconds": 180, "progression": "doubleLower", "targets": { "count": 1, "repRange": [5, 5] } }
+          ]
+        },
+        {
+          "name": "Workout B",
+          "scheduledWeekdays": ["wednesday"],
+          "exercises": [
+            { "exercise": "backSquat", "restSeconds": 150, "progression": "doubleLower", "targets": { "count": 3, "repRange": [5, 5] } },
+            { "exercise": "overheadPress", "restSeconds": 120, "progression": "doubleUpper", "targets": { "count": 3, "repRange": [5, 5] } },
+            { "exercise": "powerClean", "restSeconds": 120, "progression": "doubleUpper", "targets": { "count": 5, "repRange": [3, 3] } }
+          ]
+        }
+      ]
+    },
+    {
+      "pack": "strongLiftsFiveByFive",
+      "planName": "StrongLifts 5x5",
+      "pinnedTemplate": "Workout A",
+      "templates": [
+        {
+          "name": "Workout A",
+          "scheduledWeekdays": ["monday", "friday"],
+          "exercises": [
+            { "exercise": "backSquat", "restSeconds": 150, "progression": "doubleLower", "targets": { "count": 5, "repRange": [5, 5] } },
+            { "exercise": "benchPress", "restSeconds": 120, "progression": "doubleUpper", "targets": { "count": 5, "repRange": [5, 5] } },
+            { "exercise": "barbellRow", "restSeconds": 120, "progression": "doubleUpper", "targets": { "count": 5, "repRange": [5, 5] } }
+          ]
+        },
+        {
+          "name": "Workout B",
+          "scheduledWeekdays": ["wednesday"],
+          "exercises": [
+            { "exercise": "backSquat", "restSeconds": 150, "progression": "doubleLower", "targets": { "count": 5, "repRange": [5, 5] } },
+            { "exercise": "overheadPress", "restSeconds": 120, "progression": "doubleUpper", "targets": { "count": 5, "repRange": [5, 5] } },
+            { "exercise": "deadlift", "restSeconds": 180, "progression": "doubleLower", "targets": { "count": 1, "repRange": [5, 5] } }
+          ]
+        }
+      ]
+    },
+    {
+      "pack": "greyskullLP",
+      "planName": "Greyskull LP",
+      "pinnedTemplate": "Workout A",
+      "templates": [
+        {
+          "name": "Workout A",
+          "scheduledWeekdays": ["monday", "friday"],
+          "exercises": [
+            { "exercise": "backSquat", "restSeconds": 150, "progression": "doubleLower", "targets": { "count": 3, "repRange": [5, 5], "finalSetNote": "AMRAP+" } },
+            { "exercise": "benchPress", "restSeconds": 120, "progression": "doubleUpper", "targets": { "count": 3, "repRange": [5, 5], "finalSetNote": "AMRAP+" } },
+            { "exercise": "barbellRow", "restSeconds": 120, "progression": "doubleUpper", "targets": { "count": 3, "repRange": [5, 5], "finalSetNote": "AMRAP+" } }
+          ]
+        },
+        {
+          "name": "Workout B",
+          "scheduledWeekdays": ["wednesday"],
+          "exercises": [
+            { "exercise": "backSquat", "restSeconds": 150, "progression": "doubleLower", "targets": { "count": 3, "repRange": [5, 5], "finalSetNote": "AMRAP+" } },
+            { "exercise": "overheadPress", "restSeconds": 120, "progression": "doubleUpper", "targets": { "count": 3, "repRange": [5, 5], "finalSetNote": "AMRAP+" } },
+            { "exercise": "deadlift", "restSeconds": 180, "progression": "doubleLower", "targets": { "count": 3, "repRange": [5, 5], "finalSetNote": "AMRAP+" } }
+          ]
+        }
+      ]
+    },
+    {
+      "pack": "fiveThreeOne",
+      "planName": "5/3/1",
+      "pinnedTemplate": "Squat Day",
+      "templates": [
+        { "name": "Squat Day", "exercises": [
+          { "exercise": "backSquat", "restSeconds": 180, "progression": "wave" },
+          { "exercise": "frontSquat", "restSeconds": 90, "progression": "manual", "targets": { "count": 3, "repRange": [8, 12] } },
+          { "exercise": "legCurl", "restSeconds": 90, "progression": "manual", "targets": { "count": 3, "repRange": [8, 12] } }
+        ] },
+        { "name": "Bench Day", "exercises": [
+          { "exercise": "benchPress", "restSeconds": 180, "progression": "wave" },
+          { "exercise": "pullUp", "restSeconds": 90, "progression": "manual", "targets": { "count": 3, "repRange": [8, 12] } },
+          { "exercise": "tricepsPushdown", "restSeconds": 90, "progression": "manual", "targets": { "count": 3, "repRange": [8, 12] } }
+        ] },
+        { "name": "Deadlift Day", "exercises": [
+          { "exercise": "deadlift", "restSeconds": 180, "progression": "wave" },
+          { "exercise": "barbellRow", "restSeconds": 90, "progression": "manual", "targets": { "count": 3, "repRange": [8, 12] } },
+          { "exercise": "seatedCalfRaise", "restSeconds": 90, "progression": "manual", "targets": { "count": 3, "repRange": [8, 12] } }
+        ] },
+        { "name": "Press Day", "exercises": [
+          { "exercise": "overheadPress", "restSeconds": 180, "progression": "wave" },
+          { "exercise": "latPulldown", "restSeconds": 90, "progression": "manual", "targets": { "count": 3, "repRange": [8, 12] } },
+          { "exercise": "hammerCurl", "restSeconds": 90, "progression": "manual", "targets": { "count": 3, "repRange": [8, 12] } }
+        ] }
+      ]
+    },
+    {
+      "pack": "boringButBig",
+      "planName": "Boring But Big",
+      "pinnedTemplate": "BBB Squat Day",
+      "templates": [
+        { "name": "BBB Squat Day", "exercises": [
+          { "exercise": "backSquat", "restSeconds": 180, "progression": "wave" },
+          { "exercise": "backSquat", "restSeconds": 120, "progression": "manual", "targets": { "count": 5, "repRange": [10, 10], "note": "BBB 5x10" } }
+        ] },
+        { "name": "BBB Bench Day", "exercises": [
+          { "exercise": "benchPress", "restSeconds": 180, "progression": "wave" },
+          { "exercise": "benchPress", "restSeconds": 120, "progression": "manual", "targets": { "count": 5, "repRange": [10, 10], "note": "BBB 5x10" } }
+        ] },
+        { "name": "BBB Deadlift Day", "exercises": [
+          { "exercise": "deadlift", "restSeconds": 180, "progression": "wave" },
+          { "exercise": "deadlift", "restSeconds": 120, "progression": "manual", "targets": { "count": 5, "repRange": [10, 10], "note": "BBB 5x10" } }
+        ] },
+        { "name": "BBB Press Day", "exercises": [
+          { "exercise": "overheadPress", "restSeconds": 180, "progression": "wave" },
+          { "exercise": "overheadPress", "restSeconds": 120, "progression": "manual", "targets": { "count": 5, "repRange": [10, 10], "note": "BBB 5x10" } }
+        ] }
+      ]
+    },
+    {
+      "pack": "madcowFiveByFive",
+      "planName": "Madcow 5x5",
+      "pinnedTemplate": "Volume Day",
+      "templates": [
+        {
+          "name": "Volume Day",
+          "scheduledWeekdays": ["monday"],
+          "exercises": [
+            { "exercise": "backSquat", "restSeconds": 150, "progression": "manual", "targets": { "count": 5, "repRange": [5, 5] } },
+            { "exercise": "benchPress", "restSeconds": 120, "progression": "manual", "targets": { "count": 5, "repRange": [5, 5] } },
+            { "exercise": "barbellRow", "restSeconds": 120, "progression": "manual", "targets": { "count": 5, "repRange": [5, 5] } }
+          ]
+        },
+        {
+          "name": "Recovery Day",
+          "scheduledWeekdays": ["wednesday"],
+          "exercises": [
+            { "exercise": "backSquat", "restSeconds": 120, "progression": "manual", "targets": { "count": 4, "repRange": [5, 5] } },
+            { "exercise": "overheadPress", "restSeconds": 120, "progression": "manual", "targets": { "count": 4, "repRange": [5, 5] } },
+            { "exercise": "deadlift", "restSeconds": 150, "progression": "manual", "targets": { "count": 4, "repRange": [5, 5] } }
+          ]
+        },
+        {
+          "name": "Intensity Day",
+          "scheduledWeekdays": ["friday"],
+          "exercises": [
+            { "exercise": "backSquat", "restSeconds": 150, "progression": "manual", "targets": { "sets": [
+              { "repRange": [5, 5] }, { "repRange": [5, 5] }, { "repRange": [5, 5] },
+              { "repRange": [3, 3], "note": "Top triple" }, { "repRange": [8, 8], "note": "Backoff set" }
+            ] } },
+            { "exercise": "benchPress", "restSeconds": 120, "progression": "manual", "targets": { "sets": [
+              { "repRange": [5, 5] }, { "repRange": [5, 5] }, { "repRange": [5, 5] },
+              { "repRange": [3, 3], "note": "Top triple" }, { "repRange": [8, 8], "note": "Backoff set" }
+            ] } },
+            { "exercise": "barbellRow", "restSeconds": 120, "progression": "manual", "targets": { "sets": [
+              { "repRange": [5, 5] }, { "repRange": [5, 5] }, { "repRange": [5, 5] },
+              { "repRange": [3, 3], "note": "Top triple" }, { "repRange": [8, 8], "note": "Backoff set" }
+            ] } }
+          ]
+        }
+      ]
+    },
+    {
+      "pack": "gzclp",
+      "planName": "GZCLP",
+      "pinnedTemplate": "Workout A",
+      "templates": [
+        { "name": "Workout A", "scheduledWeekdays": ["monday"], "exercises": [
+          { "exercise": "backSquat", "restSeconds": 150, "progression": "doubleLower", "targets": { "count": 3, "repRange": [3, 5] } },
+          { "exercise": "benchPress", "restSeconds": 120, "progression": "doubleUpper", "targets": { "count": 3, "repRange": [8, 10] } },
+          { "exercise": "barbellRow", "restSeconds": 90, "progression": "manual", "targets": { "count": 3, "repRange": [12, 15] } }
+        ] },
+        { "name": "Workout B", "scheduledWeekdays": ["tuesday"], "exercises": [
+          { "exercise": "overheadPress", "restSeconds": 150, "progression": "doubleUpper", "targets": { "count": 3, "repRange": [3, 5] } },
+          { "exercise": "deadlift", "restSeconds": 120, "progression": "doubleLower", "targets": { "count": 3, "repRange": [8, 10] } },
+          { "exercise": "latPulldown", "restSeconds": 90, "progression": "manual", "targets": { "count": 3, "repRange": [12, 15] } }
+        ] },
+        { "name": "Workout C", "scheduledWeekdays": ["thursday"], "exercises": [
+          { "exercise": "benchPress", "restSeconds": 150, "progression": "doubleUpper", "targets": { "count": 3, "repRange": [3, 5] } },
+          { "exercise": "frontSquat", "restSeconds": 120, "progression": "doubleLower", "targets": { "count": 3, "repRange": [8, 10] } },
+          { "exercise": "seatedCableRow", "restSeconds": 90, "progression": "manual", "targets": { "count": 3, "repRange": [12, 15] } }
+        ] },
+        { "name": "Workout D", "scheduledWeekdays": ["friday"], "exercises": [
+          { "exercise": "deadlift", "restSeconds": 150, "progression": "doubleLower", "targets": { "count": 3, "repRange": [3, 5] } },
+          { "exercise": "overheadPress", "restSeconds": 120, "progression": "doubleUpper", "targets": { "count": 3, "repRange": [8, 10] } },
+          { "exercise": "pullUp", "restSeconds": 90, "progression": "manual", "targets": { "count": 3, "repRange": [12, 15] } }
+        ] }
+      ]
+    }
+  ]
+}

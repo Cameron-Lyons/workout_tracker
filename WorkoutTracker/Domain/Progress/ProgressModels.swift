@@ -10,7 +10,7 @@ struct TemplateReference: Identifiable, Equatable, Sendable {
     var lastStartedAt: Date?
 }
 
-struct ProgressPoint: Identifiable, Equatable, Sendable {
+struct ProgressPoint: Identifiable, Codable, Equatable, Sendable {
     var id: UUID
     var sessionID: UUID
     var date: Date
@@ -35,7 +35,7 @@ struct ProgressPoint: Identifiable, Equatable, Sendable {
     }
 }
 
-struct PersonalRecord: Identifiable, Equatable, Sendable {
+struct PersonalRecord: Identifiable, Codable, Equatable, Sendable {
     var id: UUID
     var sessionID: UUID
     var exerciseID: UUID
@@ -66,7 +66,7 @@ struct PersonalRecord: Identifiable, Equatable, Sendable {
     }
 }
 
-struct ExerciseAnalyticsSummary: Identifiable, Equatable, Sendable {
+struct ExerciseAnalyticsSummary: Identifiable, Codable, Equatable, Sendable {
     var id: UUID { exerciseID }
     var exerciseID: UUID
     var displayName: String
@@ -76,7 +76,7 @@ struct ExerciseAnalyticsSummary: Identifiable, Equatable, Sendable {
     var points: [ProgressPoint]
 }
 
-struct ProgressOverview: Equatable, Sendable {
+struct ProgressOverview: Codable, Equatable, Sendable {
     var totalSessions: Int
     var sessionsThisWeek: Int
     var sessionsLast30Days: Int
@@ -92,7 +92,7 @@ struct ProgressOverview: Equatable, Sendable {
     )
 }
 
-struct SessionFinishSummary: Identifiable, Equatable, Sendable {
+struct SessionFinishSummary: Identifiable, Codable, Equatable, Sendable {
     var id: UUID
     var templateName: String
     var completedAt: Date

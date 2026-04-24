@@ -71,17 +71,19 @@ private struct ProgressDashboardBodyView: View {
     @Binding var displayedMonth: Date
 
     var body: some View {
-        if sessionStore.hasLoadedCompletedSessionHistory == false {
-            ProgressHistoryLoadingCardView()
-        } else if progressStore.overview.totalSessions == 0 {
-            AppEmptyStateCard(
-                systemImage: "chart.xyaxis.line",
-                title: "No progress yet",
-                message: "Finish a session and PRs, trends, and calendar history will populate here.",
-                tone: .progress,
-                style: .plain,
-                textAlignment: .center
-            )
+        if progressStore.overview.totalSessions == 0 {
+            if sessionStore.hasLoadedCompletedSessionHistory == false {
+                ProgressHistoryLoadingCardView()
+            } else {
+                AppEmptyStateCard(
+                    systemImage: "chart.xyaxis.line",
+                    title: "No progress yet",
+                    message: "Finish a session and PRs, trends, and calendar history will populate here.",
+                    tone: .progress,
+                    style: .plain,
+                    textAlignment: .center
+                )
+            }
         } else {
             ProgressDashboardLoadedView(displayedMonth: $displayedMonth)
         }
@@ -89,6 +91,7 @@ private struct ProgressDashboardBodyView: View {
 }
 
 private struct ProgressDashboardLoadedView: View {
+    @Environment(SessionStore.self) private var sessionStore
     @Binding var displayedMonth: Date
 
     var body: some View {
@@ -97,8 +100,12 @@ private struct ProgressDashboardLoadedView: View {
                 ProgressOverviewSectionView()
                 ProgressRecordsSectionView()
                 ProgressChartSectionContainerView()
-                ProgressCalendarSectionView(displayedMonth: $displayedMonth)
-                ProgressHistorySectionView()
+                if sessionStore.hasLoadedCompletedSessionHistory {
+                    ProgressCalendarSectionView(displayedMonth: $displayedMonth)
+                    ProgressHistorySectionView()
+                } else {
+                    ProgressHistoryLoadingCardView()
+                }
             }
             .padding(.horizontal, 14)
             .padding(.vertical, 14)

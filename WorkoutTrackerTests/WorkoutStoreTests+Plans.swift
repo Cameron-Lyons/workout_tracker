@@ -69,6 +69,20 @@ extension WorkoutStoreTests {
     }
 
     @MainActor
+    func testPresetPackDefinitionsCompileFromDataFile() throws {
+        let settings = SettingsStore(defaults: testDefaults)
+
+        for pack in PresetPack.allCases {
+            let plan = try XCTUnwrap(PresetPackBuilder.makePlans(for: pack, settings: settings).first)
+
+            XCTAssertEqual(plan.name, pack.displayName)
+            XCTAssertFalse(plan.templates.isEmpty)
+            XCTAssertNotNil(plan.pinnedTemplateID)
+            XCTAssertTrue(plan.templates.allSatisfy { !$0.exercises.isEmpty })
+        }
+    }
+
+    @MainActor
     func testNewPresetPacksGenerateExpectedTemplateStructures() throws {
         let settings = SettingsStore(defaults: testDefaults)
 

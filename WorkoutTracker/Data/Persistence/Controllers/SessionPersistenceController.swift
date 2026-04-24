@@ -49,6 +49,24 @@ final class SessionPersistenceController: @unchecked Sendable {
         }
     }
 
+    func scheduleSaveSessionAnalyticsSnapshot(
+        _ snapshot: AnalyticsRepository.SessionAnalyticsSnapshot,
+        completedSessionsRevision: Int
+    ) {
+        queue.async { [modelContainer] in
+            let interval = PerformanceSignpost.begin("Analytics Snapshot Persistence")
+            defer { PerformanceSignpost.end(interval) }
+
+            let context = ModelContext(modelContainer)
+            context.autosaveEnabled = false
+            let repository = SessionRepository(modelContext: context)
+            repository.saveSessionAnalyticsSnapshot(
+                snapshot,
+                completedSessionsRevision: completedSessionsRevision
+            )
+        }
+    }
+
     func scheduleDeleteEverything() {
         queue.async { [modelContainer] in
             let interval = PerformanceSignpost.begin("Session Reset Persistence")

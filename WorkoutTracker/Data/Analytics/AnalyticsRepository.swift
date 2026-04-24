@@ -15,6 +15,7 @@ struct AnalyticsRepository: Sendable {
         var personalRecords: [PersonalRecord]
         var exerciseSummaries: [ExerciseAnalyticsSummary]
         var selectedExerciseID: UUID?
+        var firstSessionDate: Date?
     }
 
     struct DerivedStoreSnapshot: Equatable, Sendable {
@@ -22,12 +23,14 @@ struct AnalyticsRepository: Sendable {
         var progress: ProgressSnapshot
     }
 
-    struct SessionAnalyticsSnapshot: Equatable, Sendable {
+    struct SessionAnalyticsSnapshot: Codable, Equatable, Sendable {
         var overview: ProgressOverview
         var personalRecords: [PersonalRecord]
         var exerciseSummaries: [ExerciseAnalyticsSummary]
         var recentPersonalRecords: [PersonalRecord]
         var recentSessions: [CompletedSession]
+        var firstSessionDate: Date?
+        var workoutDayCounts: [Date: Int]
     }
 
     struct CompletedSessionResult: Sendable {
@@ -123,8 +126,46 @@ struct AnalyticsRepository: Sendable {
         now: Date = .now
     ) -> SessionAnalyticsSnapshot {
         var updatedSnapshot = snapshot
-        updatedSnapshot.overview = makeOverview(sessions: sessions, now: now)
+        if sessions.isEmpty, let firstSessionDate = snapshot.firstSessionDate {
+            updatedSnapshot.overview = makeOverview(
+                sessionCount: snapshot.overview.totalSessions,
+                firstSessionDate: firstSessionDate,
+                totalVolume: snapshot.overview.totalVolume,
+                workoutDayCounts: snapshot.workoutDayCounts,
+                now: now
+            )
+        } else {
+            updatedSnapshot.overview = makeOverview(sessions: sessions, now: now)
+        }
         return updatedSnapshot
+    }
+
+    func makeOverview(
+        sessionCount: Int,
+        firstSessionDate: Date,
+        totalVolume: Double,
+        workoutDayCounts: [Date: Int],
+        now: Date = .now
+    ) -> ProgressOverview {
+        let calendar = Calendar.autoupdatingCurrent
+        let startOfToday = calendar.startOfDay(for: now)
+        let startOfWeek = calendar.dateInterval(of: .weekOfYear, for: startOfToday)?.start ?? startOfToday
+        let last30Days = AnalyticsDefaults.rollingWindowStart(from: startOfToday, calendar: calendar)
+        let sessionsThisWeek = workoutDayCounts.reduce(0) { partialResult, entry in
+            partialResult + (entry.key >= startOfWeek ? entry.value : 0)
+        }
+        let sessionsLast30Days = workoutDayCounts.reduce(0) { partialResult, entry in
+            partialResult + (entry.key >= last30Days ? entry.value : 0)
+        }
+
+        return ProgressOverview(
+            totalSessions: sessionCount,
+            sessionsThisWeek: sessionsThisWeek,
+            sessionsLast30Days: sessionsLast30Days,
+            totalVolume: totalVolume,
+            averageSessionsPerWeek: Double(sessionCount)
+                / AnalyticsDefaults.weeksSpan(from: firstSessionDate, to: startOfToday)
+        )
     }
 
     func finishSummary(
@@ -176,7 +217,9 @@ struct AnalyticsRepository: Sendable {
                 personalRecords: [],
                 exerciseSummaries: [],
                 recentPersonalRecords: [],
-                recentSessions: []
+                recentSessions: [],
+                firstSessionDate: nil,
+                workoutDayCounts: [:]
             )
         }
 
@@ -192,8 +235,12 @@ struct AnalyticsRepository: Sendable {
         var bestOneRepMaxByExerciseID: [UUID: Double] = [:]
         var personalRecords: [PersonalRecord] = []
         var exerciseAccumulatorsByID: [UUID: ExerciseAnalyticsAccumulator] = [:]
+        var workoutDayCounts: [Date: Int] = [:]
 
         for session in chronologicalSessions {
+            let completedDay = calendar.startOfDay(for: session.completedAt)
+            workoutDayCounts[completedDay, default: 0] += 1
+
             if session.completedAt >= startOfWeek {
                 sessionsThisWeek += 1
             }
@@ -277,7 +324,9 @@ struct AnalyticsRepository: Sendable {
             personalRecords: personalRecords,
             exerciseSummaries: exerciseSummaries,
             recentPersonalRecords: Array(personalRecords.suffix(AnalyticsDefaults.recentActivityLimit).reversed()),
-            recentSessions: Array(chronologicalSessions.suffix(AnalyticsDefaults.recentActivityLimit).reversed())
+            recentSessions: Array(chronologicalSessions.suffix(AnalyticsDefaults.recentActivityLimit).reversed()),
+            firstSessionDate: firstSessionDate,
+            workoutDayCounts: workoutDayCounts
         )
     }
 
@@ -339,7 +388,8 @@ struct AnalyticsRepository: Sendable {
             selectedExerciseID: ExerciseAnalyticsSelection.selectedExerciseID(
                 selectedExerciseID,
                 summaries: sessionAnalytics.exerciseSummaries
-            )
+            ),
+            firstSessionDate: sessionAnalytics.firstSessionDate
         )
     }
 

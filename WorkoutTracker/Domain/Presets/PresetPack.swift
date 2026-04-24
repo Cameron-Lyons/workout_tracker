@@ -1,6 +1,6 @@
 import Foundation
 
-enum PresetPack: String, CaseIterable, Identifiable, Sendable {
+enum PresetPack: String, CaseIterable, Codable, Identifiable, Sendable {
     case generalGym
     case phul
     case startingStrength
