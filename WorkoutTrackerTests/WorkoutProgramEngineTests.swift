@@ -498,6 +498,124 @@ final class WorkoutProgramEngineTests: XCTestCase {
         XCTAssertEqual(updatedRow.log.weight, 192.5)
     }
 
+    func testUpdateWeightAutofillsUnsetMatchingWorkingSets() throws {
+        let firstRow = SessionSetRow(
+            target: SetTarget(
+                setKind: .working,
+                targetWeight: 185,
+                repRange: RepRange(5, 5)
+            )
+        )
+        let secondRow = SessionSetRow(
+            target: SetTarget(
+                setKind: .working,
+                targetWeight: 185,
+                repRange: RepRange(5, 5)
+            )
+        )
+        let variedRow = SessionSetRow(
+            target: SetTarget(
+                setKind: .working,
+                targetWeight: 205,
+                repRange: RepRange(3, 3)
+            )
+        )
+        let block = SessionExercise(
+            exerciseID: CatalogSeed.benchPress,
+            exerciseNameSnapshot: "Bench Press",
+            restSeconds: 90,
+            progressionRule: .manual,
+            sets: [firstRow, secondRow, variedRow]
+        )
+        var draft = SessionDraft(
+            planID: UUID(),
+            templateID: UUID(),
+            templateNameSnapshot: "Bench Day",
+            exercises: [block]
+        )
+
+        SessionEngine.updateWeight(to: 192.5, setID: firstRow.id, in: block.id, draft: &draft)
+
+        let rows = try XCTUnwrap(draft.exercises.first?.sets)
+        XCTAssertEqual(rows[0].log.weight, 192.5)
+        XCTAssertEqual(rows[1].log.weight, 192.5)
+        XCTAssertNil(rows[2].log.weight)
+    }
+
+    func testUpdateWeightDoesNotOverwriteExistingSiblingWeight() throws {
+        let firstRow = SessionSetRow(
+            target: SetTarget(
+                setKind: .working,
+                targetWeight: 185,
+                repRange: RepRange(5, 5)
+            )
+        )
+        let secondTarget = SetTarget(
+            setKind: .working,
+            targetWeight: 185,
+            repRange: RepRange(5, 5)
+        )
+        let secondRow = SessionSetRow(
+            target: secondTarget,
+            log: SetLog(setTargetID: secondTarget.id, weight: 180)
+        )
+        let block = SessionExercise(
+            exerciseID: CatalogSeed.benchPress,
+            exerciseNameSnapshot: "Bench Press",
+            restSeconds: 90,
+            progressionRule: .manual,
+            sets: [firstRow, secondRow]
+        )
+        var draft = SessionDraft(
+            planID: UUID(),
+            templateID: UUID(),
+            templateNameSnapshot: "Bench Day",
+            exercises: [block]
+        )
+
+        SessionEngine.updateWeight(to: 192.5, setID: firstRow.id, in: block.id, draft: &draft)
+
+        let rows = try XCTUnwrap(draft.exercises.first?.sets)
+        XCTAssertEqual(rows[0].log.weight, 192.5)
+        XCTAssertEqual(rows[1].log.weight, 180)
+    }
+
+    func testUpdateWeightAutofillsManualWorkingSetsWithoutTargets() throws {
+        let firstRow = SessionSetRow(
+            target: SetTarget(
+                setKind: .working,
+                targetWeight: nil,
+                repRange: RepRange(5, 5)
+            )
+        )
+        let secondRow = SessionSetRow(
+            target: SetTarget(
+                setKind: .working,
+                targetWeight: nil,
+                repRange: RepRange(5, 5)
+            )
+        )
+        let block = SessionExercise(
+            exerciseID: CatalogSeed.benchPress,
+            exerciseNameSnapshot: "Bench Press",
+            restSeconds: 90,
+            progressionRule: .manual,
+            sets: [firstRow, secondRow]
+        )
+        var draft = SessionDraft(
+            planID: UUID(),
+            templateID: UUID(),
+            templateNameSnapshot: "Bench Day",
+            exercises: [block]
+        )
+
+        SessionEngine.updateWeight(to: 95, setID: firstRow.id, in: block.id, draft: &draft)
+
+        let rows = try XCTUnwrap(draft.exercises.first?.sets)
+        XCTAssertEqual(rows[0].log.weight, 95)
+        XCTAssertEqual(rows[1].log.weight, 95)
+    }
+
     func testUpdateRepsStoresExactLoggedReps() throws {
         let row = SessionSetRow(target: SetTarget(repRange: RepRange(8, 10)))
         let block = SessionExercise(

@@ -252,6 +252,13 @@ enum SessionEngine {
             if draft.exercises[exerciseIndex].sets[setIndex].log.weight == nil {
                 draft.exercises[exerciseIndex].sets[setIndex].log.weight =
                     draft.exercises[exerciseIndex].sets[setIndex].target.targetWeight
+                if let weight = draft.exercises[exerciseIndex].sets[setIndex].log.weight {
+                    autofillMatchingWorkingSetWeights(
+                        in: &draft.exercises[exerciseIndex],
+                        editedSetIndex: setIndex,
+                        weight: weight
+                    )
+                }
             }
             if draft.exercises[exerciseIndex].sets[setIndex].log.reps == nil {
                 draft.exercises[exerciseIndex].sets[setIndex].log.reps =
@@ -300,11 +307,21 @@ enum SessionEngine {
                 return .unchanged
             }
             draft.exercises[exerciseIndex].sets[setIndex].log.weight = updatedWeight
+            autofillMatchingWorkingSetWeights(
+                in: &draft.exercises[exerciseIndex],
+                editedSetIndex: setIndex,
+                weight: updatedWeight
+            )
         } else {
             guard delta > 0 else {
                 return .unchanged
             }
             draft.exercises[exerciseIndex].sets[setIndex].log.weight = delta
+            autofillMatchingWorkingSetWeights(
+                in: &draft.exercises[exerciseIndex],
+                editedSetIndex: setIndex,
+                weight: delta
+            )
         }
 
         draft.touch(now: now)
@@ -337,6 +354,11 @@ enum SessionEngine {
         }
 
         draft.exercises[exerciseIndex].sets[setIndex].log.weight = updatedWeight
+        autofillMatchingWorkingSetWeights(
+            in: &draft.exercises[exerciseIndex],
+            editedSetIndex: setIndex,
+            weight: updatedWeight
+        )
         draft.touch(now: now)
         return .changed
     }
@@ -603,5 +625,31 @@ private extension SessionEngine {
         }
 
         return sessionExercise.sets.firstIndex(where: { $0.id == setID })
+    }
+
+    static func autofillMatchingWorkingSetWeights(
+        in exercise: inout SessionExercise,
+        editedSetIndex: Int,
+        weight: Double
+    ) {
+        guard exercise.sets.indices.contains(editedSetIndex) else {
+            return
+        }
+
+        let editedTarget = exercise.sets[editedSetIndex].target
+        guard editedTarget.setKind == .working else {
+            return
+        }
+
+        for index in exercise.sets.indices where index != editedSetIndex {
+            guard exercise.sets[index].target.setKind == .working,
+                exercise.sets[index].target.targetWeight == editedTarget.targetWeight,
+                exercise.sets[index].log.weight == nil
+            else {
+                continue
+            }
+
+            exercise.sets[index].log.weight = weight
+        }
     }
 }
