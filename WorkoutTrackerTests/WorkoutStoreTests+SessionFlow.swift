@@ -5,7 +5,7 @@ import XCTest
 
 extension WorkoutStoreTests {
     @MainActor
-    func testDeferredDraftMutationsPersistWhenFlushed() throws {
+    func testDeferredDraftMutationsPersistWhenFlushed() async throws {
         let container = WorkoutModelContainerFactory.makeContainer(isStoredInMemoryOnly: true)
         let context = ModelContext(container)
         context.autosaveEnabled = false
@@ -43,7 +43,7 @@ extension WorkoutStoreTests {
         XCTAssertEqual(store.activeDraft?.exercises.first?.sets.first?.log.weight, 190)
         XCTAssertNil(repository.loadActiveDraft()?.exercises.first?.sets.first?.log.weight)
 
-        store.flushPendingDraftSave()
+        await store.flushPendingDraftSave()
 
         XCTAssertEqual(repository.loadActiveDraft()?.exercises.first?.sets.first?.log.weight, 190)
     }
@@ -67,7 +67,7 @@ extension WorkoutStoreTests {
         )
 
         store.beginSession(draft)
-        persistenceController.flush()
+        await store.flushPendingDraftSave()
 
         store.pushMutation(persistence: .deferred) { updatedDraft in
             updatedDraft.templateNameSnapshot = "Updated day"
@@ -76,7 +76,7 @@ extension WorkoutStoreTests {
         XCTAssertEqual(repository.loadActiveDraft()?.templateNameSnapshot, "Bench Day")
 
         try await Task.sleep(nanoseconds: 700_000_000)
-        persistenceController.flush()
+        await store.flushPendingDraftSave()
 
         XCTAssertEqual(repository.loadActiveDraft()?.templateNameSnapshot, "Updated day")
     }
@@ -215,7 +215,7 @@ extension WorkoutStoreTests {
     }
 
     @MainActor
-    func testSessionStoreUndoRestoresBlockSessionAndFullDraftMutationsIncrementally() throws {
+    func testSessionStoreUndoRestoresBlockSessionAndFullDraftMutationsIncrementally() async throws {
         let container = WorkoutModelContainerFactory.makeContainer(isStoredInMemoryOnly: true)
         let context = ModelContext(container)
         context.autosaveEnabled = false
@@ -302,7 +302,7 @@ extension WorkoutStoreTests {
         XCTAssertEqual(afterBlockValueUndo.exercises.first?.sets.first?.log.weight, 185)
         XCTAssertFalse(store.canUndo)
 
-        store.flushPendingDraftSave()
+        await store.flushPendingDraftSave()
 
         let rehydrationContext = ModelContext(container)
         rehydrationContext.autosaveEnabled = false

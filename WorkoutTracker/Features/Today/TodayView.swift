@@ -59,15 +59,12 @@ struct TodayView: View {
                 pendingStartRequest: $pendingStartRequest,
                 activeDraft: activeDraft,
                 onResumeCurrent: {
-                    appStore.resumeActiveSession()
+                    appStore.send(.resumeActiveSession)
                 },
                 onReplace: { request in
                     Task { @MainActor in
                         await appStore.preparePlanInteractionDataIfNeeded()
-                        appStore.replaceActiveSessionAndStart(
-                            planID: request.planID,
-                            templateID: request.templateID
-                        )
+                        appStore.send(.replaceActiveSessionAndStart(planID: request.planID, templateID: request.templateID))
                     }
                 }
             )

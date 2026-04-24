@@ -213,15 +213,15 @@ struct PlansView: View {
             }
             .sheet(item: $editingPlan) { plan in
                 PlanEditorSheet(existingPlan: plan.name.isEmpty ? nil : plan) { savedPlan in
-                    appStore.savePlan(savedPlan)
+                    appStore.send(.savePlan(savedPlan))
                 }
             }
             .sheet(item: $editingTemplateContext) { context in
                 TemplateEditorSheet(
                     existingTemplate: context.template
                 ) { template, profiles in
-                    appStore.saveProfiles(profiles)
-                    appStore.saveTemplate(planID: context.planID, template: template)
+                    appStore.send(.saveProfiles(profiles))
+                    appStore.send(.saveTemplate(planID: context.planID, template: template))
                 }
             }
             .confirmationDialog(
@@ -238,8 +238,7 @@ struct PlansView: View {
             ) {
                 if let selectedPresetPack {
                     Button("Add \(selectedPresetPack.displayName)") {
-                        appStore.plansStore.addPresetPack(selectedPresetPack, settings: appStore.settingsStore)
-                        appStore.refreshTodayStore()
+                        appStore.send(.addPresetPack(selectedPresetPack))
                     }
                 }
 
@@ -251,15 +250,12 @@ struct PlansView: View {
                 pendingStartRequest: $pendingStartRequest,
                 activeDraft: activeDraft,
                 onResumeCurrent: {
-                    appStore.resumeActiveSession()
+                    appStore.send(.resumeActiveSession)
                 },
                 onReplace: { request in
                     Task { @MainActor in
                         await appStore.preparePlanInteractionDataIfNeeded()
-                        appStore.replaceActiveSessionAndStart(
-                            planID: request.planID,
-                            templateID: request.templateID
-                        )
+                        appStore.send(.replaceActiveSessionAndStart(planID: request.planID, templateID: request.templateID))
                     }
                 }
             )

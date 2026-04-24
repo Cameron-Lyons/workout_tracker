@@ -64,7 +64,7 @@ struct RootAppView: View {
                 get: { appStore.persistenceStartupIssue },
                 set: { issue in
                     if issue == nil {
-                        appStore.dismissPersistenceStartupIssue()
+                        appStore.send(.dismissPersistenceStartupIssue)
                     }
                 }
             )
@@ -73,7 +73,7 @@ struct RootAppView: View {
                 title: Text(issue.title),
                 message: Text(issue.message),
                 dismissButton: .default(Text("OK")) {
-                    appStore.dismissPersistenceStartupIssue()
+                    appStore.send(.dismissPersistenceStartupIssue)
                 }
             )
         }

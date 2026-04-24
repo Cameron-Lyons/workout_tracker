@@ -17,7 +17,7 @@ struct TodayResumeCardView: View {
                     .foregroundStyle(AppColors.textSecondary)
 
                 Button {
-                    appStore.resumeActiveSession()
+                    appStore.send(.resumeActiveSession)
                 } label: {
                     Label("Resume Session", systemImage: "play.fill")
                         .font(.headline)

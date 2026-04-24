@@ -271,7 +271,7 @@ extension WorkoutStoreTests {
     func testFinishSessionIncrementallyUpdatesTodayAndProgressStores() async throws {
         let store = makeStore()
         await store.hydrateIfNeeded()
-        store.completeOnboarding(with: nil)
+        store.send(.completeOnboarding(nil))
 
         let plan = makeSingleTemplatePlan(
             name: "Bench Focus",
@@ -279,13 +279,13 @@ extension WorkoutStoreTests {
             store: store,
             weight: 185
         )
-        store.savePlan(plan)
-        store.startSession(planID: plan.id, templateID: try XCTUnwrap(plan.templates.first?.id))
+        store.send(.savePlan(plan))
+        store.send(.startSession(planID: plan.id, templateID: try XCTUnwrap(plan.templates.first?.id)))
 
         let block = try XCTUnwrap(store.sessionStore.activeDraft?.exercises.first)
         let row = try XCTUnwrap(block.sets.first(where: { $0.target.setKind == .working }))
-        store.toggleSetCompletion(blockID: block.id, setID: row.id)
-        store.finishActiveSession()
+        store.send(.toggleSetCompletion(blockID: block.id, setID: row.id))
+        store.send(.finishActiveSession)
 
         XCTAssertEqual(store.todayStore.recentSessions.first?.templateNameSnapshot, "Bench Day")
         XCTAssertEqual(store.todayStore.recentPersonalRecords.count, 1)
@@ -298,7 +298,7 @@ extension WorkoutStoreTests {
     func testDuplicateExerciseBlocksOnlyAdvanceMatchedTemplateProgressionOnce() async throws {
         let store = makeStore()
         await store.hydrateIfNeeded()
-        store.completeOnboarding(with: nil)
+        store.send(.completeOnboarding(nil))
 
         var plan = store.makePlan(name: "Duplicate Bench")
         let template = WorkoutTemplate(
@@ -326,15 +326,15 @@ extension WorkoutStoreTests {
         )
         plan.templates = [template]
         plan.pinnedTemplateID = template.id
-        store.savePlan(plan)
+        store.send(.savePlan(plan))
 
-        store.startSession(planID: plan.id, templateID: template.id)
+        store.send(.startSession(planID: plan.id, templateID: template.id))
         let activeBlocks = try XCTUnwrap(store.sessionStore.activeDraft?.exercises)
         let mainSessionBlock = try XCTUnwrap(activeBlocks.first)
         for row in mainSessionBlock.sets where row.target.setKind == .working {
-            store.toggleSetCompletion(blockID: mainSessionBlock.id, setID: row.id)
+            store.send(.toggleSetCompletion(blockID: mainSessionBlock.id, setID: row.id))
         }
-        store.finishActiveSession()
+        store.send(.finishActiveSession)
 
         let updatedTemplate = try XCTUnwrap(store.plansStore.plan(for: plan.id)?.templates.first)
         let mainBlock = try XCTUnwrap(updatedTemplate.exercises.first)
@@ -350,7 +350,7 @@ extension WorkoutStoreTests {
     func testAdHocDuplicateExerciseBlockDoesNotAdvanceTemplateProgressionTwice() async throws {
         let store = makeStore()
         await store.hydrateIfNeeded()
-        store.completeOnboarding(with: nil)
+        store.send(.completeOnboarding(nil))
 
         var plan = store.makePlan(name: "Ad Hoc Bench")
         let template = WorkoutTemplate(
@@ -369,21 +369,21 @@ extension WorkoutStoreTests {
         )
         plan.templates = [template]
         plan.pinnedTemplateID = template.id
-        store.savePlan(plan)
+        store.send(.savePlan(plan))
 
-        store.startSession(planID: plan.id, templateID: template.id)
+        store.send(.startSession(planID: plan.id, templateID: template.id))
 
         let startedBlock = try XCTUnwrap(store.sessionStore.activeDraft?.exercises.first)
         for row in startedBlock.sets where row.target.setKind == .working {
-            store.toggleSetCompletion(blockID: startedBlock.id, setID: row.id)
+            store.send(.toggleSetCompletion(blockID: startedBlock.id, setID: row.id))
         }
 
-        store.addExerciseToActiveSession(exerciseID: CatalogSeed.benchPress)
+        store.send(.addExerciseToActiveSession(exerciseID: CatalogSeed.benchPress))
         let addedBlock = try XCTUnwrap(store.sessionStore.activeDraft?.exercises.last)
         let addedRow = try XCTUnwrap(addedBlock.sets.first(where: { $0.target.setKind == .working }))
-        store.toggleSetCompletion(blockID: addedBlock.id, setID: addedRow.id)
+        store.send(.toggleSetCompletion(blockID: addedBlock.id, setID: addedRow.id))
 
-        XCTAssertTrue(store.finishActiveSession())
+        XCTAssertTrue(store.send(.finishActiveSession))
 
         let updatedTemplate = try XCTUnwrap(store.plansStore.plan(for: plan.id)?.templates.first)
         XCTAssertEqual(updatedTemplate.exercises.first?.progressionRule.percentageWave?.currentWeekIndex, 1)
@@ -394,16 +394,16 @@ extension WorkoutStoreTests {
     func testFinishingStartingStrengthSessionPinsTheAlternateWorkout() async throws {
         let store = makeStore()
         await store.hydrateIfNeeded()
-        store.completeOnboarding(with: .startingStrength)
+        store.send(.completeOnboarding(.startingStrength))
 
         let initialPinned = try XCTUnwrap(store.todayStore.pinnedTemplate)
         XCTAssertEqual(initialPinned.templateName, "Workout A")
 
-        store.startSession(planID: initialPinned.planID, templateID: initialPinned.templateID)
+        store.send(.startSession(planID: initialPinned.planID, templateID: initialPinned.templateID))
         let block = try XCTUnwrap(store.sessionStore.activeDraft?.exercises.first)
         let row = try XCTUnwrap(block.sets.first(where: { $0.target.setKind == .working }))
-        store.toggleSetCompletion(blockID: block.id, setID: row.id)
-        store.finishActiveSession()
+        store.send(.toggleSetCompletion(blockID: block.id, setID: row.id))
+        store.send(.finishActiveSession)
 
         let rotatedPinned = try XCTUnwrap(store.todayStore.pinnedTemplate)
         let updatedPlan = try XCTUnwrap(store.plansStore.plan(for: initialPinned.planID))
@@ -416,16 +416,16 @@ extension WorkoutStoreTests {
     func testFinishingStrongLiftsSessionPinsTheAlternateWorkout() async throws {
         let store = makeStore()
         await store.hydrateIfNeeded()
-        store.completeOnboarding(with: .strongLiftsFiveByFive)
+        store.send(.completeOnboarding(.strongLiftsFiveByFive))
 
         let initialPinned = try XCTUnwrap(store.todayStore.pinnedTemplate)
         XCTAssertEqual(initialPinned.templateName, "Workout A")
 
-        store.startSession(planID: initialPinned.planID, templateID: initialPinned.templateID)
+        store.send(.startSession(planID: initialPinned.planID, templateID: initialPinned.templateID))
         let block = try XCTUnwrap(store.sessionStore.activeDraft?.exercises.first)
         let row = try XCTUnwrap(block.sets.first(where: { $0.target.setKind == .working }))
-        store.toggleSetCompletion(blockID: block.id, setID: row.id)
-        store.finishActiveSession()
+        store.send(.toggleSetCompletion(blockID: block.id, setID: row.id))
+        store.send(.finishActiveSession)
 
         let rotatedPinned = try XCTUnwrap(store.todayStore.pinnedTemplate)
         let updatedPlan = try XCTUnwrap(store.plansStore.plan(for: initialPinned.planID))
@@ -438,16 +438,16 @@ extension WorkoutStoreTests {
     func testQuickStartsStayDeduplicatedAfterRepeatedTemplateCompletion() async throws {
         let store = makeStore()
         await store.hydrateIfNeeded()
-        store.completeOnboarding(with: .generalGym)
+        store.send(.completeOnboarding(.generalGym))
 
         let reference = try XCTUnwrap(store.todayStore.quickStartTemplates.first)
 
         for _ in 0..<2 {
-            store.startSession(planID: reference.planID, templateID: reference.templateID)
+            store.send(.startSession(planID: reference.planID, templateID: reference.templateID))
             let block = try XCTUnwrap(store.sessionStore.activeDraft?.exercises.first)
             let row = try XCTUnwrap(block.sets.first(where: { $0.target.setKind == .working }))
-            store.toggleSetCompletion(blockID: block.id, setID: row.id)
-            store.finishActiveSession()
+            store.send(.toggleSetCompletion(blockID: block.id, setID: row.id))
+            store.send(.finishActiveSession)
         }
 
         let quickStartIDs = store.todayStore.quickStartTemplates.map(\.templateID)

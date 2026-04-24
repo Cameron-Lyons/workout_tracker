@@ -23,7 +23,7 @@ struct OnboardingView: View {
                             presetPacks: presetPacks,
                             onSelectPack: beginPresetOnboarding,
                             onStartBlank: {
-                                appStore.completeOnboarding(with: nil)
+                                appStore.send(.completeOnboarding(nil))
                             }
                         )
                     }

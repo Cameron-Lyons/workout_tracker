@@ -44,7 +44,7 @@ struct PlanCardView: View {
                         }
                     }
                     Button("Delete Program", systemImage: "trash", role: .destructive) {
-                        appStore.deletePlan(plan.id)
+                        appStore.send(.deletePlan(plan.id))
                     }
                 } label: {
                     Image(systemName: "ellipsis.circle")
@@ -139,12 +139,12 @@ private struct TemplateCardView: View {
                         templateID: template.id,
                         templateName: template.name,
                         onResumeCurrent: {
-                            appStore.resumeActiveSession()
+                            appStore.send(.resumeActiveSession)
                         },
                         onStartNew: { planID, templateID in
                             Task { @MainActor in
                                 await appStore.preparePlanInteractionDataIfNeeded()
-                                appStore.startSession(planID: planID, templateID: templateID)
+                                appStore.send(.startSession(planID: planID, templateID: templateID))
                             }
                         }
                     )
@@ -159,7 +159,7 @@ private struct TemplateCardView: View {
                         isPinned ? "Pinned to Today" : "Pin to Today",
                         systemImage: isPinned ? "pin.fill" : "pin"
                     ) {
-                        appStore.pinTemplate(planID: plan.id, templateID: template.id)
+                        appStore.send(.pinTemplate(planID: plan.id, templateID: template.id))
                     }
 
                     Button("Edit Template", systemImage: "square.and.pencil") {
@@ -182,7 +182,7 @@ private struct TemplateCardView: View {
                     }
 
                     Button("Delete Template", systemImage: "trash", role: .destructive) {
-                        appStore.deleteTemplate(planID: plan.id, templateID: template.id)
+                        appStore.send(.deleteTemplate(planID: plan.id, templateID: template.id))
                     }
                 } label: {
                     Image(systemName: "ellipsis.circle")

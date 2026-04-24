@@ -2,6 +2,40 @@ import Foundation
 import Observation
 import SwiftData
 
+enum AppCommand {
+    case dismissPersistenceStartupIssue
+    case resetAllDataForFreshStart
+    case completeOnboarding(PresetPack?)
+    case startSession(planID: UUID, templateID: UUID)
+    case replaceActiveSessionAndStart(planID: UUID, templateID: UUID)
+    case resumeActiveSession
+    case toggleSetCompletion(blockID: UUID, setID: UUID)
+    case adjustSetWeight(blockID: UUID, setID: UUID, delta: Double)
+    case adjustSetReps(blockID: UUID, setID: UUID, delta: Int)
+    case updateSetWeight(blockID: UUID, setID: UUID, weight: Double)
+    case updateSetReps(blockID: UUID, setID: UUID, reps: Int)
+    case addSet(blockID: UUID)
+    case copyLastSet(blockID: UUID)
+    case addExerciseToActiveSession(exerciseID: UUID)
+    case addCustomExerciseToActiveSession(name: String)
+    case clearRestTimer
+    case finishActiveSession
+    case discardActiveSession
+    case undoSessionMutation
+    case savePlan(Plan)
+    case deletePlan(UUID)
+    case saveTemplate(planID: UUID, template: WorkoutTemplate)
+    case deleteTemplate(planID: UUID, templateID: UUID)
+    case pinTemplate(planID: UUID, templateID: UUID)
+    case saveProfiles([ExerciseProfile])
+    case addPresetPack(PresetPack)
+    case updateCatalogItem(itemID: UUID, name: String, aliases: [String], category: ExerciseCategory)
+    case refreshTodayStore
+    case flushPendingSessionPersistence
+    case flushPendingPlanPersistence
+    case syncRestTimerLiveActivity
+}
+
 @MainActor
 @Observable
 final class AppStore {
@@ -91,12 +125,115 @@ final class AppStore {
         )
     }
 
-    func dismissPersistenceStartupIssue() {
-        persistenceStartupIssue = nil
-    }
-
     var shouldShowOnboarding: Bool {
         !settingsStore.hasCompletedOnboarding
+    }
+
+    @discardableResult
+    func send(_ command: AppCommand) -> Bool {
+        switch command {
+        case .dismissPersistenceStartupIssue:
+            persistenceStartupIssue = nil
+            return true
+        case .resetAllDataForFreshStart:
+            cancelCompletedSessionHistoryLoad()
+            planCoordinator.resetAllDataForFreshStart()
+            return true
+        case let .completeOnboarding(presetPack):
+            planCoordinator.completeOnboarding(with: presetPack)
+            return true
+        case let .startSession(planID, templateID):
+            sessionCoordinator.startSession(planID: planID, templateID: templateID)
+            return true
+        case let .replaceActiveSessionAndStart(planID, templateID):
+            sessionCoordinator.replaceActiveSessionAndStart(planID: planID, templateID: templateID)
+            return true
+        case .resumeActiveSession:
+            sessionCoordinator.resumeActiveSession()
+            return true
+        case let .toggleSetCompletion(blockID, setID):
+            sessionCoordinator.toggleSetCompletion(blockID: blockID, setID: setID)
+            return true
+        case let .adjustSetWeight(blockID, setID, delta):
+            sessionCoordinator.adjustSetWeight(blockID: blockID, setID: setID, delta: delta)
+            return true
+        case let .adjustSetReps(blockID, setID, delta):
+            sessionCoordinator.adjustSetReps(blockID: blockID, setID: setID, delta: delta)
+            return true
+        case let .updateSetWeight(blockID, setID, weight):
+            sessionCoordinator.updateSetWeight(blockID: blockID, setID: setID, weight: weight)
+            return true
+        case let .updateSetReps(blockID, setID, reps):
+            sessionCoordinator.updateSetReps(blockID: blockID, setID: setID, reps: reps)
+            return true
+        case let .addSet(blockID):
+            sessionCoordinator.addSet(to: blockID)
+            return true
+        case let .copyLastSet(blockID):
+            sessionCoordinator.copyLastSet(in: blockID)
+            return true
+        case let .addExerciseToActiveSession(exerciseID):
+            sessionCoordinator.addExerciseToActiveSession(exerciseID: exerciseID)
+            return true
+        case let .addCustomExerciseToActiveSession(name):
+            sessionCoordinator.addCustomExerciseToActiveSession(name: name)
+            return true
+        case .clearRestTimer:
+            sessionCoordinator.clearRestTimer()
+            return true
+        case .finishActiveSession:
+            return sessionCoordinator.finishActiveSession()
+        case .discardActiveSession:
+            sessionCoordinator.discardActiveSession()
+            return true
+        case .undoSessionMutation:
+            sessionCoordinator.undoSessionMutation()
+            return true
+        case let .savePlan(plan):
+            planCoordinator.savePlan(plan)
+            return true
+        case let .deletePlan(planID):
+            planCoordinator.deletePlan(planID)
+            return true
+        case let .saveTemplate(planID, template):
+            planCoordinator.saveTemplate(planID: planID, template: template)
+            return true
+        case let .deleteTemplate(planID, templateID):
+            planCoordinator.deleteTemplate(planID: planID, templateID: templateID)
+            return true
+        case let .pinTemplate(planID, templateID):
+            planCoordinator.pinTemplate(planID: planID, templateID: templateID)
+            return true
+        case let .saveProfiles(profiles):
+            planCoordinator.saveProfiles(profiles)
+            return true
+        case let .addPresetPack(presetPack):
+            plansStore.addPresetPack(presetPack, settings: settingsStore)
+            derivedStateController.refreshToday(plansStore: plansStore, sessionStore: sessionStore)
+            return true
+        case let .updateCatalogItem(itemID, name, aliases, category):
+            planCoordinator.updateCatalogItem(itemID: itemID, name: name, aliases: aliases, category: category)
+            return true
+        case .refreshTodayStore:
+            derivedStateController.refreshToday(plansStore: plansStore, sessionStore: sessionStore)
+            return true
+        case .flushPendingSessionPersistence:
+            Task { @MainActor in
+                sessionCoordinator.flushPendingDraftPersistence()
+            }
+            return true
+        case .flushPendingPlanPersistence:
+            Task { @MainActor in
+                await plansStore.flushPendingPersistence()
+            }
+            return true
+        case .syncRestTimerLiveActivity:
+            let draft = sessionStore.activeDraft
+            Task { @MainActor in
+                await restTimerLiveActivityManager.sync(with: draft)
+            }
+            return true
+        }
     }
 
     func hydrateIfNeeded() async {
@@ -108,7 +245,7 @@ final class AppStore {
         let isEmptyStoreLaunch = launchArguments.contains(UITestingLaunchArguments.emptyStore)
 
         if isEmptyStoreLaunch {
-            resetAllDataForFreshStart()
+            send(.resetAllDataForFreshStart)
         }
 
         if launchArguments.contains(UITestingLaunchArguments.completeOnboarding) {
@@ -127,11 +264,6 @@ final class AppStore {
         await derivedStateController.hydrate(plansStore: plansStore, sessionStore: sessionStore)
         applyUITestingFixturesIfNeeded()
         isHydrated = true
-    }
-
-    func resetAllDataForFreshStart() {
-        cancelCompletedSessionHistoryLoad()
-        planCoordinator.resetAllDataForFreshStart()
     }
 
     func hydrateCompletedSessionHistoryIfNeeded(priority: TaskPriority = .utility) async {
@@ -165,10 +297,6 @@ final class AppStore {
         await applyCompletedSessionHistoryIfNeeded(sessions)
     }
 
-    func completeOnboarding(with presetPack: PresetPack?) {
-        planCoordinator.completeOnboarding(with: presetPack)
-    }
-
     func beginPresetOnboarding(_ presetPack: PresetPack) async {
         guard isCompletingOnboarding == false else {
             return
@@ -180,110 +308,7 @@ final class AppStore {
             isCompletingOnboarding = false
         }
 
-        completeOnboarding(with: presetPack)
-    }
-
-    func startSession(planID: UUID, templateID: UUID) {
-        sessionCoordinator.startSession(planID: planID, templateID: templateID)
-    }
-
-    func replaceActiveSessionAndStart(planID: UUID, templateID: UUID) {
-        sessionCoordinator.replaceActiveSessionAndStart(planID: planID, templateID: templateID)
-    }
-
-    func resumeActiveSession() {
-        sessionCoordinator.resumeActiveSession()
-    }
-
-    func toggleSetCompletion(blockID: UUID, setID: UUID) {
-        sessionCoordinator.toggleSetCompletion(blockID: blockID, setID: setID)
-    }
-
-    func adjustSetWeight(blockID: UUID, setID: UUID, delta: Double) {
-        sessionCoordinator.adjustSetWeight(blockID: blockID, setID: setID, delta: delta)
-    }
-
-    func adjustSetReps(blockID: UUID, setID: UUID, delta: Int) {
-        sessionCoordinator.adjustSetReps(blockID: blockID, setID: setID, delta: delta)
-    }
-
-    func updateSetWeight(blockID: UUID, setID: UUID, weight: Double) {
-        sessionCoordinator.updateSetWeight(blockID: blockID, setID: setID, weight: weight)
-    }
-
-    func updateSetReps(blockID: UUID, setID: UUID, reps: Int) {
-        sessionCoordinator.updateSetReps(blockID: blockID, setID: setID, reps: reps)
-    }
-
-    func addSet(to blockID: UUID) {
-        sessionCoordinator.addSet(to: blockID)
-    }
-
-    func copyLastSet(in blockID: UUID) {
-        sessionCoordinator.copyLastSet(in: blockID)
-    }
-
-    func addExerciseToActiveSession(exerciseID: UUID) {
-        sessionCoordinator.addExerciseToActiveSession(exerciseID: exerciseID)
-    }
-
-    func addCustomExerciseToActiveSession(name: String) {
-        sessionCoordinator.addCustomExerciseToActiveSession(name: name)
-    }
-
-    func clearRestTimer() {
-        sessionCoordinator.clearRestTimer()
-    }
-
-    @discardableResult
-    func finishActiveSession() -> Bool {
-        sessionCoordinator.finishActiveSession()
-    }
-
-    func discardActiveSession() {
-        sessionCoordinator.discardActiveSession()
-    }
-
-    func undoSessionMutation() {
-        sessionCoordinator.undoSessionMutation()
-    }
-
-    func savePlan(_ plan: Plan) {
-        planCoordinator.savePlan(plan)
-    }
-
-    func deletePlan(_ planID: UUID) {
-        planCoordinator.deletePlan(planID)
-    }
-
-    func saveTemplate(planID: UUID, template: WorkoutTemplate) {
-        planCoordinator.saveTemplate(planID: planID, template: template)
-    }
-
-    func deleteTemplate(planID: UUID, templateID: UUID) {
-        planCoordinator.deleteTemplate(planID: planID, templateID: templateID)
-    }
-
-    func pinTemplate(planID: UUID, templateID: UUID) {
-        planCoordinator.pinTemplate(planID: planID, templateID: templateID)
-    }
-
-    func saveProfiles(_ profiles: [ExerciseProfile]) {
-        planCoordinator.saveProfiles(profiles)
-    }
-
-    func updateCatalogItem(
-        itemID: UUID,
-        name: String,
-        aliases: [String],
-        category: ExerciseCategory
-    ) {
-        planCoordinator.updateCatalogItem(
-            itemID: itemID,
-            name: name,
-            aliases: aliases,
-            category: category
-        )
+        send(.completeOnboarding(presetPack))
     }
 
     func makePlan(name: String) -> Plan {
@@ -333,23 +358,12 @@ final class AppStore {
         }
     }
 
-    func refreshTodayStore() {
-        derivedStateController.refreshToday(plansStore: plansStore, sessionStore: sessionStore)
-    }
-
-    func flushPendingSessionPersistence() {
+    func flushPendingSessionPersistence() async {
         sessionCoordinator.flushPendingDraftPersistence()
     }
 
-    func flushPendingPlanPersistence() {
-        plansStore.flushPendingPersistence()
-    }
-
-    func syncRestTimerLiveActivity() {
-        let draft = sessionStore.activeDraft
-        Task { @MainActor in
-            await restTimerLiveActivityManager.sync(with: draft)
-        }
+    func flushPendingPlanPersistence() async {
+        await plansStore.flushPendingPersistence()
     }
 
     private func applyCompletedSessionHistoryIfNeeded(_ sessions: [CompletedSession]) async {
@@ -370,13 +384,13 @@ final class AppStore {
         }
 
         if shouldShowOnboarding {
-            completeOnboarding(with: .generalGym)
+            send(.completeOnboarding(.generalGym))
         }
 
         if sessionStore.activeDraft == nil,
             let pinnedTemplate = todayStore.pinnedTemplate
         {
-            startSession(planID: pinnedTemplate.planID, templateID: pinnedTemplate.templateID)
+            send(.startSession(planID: pinnedTemplate.planID, templateID: pinnedTemplate.templateID))
         }
 
         guard let sessionExercise = sessionStore.activeDraft?.exercises.first,
@@ -386,9 +400,9 @@ final class AppStore {
         }
 
         if workingRow.log.isCompleted == false {
-            toggleSetCompletion(blockID: sessionExercise.id, setID: workingRow.id)
+            send(.toggleSetCompletion(blockID: sessionExercise.id, setID: workingRow.id))
         }
-        clearRestTimer()
+        send(.clearRestTimer)
     }
 
     private func cancelCompletedSessionHistoryLoad() {

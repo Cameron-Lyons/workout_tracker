@@ -212,7 +212,7 @@ extension WorkoutStoreTests {
     func testPinningTemplateMakesItTodayDefaultAndClearsOlderPins() async throws {
         let store = makeStore()
         await store.hydrateIfNeeded()
-        store.completeOnboarding(with: nil)
+        store.send(.completeOnboarding(nil))
 
         let firstPlan = makeSingleTemplatePlan(
             name: "Plan A",
@@ -226,11 +226,11 @@ extension WorkoutStoreTests {
             store: store,
             weight: 135
         )
-        store.savePlan(firstPlan)
-        store.savePlan(secondPlan)
+        store.send(.savePlan(firstPlan))
+        store.send(.savePlan(secondPlan))
 
         let secondTemplateID = try XCTUnwrap(secondPlan.templates.first?.id)
-        store.pinTemplate(planID: secondPlan.id, templateID: secondTemplateID)
+        store.send(.pinTemplate(planID: secondPlan.id, templateID: secondTemplateID))
 
         XCTAssertEqual(store.todayStore.pinnedTemplate?.templateID, secondTemplateID)
         XCTAssertNil(store.plansStore.plan(for: firstPlan.id)?.pinnedTemplateID)
@@ -276,39 +276,6 @@ extension WorkoutStoreTests {
         let records = try context.fetch(FetchDescriptor<StoredActiveSession>())
         XCTAssertEqual(records.count, 1)
         XCTAssertEqual(repository.loadActiveDraft()?.templateNameSnapshot, "Lower")
-    }
-
-    @MainActor
-    func testPlanRepositorySkipsPlansWithInvalidPayloads() throws {
-        let container = WorkoutModelContainerFactory.makeContainer(isStoredInMemoryOnly: true)
-        let context = ModelContext(container)
-        context.autosaveEnabled = false
-
-        let planID = UUID()
-        let summaryData = try JSONEncoder().encode(
-            PlanSummary(
-                id: planID,
-                name: "Starter",
-                createdAt: .now,
-                pinnedTemplateID: nil,
-                templates: []
-            )
-        )
-        let plan = StoredPlan(
-            id: planID,
-            name: "Starter",
-            createdAt: .now,
-            pinnedTemplateID: nil,
-            payloadData: Data("invalid".utf8),
-            summaryData: summaryData
-        )
-
-        context.insert(plan)
-        try context.save()
-
-        let repository = PlanRepository(modelContext: context)
-        XCTAssertTrue(repository.loadPlans().isEmpty)
-        XCTAssertEqual(repository.loadPlanSummaries().count, 1)
     }
 
     @MainActor

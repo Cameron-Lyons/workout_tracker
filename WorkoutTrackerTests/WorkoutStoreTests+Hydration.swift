@@ -9,7 +9,7 @@ extension WorkoutStoreTests {
         let container = WorkoutModelContainerFactory.makeContainer(isStoredInMemoryOnly: true)
         let firstStore = makeStore(container: container)
         await firstStore.hydrateIfNeeded()
-        firstStore.completeOnboarding(with: nil)
+        firstStore.send(.completeOnboarding(nil))
 
         let plan = makeSingleTemplatePlan(
             name: "Test Plan",
@@ -17,8 +17,8 @@ extension WorkoutStoreTests {
             store: firstStore,
             weight: 185
         )
-        firstStore.savePlan(plan)
-        firstStore.startSession(planID: plan.id, templateID: try XCTUnwrap(plan.templates.first?.id))
+        firstStore.send(.savePlan(plan))
+        firstStore.send(.startSession(planID: plan.id, templateID: try XCTUnwrap(plan.templates.first?.id)))
 
         let rehydratedStore = makeStore(container: container)
         await rehydratedStore.hydrateIfNeeded()
@@ -32,7 +32,7 @@ extension WorkoutStoreTests {
         let container = WorkoutModelContainerFactory.makeContainer(isStoredInMemoryOnly: true)
         let seededStore = makeStore(container: container)
         await seededStore.hydrateIfNeeded()
-        seededStore.completeOnboarding(with: nil)
+        seededStore.send(.completeOnboarding(nil))
 
         let plan = makeSingleTemplatePlan(
             name: "Test Plan",
@@ -40,14 +40,14 @@ extension WorkoutStoreTests {
             store: seededStore,
             weight: 185
         )
-        seededStore.savePlan(plan)
-        seededStore.startSession(planID: plan.id, templateID: try XCTUnwrap(plan.templates.first?.id))
+        seededStore.send(.savePlan(plan))
+        seededStore.send(.startSession(planID: plan.id, templateID: try XCTUnwrap(plan.templates.first?.id)))
 
         let block = try XCTUnwrap(seededStore.sessionStore.activeDraft?.exercises.first)
         let workingRow = try XCTUnwrap(block.sets.first(where: { $0.target.setKind == .working }))
-        seededStore.toggleSetCompletion(blockID: block.id, setID: workingRow.id)
-        XCTAssertTrue(seededStore.finishActiveSession())
-        seededStore.flushPendingSessionPersistence()
+        seededStore.send(.toggleSetCompletion(blockID: block.id, setID: workingRow.id))
+        XCTAssertTrue(seededStore.send(.finishActiveSession))
+        await seededStore.flushPendingSessionPersistence()
 
         let rehydratedStore = makeStore(container: container)
         await rehydratedStore.hydrateIfNeeded()
@@ -70,7 +70,7 @@ extension WorkoutStoreTests {
         let container = WorkoutModelContainerFactory.makeContainer(isStoredInMemoryOnly: true)
         let seededStore = makeStore(container: container)
         await seededStore.hydrateIfNeeded()
-        seededStore.completeOnboarding(with: nil)
+        seededStore.send(.completeOnboarding(nil))
 
         let plan = makeSingleTemplatePlan(
             name: "Deferred Plan",
@@ -78,15 +78,15 @@ extension WorkoutStoreTests {
             store: seededStore,
             weight: 185
         )
-        seededStore.savePlan(plan)
-        seededStore.startSession(planID: plan.id, templateID: try XCTUnwrap(plan.templates.first?.id))
+        seededStore.send(.savePlan(plan))
+        seededStore.send(.startSession(planID: plan.id, templateID: try XCTUnwrap(plan.templates.first?.id)))
 
         let block = try XCTUnwrap(seededStore.sessionStore.activeDraft?.exercises.first)
         let workingRow = try XCTUnwrap(block.sets.first(where: { $0.target.setKind == .working }))
-        seededStore.toggleSetCompletion(blockID: block.id, setID: workingRow.id)
-        XCTAssertTrue(seededStore.finishActiveSession())
-        seededStore.flushPendingSessionPersistence()
-        seededStore.flushPendingPlanPersistence()
+        seededStore.send(.toggleSetCompletion(blockID: block.id, setID: workingRow.id))
+        XCTAssertTrue(seededStore.send(.finishActiveSession))
+        await seededStore.flushPendingSessionPersistence()
+        await seededStore.flushPendingPlanPersistence()
 
         let rehydratedStore = makeStore(container: container)
         await rehydratedStore.hydrateIfNeeded()
@@ -109,7 +109,7 @@ extension WorkoutStoreTests {
         let container = WorkoutModelContainerFactory.makeContainer(isStoredInMemoryOnly: true)
         let seededStore = makeStore(container: container)
         await seededStore.hydrateIfNeeded()
-        seededStore.completeOnboarding(with: nil)
+        seededStore.send(.completeOnboarding(nil))
 
         let plan = makeSingleTemplatePlan(
             name: "Deferred Plan",
@@ -117,8 +117,8 @@ extension WorkoutStoreTests {
             store: seededStore,
             weight: 185
         )
-        seededStore.savePlan(plan)
-        seededStore.flushPendingPlanPersistence()
+        seededStore.send(.savePlan(plan))
+        await seededStore.flushPendingPlanPersistence()
 
         let rehydratedStore = makeStore(container: container)
         await rehydratedStore.hydrateIfNeeded()
@@ -129,7 +129,7 @@ extension WorkoutStoreTests {
 
         let loadedPlan = try XCTUnwrap(rehydratedStore.plansStore.plan(for: plan.id))
         let templateID = try XCTUnwrap(loadedPlan.templates.first?.id)
-        rehydratedStore.startSession(planID: loadedPlan.id, templateID: templateID)
+        rehydratedStore.send(.startSession(planID: loadedPlan.id, templateID: templateID))
 
         XCTAssertEqual(rehydratedStore.sessionStore.activeDraft?.templateNameSnapshot, "Upper 1")
     }
@@ -139,15 +139,15 @@ extension WorkoutStoreTests {
         let container = WorkoutModelContainerFactory.makeContainer(isStoredInMemoryOnly: true)
         let seededStore = makeStore(container: container)
         await seededStore.hydrateIfNeeded()
-        seededStore.completeOnboarding(with: nil)
+        seededStore.send(.completeOnboarding(nil))
 
         let profile = ExerciseProfile(
             exerciseID: CatalogSeed.benchPress,
             trainingMax: 235,
             preferredIncrement: 5
         )
-        seededStore.saveProfiles([profile])
-        seededStore.flushPendingPlanPersistence()
+        seededStore.send(.saveProfiles([profile]))
+        await seededStore.flushPendingPlanPersistence()
 
         let rehydratedStore = makeStore(container: container)
         await rehydratedStore.hydrateIfNeeded()
@@ -168,7 +168,7 @@ extension WorkoutStoreTests {
         let container = WorkoutModelContainerFactory.makeContainer(isStoredInMemoryOnly: true)
         let seededStore = makeStore(container: container)
         await seededStore.hydrateIfNeeded()
-        seededStore.completeOnboarding(with: nil)
+        seededStore.send(.completeOnboarding(nil))
 
         var plan = seededStore.makePlan(name: "Wave Bench")
         let template = WorkoutTemplate(
@@ -194,9 +194,9 @@ extension WorkoutStoreTests {
             preferredIncrement: 5
         )
 
-        seededStore.savePlan(plan)
-        seededStore.saveProfiles([profile])
-        seededStore.flushPendingPlanPersistence()
+        seededStore.send(.savePlan(plan))
+        seededStore.send(.saveProfiles([profile]))
+        await seededStore.flushPendingPlanPersistence()
 
         let rehydratedStore = makeStore(container: container)
         await rehydratedStore.hydrateIfNeeded()
@@ -204,7 +204,7 @@ extension WorkoutStoreTests {
         XCTAssertEqual(rehydratedStore.plansStore.profiles.count, 1)
         XCTAssertEqual(rehydratedStore.plansStore.profileCount, 1)
 
-        rehydratedStore.startSession(planID: plan.id, templateID: template.id)
+        rehydratedStore.send(.startSession(planID: plan.id, templateID: template.id))
 
         let startedBlock = try XCTUnwrap(rehydratedStore.sessionStore.activeDraft?.exercises.first)
         let workingTargets = startedBlock.sets
@@ -219,7 +219,7 @@ extension WorkoutStoreTests {
     func testEmptySessionDoesNotFinishOrPersist() async throws {
         let store = makeStore()
         await store.hydrateIfNeeded()
-        store.completeOnboarding(with: nil)
+        store.send(.completeOnboarding(nil))
 
         let plan = makeSingleTemplatePlan(
             name: "Test Plan",
@@ -227,12 +227,12 @@ extension WorkoutStoreTests {
             store: store,
             weight: 185
         )
-        store.savePlan(plan)
+        store.send(.savePlan(plan))
         let templateID = try XCTUnwrap(plan.templates.first?.id)
 
-        store.startSession(planID: plan.id, templateID: templateID)
+        store.send(.startSession(planID: plan.id, templateID: templateID))
 
-        XCTAssertFalse(store.finishActiveSession())
+        XCTAssertFalse(store.send(.finishActiveSession))
         XCTAssertNotNil(store.sessionStore.activeDraft)
         XCTAssertTrue(store.sessionStore.completedSessions.isEmpty)
     }
@@ -241,7 +241,7 @@ extension WorkoutStoreTests {
     func testWarmupOnlySessionDoesNotFinishOrPersist() async throws {
         let store = makeStore()
         await store.hydrateIfNeeded()
-        store.completeOnboarding(with: nil)
+        store.send(.completeOnboarding(nil))
 
         let plan = makeSingleTemplatePlan(
             name: "Test Plan",
@@ -249,16 +249,16 @@ extension WorkoutStoreTests {
             store: store,
             weight: 185
         )
-        store.savePlan(plan)
+        store.send(.savePlan(plan))
         let templateID = try XCTUnwrap(plan.templates.first?.id)
 
-        store.startSession(planID: plan.id, templateID: templateID)
+        store.send(.startSession(planID: plan.id, templateID: templateID))
 
         let block = try XCTUnwrap(store.sessionStore.activeDraft?.exercises.first)
         let warmupRow = try XCTUnwrap(block.sets.first(where: { $0.target.setKind == .warmup }))
-        store.toggleSetCompletion(blockID: block.id, setID: warmupRow.id)
+        store.send(.toggleSetCompletion(blockID: block.id, setID: warmupRow.id))
 
-        XCTAssertFalse(store.finishActiveSession())
+        XCTAssertFalse(store.send(.finishActiveSession))
         XCTAssertNotNil(store.sessionStore.activeDraft)
         XCTAssertTrue(store.sessionStore.completedSessions.isEmpty)
     }
@@ -267,7 +267,7 @@ extension WorkoutStoreTests {
     func testExerciseRenamePreservesAnalyticsContinuityAndSnapshots() async throws {
         let store = makeStore()
         await store.hydrateIfNeeded()
-        store.completeOnboarding(with: nil)
+        store.send(.completeOnboarding(nil))
 
         let plan = makeSingleTemplatePlan(
             name: "Pressing",
@@ -275,22 +275,22 @@ extension WorkoutStoreTests {
             store: store,
             weight: 185
         )
-        store.savePlan(plan)
-        store.startSession(planID: plan.id, templateID: try XCTUnwrap(plan.templates.first?.id))
+        store.send(.savePlan(plan))
+        store.send(.startSession(planID: plan.id, templateID: try XCTUnwrap(plan.templates.first?.id)))
 
         let draft = try XCTUnwrap(store.sessionStore.activeDraft)
         let block = try XCTUnwrap(draft.exercises.first)
         let row = try XCTUnwrap(block.sets.first(where: { $0.target.setKind == .working }))
 
-        store.toggleSetCompletion(blockID: block.id, setID: row.id)
-        store.finishActiveSession()
+        store.send(.toggleSetCompletion(blockID: block.id, setID: row.id))
+        store.send(.finishActiveSession)
 
-        store.updateCatalogItem(
+        store.send(.updateCatalogItem(
             itemID: CatalogSeed.benchPress,
             name: "Competition Bench Press",
             aliases: ["Barbell Bench"],
             category: .chest
-        )
+        ))
         await store.refreshDerivedStores()
 
         let summary = try XCTUnwrap(
@@ -307,7 +307,7 @@ extension WorkoutStoreTests {
     func testExerciseRenameUpdatesTemplateAndActiveDraftSnapshots() async throws {
         let store = makeStore()
         await store.hydrateIfNeeded()
-        store.completeOnboarding(with: nil)
+        store.send(.completeOnboarding(nil))
 
         let plan = makeSingleTemplatePlan(
             name: "Pressing",
@@ -315,16 +315,16 @@ extension WorkoutStoreTests {
             store: store,
             weight: 185
         )
-        store.savePlan(plan)
+        store.send(.savePlan(plan))
         let templateID = try XCTUnwrap(plan.templates.first?.id)
 
-        store.startSession(planID: plan.id, templateID: templateID)
-        store.updateCatalogItem(
+        store.send(.startSession(planID: plan.id, templateID: templateID))
+        store.send(.updateCatalogItem(
             itemID: CatalogSeed.benchPress,
             name: "Competition Bench Press",
             aliases: ["Barbell Bench"],
             category: .chest
-        )
+        ))
 
         let updatedPlan = try XCTUnwrap(store.plansStore.plan(for: plan.id))
 
@@ -349,7 +349,7 @@ extension WorkoutStoreTests {
     func testStartingAnotherTemplateResumesCurrentDraftUntilUserReplacesIt() async throws {
         let store = makeStore()
         await store.hydrateIfNeeded()
-        store.completeOnboarding(with: nil)
+        store.send(.completeOnboarding(nil))
 
         let firstPlan = makeSingleTemplatePlan(
             name: "Plan A",
@@ -363,20 +363,20 @@ extension WorkoutStoreTests {
             store: store,
             weight: 135
         )
-        store.savePlan(firstPlan)
-        store.savePlan(secondPlan)
+        store.send(.savePlan(firstPlan))
+        store.send(.savePlan(secondPlan))
 
         let firstTemplateID = try XCTUnwrap(firstPlan.templates.first?.id)
         let secondTemplateID = try XCTUnwrap(secondPlan.templates.first?.id)
 
-        store.startSession(planID: firstPlan.id, templateID: firstTemplateID)
-        store.startSession(planID: secondPlan.id, templateID: secondTemplateID)
+        store.send(.startSession(planID: firstPlan.id, templateID: firstTemplateID))
+        store.send(.startSession(planID: secondPlan.id, templateID: secondTemplateID))
 
         XCTAssertEqual(store.sessionStore.activeDraft?.templateID, firstTemplateID)
         XCTAssertEqual(store.sessionStore.activeDraft?.templateNameSnapshot, "Bench Day")
         XCTAssertNil(store.plansStore.plan(for: secondPlan.id)?.templates.first?.lastStartedAt)
 
-        store.replaceActiveSessionAndStart(planID: secondPlan.id, templateID: secondTemplateID)
+        store.send(.replaceActiveSessionAndStart(planID: secondPlan.id, templateID: secondTemplateID))
 
         XCTAssertEqual(store.sessionStore.activeDraft?.templateID, secondTemplateID)
         XCTAssertEqual(store.sessionStore.activeDraft?.templateNameSnapshot, "Press Day")

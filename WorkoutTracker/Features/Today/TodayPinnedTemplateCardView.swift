@@ -45,12 +45,12 @@ struct TodayPinnedTemplateCardView: View {
                         templateID: reference.templateID,
                         templateName: reference.templateName,
                         onResumeCurrent: {
-                            appStore.resumeActiveSession()
+                            appStore.send(.resumeActiveSession)
                         },
                         onStartNew: { planID, templateID in
                             Task { @MainActor in
                                 await appStore.preparePlanInteractionDataIfNeeded()
-                                appStore.startSession(planID: planID, templateID: templateID)
+                                appStore.send(.startSession(planID: planID, templateID: templateID))
                             }
                         }
                     )

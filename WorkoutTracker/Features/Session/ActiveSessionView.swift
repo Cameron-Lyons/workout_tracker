@@ -101,20 +101,20 @@ struct ActiveSessionView: View {
 
     private var actions: ActiveSessionActions {
         ActiveSessionActions(
-            addSet: { appStore.addSet(to: $0) },
-            copyLastSet: { appStore.copyLastSet(in: $0) },
+            addSet: { appStore.send(.addSet(blockID: $0)) },
+            copyLastSet: { appStore.send(.copyLastSet(blockID: $0)) },
             updateWeight: { blockID, setID, weight in
-                appStore.updateSetWeight(blockID: blockID, setID: setID, weight: weight)
+                appStore.send(.updateSetWeight(blockID: blockID, setID: setID, weight: weight))
             },
             updateReps: { blockID, setID, reps in
-                appStore.updateSetReps(blockID: blockID, setID: setID, reps: reps)
+                appStore.send(.updateSetReps(blockID: blockID, setID: setID, reps: reps))
             },
             toggleSetCompletion: { blockID, setID in
-                appStore.toggleSetCompletion(blockID: blockID, setID: setID)
+                appStore.send(.toggleSetCompletion(blockID: blockID, setID: setID))
             },
-            clearRest: { appStore.clearRestTimer() },
+            clearRest: { appStore.send(.clearRestTimer) },
             finishWorkout: {
-                if appStore.finishActiveSession() {
+                if appStore.send(.finishActiveSession) {
                     dismiss()
                 }
             }
@@ -155,7 +155,7 @@ struct ActiveSessionView: View {
 
                 ToolbarItemGroup(placement: .topBarTrailing) {
                     Button("Undo") {
-                        appStore.undoSessionMutation()
+                        appStore.send(.undoSessionMutation)
                     }
                     .disabled(sessionStore.canUndo == false)
 
@@ -164,7 +164,7 @@ struct ActiveSessionView: View {
                     }
 
                     Button("Discard", role: .destructive) {
-                        appStore.discardActiveSession()
+                        appStore.send(.discardActiveSession)
                         dismiss()
                     }
                 }
@@ -174,10 +174,10 @@ struct ActiveSessionView: View {
                     catalog: plansStore.catalog,
                     title: "Add Exercise",
                     onPick: { exercise in
-                        appStore.addExerciseToActiveSession(exerciseID: exercise.id)
+                        appStore.send(.addExerciseToActiveSession(exerciseID: exercise.id))
                     },
                     onCreateCustom: { customName in
-                        appStore.addCustomExerciseToActiveSession(name: customName)
+                        appStore.send(.addCustomExerciseToActiveSession(name: customName))
                     }
                 )
             }

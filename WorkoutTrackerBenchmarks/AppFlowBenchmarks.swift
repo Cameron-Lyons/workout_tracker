@@ -136,14 +136,14 @@ final class AppFlowBenchmarks: BenchmarkTestCase {
 
                 let store = self.makeBenchmarkAppStore(container: container)
                 await store.hydrateIfNeeded()
-                store.completeOnboarding(with: nil)
+                store.send(.completeOnboarding(nil))
                 XCTAssertFalse(store.plansStore.hasLoadedPlanLibrary)
                 XCTAssertEqual(store.plansStore.profiles.count, profiles.count)
                 return store
             },
             operation: { store in
-                store.startSession(planID: progressivePlan.id, templateID: template.id)
-                store.flushPendingSessionPersistence()
+                store.send(.startSession(planID: progressivePlan.id, templateID: template.id))
+                await store.flushPendingSessionPersistence()
 
                 XCTAssertEqual(store.sessionStore.activeDraft?.exercises.count, template.exercises.count)
                 XCTAssertEqual(store.plansStore.profiles.count, profiles.count)
@@ -165,10 +165,10 @@ final class AppFlowBenchmarks: BenchmarkTestCase {
             setup: {
                 let store = self.makeBenchmarkAppStore()
                 await store.hydrateIfNeeded()
-                store.completeOnboarding(with: nil)
-                store.savePlan(plan)
-                store.saveProfiles(profiles)
-                store.flushPendingPlanPersistence()
+                store.send(.completeOnboarding(nil))
+                store.send(.savePlan(plan))
+                store.send(.saveProfiles(profiles))
+                await store.flushPendingPlanPersistence()
 
                 let draft = WorkoutBenchmarkFixtures.completedDraft(
                     from: WorkoutBenchmarkFixtures.makeDraft(
@@ -178,13 +178,13 @@ final class AppFlowBenchmarks: BenchmarkTestCase {
                     )
                 )
                 store.sessionStore.beginSession(draft)
-                store.flushPendingSessionPersistence()
+                await store.flushPendingSessionPersistence()
                 return store
             },
             operation: { store in
-                XCTAssertTrue(store.finishActiveSession())
-                store.flushPendingPlanPersistence()
-                store.flushPendingSessionPersistence()
+                XCTAssertTrue(store.send(.finishActiveSession))
+                await store.flushPendingPlanPersistence()
+                await store.flushPendingSessionPersistence()
             }
         )
     }
@@ -219,7 +219,7 @@ final class AppFlowBenchmarks: BenchmarkTestCase {
 
                 let store = self.makeBenchmarkAppStore(container: container)
                 await store.hydrateIfNeeded()
-                store.completeOnboarding(with: nil)
+                store.send(.completeOnboarding(nil))
                 XCTAssertFalse(store.plansStore.hasLoadedPlanLibrary)
                 XCTAssertFalse(store.sessionStore.hasLoadedCompletedSessionHistory)
                 return store
@@ -385,16 +385,16 @@ final class AppFlowBenchmarks: BenchmarkTestCase {
         )
     }
 
-    func testSessionStoreMutateAndFlushActiveDraftLargeSession() {
-        benchmark(
+    func testSessionStoreMutateAndFlushActiveDraftLargeSession() async {
+        await benchmark(
             named: "Session store mutateActiveDraft + flush / large session",
             threshold: Thresholds.sessionStoreMutateAndFlushActiveDraftLargeSession,
             setup: {
-                self.makeSessionMutationBenchmarkFixture()
+                await self.makeSessionMutationBenchmarkFixture()
             },
             operation: { fixture in
                 let mutationCount = self.applyMutationBatch(to: fixture)
-                fixture.sessionStore.flushPendingDraftSave()
+                await fixture.sessionStore.flushPendingDraftSave()
 
                 XCTAssertGreaterThan(mutationCount, 0)
                 XCTAssertTrue(fixture.sessionStore.canUndo)
@@ -403,12 +403,12 @@ final class AppFlowBenchmarks: BenchmarkTestCase {
         )
     }
 
-    func testSessionStoreUndoLastMutationsLargeSession() {
-        benchmark(
+    func testSessionStoreUndoLastMutationsLargeSession() async {
+        await benchmark(
             named: "Session store undoLastMutation + flush / large session",
             threshold: Thresholds.sessionStoreUndoLastMutationsLargeSession,
             setup: {
-                let fixture = self.makeSessionMutationBenchmarkFixture()
+                let fixture = await self.makeSessionMutationBenchmarkFixture()
                 let mutationCount = self.applyMutationBatch(to: fixture)
                 return (fixture, mutationCount)
             },
@@ -418,7 +418,7 @@ final class AppFlowBenchmarks: BenchmarkTestCase {
                 for _ in 0..<mutationCount {
                     sessionFixture.sessionStore.undoLastMutation()
                 }
-                sessionFixture.sessionStore.flushPendingDraftSave()
+                await sessionFixture.sessionStore.flushPendingDraftSave()
 
                 XCTAssertFalse(sessionFixture.sessionStore.canUndo)
                 XCTAssertNotNil(sessionFixture.sessionStore.activeDraft)
@@ -448,7 +448,7 @@ final class AppFlowBenchmarks: BenchmarkTestCase {
         )
     }
 
-    private func makeSessionMutationBenchmarkFixture() -> SessionMutationBenchmarkFixture {
+    private func makeSessionMutationBenchmarkFixture() async -> SessionMutationBenchmarkFixture {
         let container = WorkoutModelContainerFactory.makeContainer(isStoredInMemoryOnly: true)
         let context = ModelContext(container)
         context.autosaveEnabled = false
@@ -466,7 +466,7 @@ final class AppFlowBenchmarks: BenchmarkTestCase {
             profiles: WorkoutBenchmarkFixtures.makeProfiles()
         )
         sessionStore.beginSession(draft)
-        sessionStore.flushPendingDraftSave()
+        await sessionStore.flushPendingDraftSave()
 
         let mutationTargets =
             sessionStore.activeDraft?.exercises.prefix(4).compactMap { block in

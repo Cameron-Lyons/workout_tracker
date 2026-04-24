@@ -76,14 +76,16 @@ struct WorkoutTrackerApp: App {
                             return
                         }
 
-                        appStore.syncRestTimerLiveActivity()
+                        appStore.send(.syncRestTimerLiveActivity)
                         Task {
                             await appStore.refreshDerivedStores()
                         }
 
                     case .inactive, .background:
-                        appStore.flushPendingSessionPersistence()
-                        appStore.flushPendingPlanPersistence()
+                        Task {
+                            await appStore.flushPendingSessionPersistence()
+                            await appStore.flushPendingPlanPersistence()
+                        }
 
                     @unknown default:
                         break
